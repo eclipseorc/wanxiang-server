@@ -2,17 +2,9 @@
 
 Go 实现的设备消息转发器与管理 API。HTTP 管理服务、WebSocket 转发服务独立运行；SQLite 持久化用户、设备、分组、授权关系、会话和审计信息。
 
-## 管理后台页面
+管理后台页面：启动 HTTP 服务后打开 `http://<server>:8080/`。页面由纯 HTML/CSS/JavaScript 构成，无需 Node 构建工具。
 
-启动 HTTP 服务后打开 `http://<server>:8080/`。页面由纯 HTML/CSS/JavaScript 构成，无需 Node 构建工具。登录后可查看设备、实时接收在线/离线/心跳事件、创建设备和用户、创建组、分配用户/设备到组、设置组访问权限，以及断开/启用设备和发起经设备端用户授权的屏幕共享。
-
-如果 WebSocket 服务和 HTTP 服务使用不同主机/端口，可在浏览器控制台设置 WS 地址：
-
-```js
-localStorage.setItem('wsBase', 'wss://relay.example.com')
-```
-
-然后刷新页面。服务端需把管理页面准确 Origin 配置到 `WS_ALLOWED_ORIGINS`。页面登录 token 保存在当前浏览器标签页的 `sessionStorage`；设备 token 创建后只显示一次，请安全保存。
+WebRTC 协议流程与消息样例见 [`docs/webrtc-client-flow.md`](docs/webrtc-client-flow.md)，包括设备授权、offer/answer、trickle ICE、会话清理、TURN 配置与测试步骤。屏幕采集必须经过 Android 系统 MediaProjection 授权；Go 服务只转发信令，不接收媒体帧。
 
 ## 运行
 
@@ -56,11 +48,5 @@ WebSocket Origin 必须与 `WS_ALLOWED_ORIGINS` 中某个值完全匹配；无 O
 - `POST /api/admin/devices/enable`：重新启用设备
 - `POST /api/admin/ws-ticket`：获取管理端一次性 WebSocket ticket
 - `POST /api/device/ws-ticket`：设备用长期设备令牌作为 Bearer 获取一次性 ticket，JSON `{"deviceId":"..."}`
-
-设备 WebSocket：`/ws/device?ticket=<one-time-ticket>`。管理 WebSocket：`/ws/admin?ticket=<one-time-ticket>`。WebRTC 屏幕采集必须经过 Android 系统 MediaProjection 授权；服务端只转发协商信令，不接收媒体帧。
-
-## 权限模型
-
-管理员拥有全部权限。普通用户只有在以下关系同时成立时才能查看设备：用户属于某用户组、设备属于某设备组、且 `group_access` 为这对组授予 `can_view`。断开/启用设备要求 `can_manage`；设置 `can_manage=true` 时服务端自动同时授予查看权限。每次查看、控制或实时状态推送都在服务端校验，不依赖前端界面权限。
 
 此版本是单 SQLite 主机、单转发节点、单全局观看会话的开发原型，不是多节点生产集群。上线前还需 TLS、速率限制、备份恢复、审计查询、密钥轮换及部署安全评估。
