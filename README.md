@@ -2,16 +2,17 @@
 
 Go 实现的设备消息转发器与管理 API。HTTP 管理服务、WebSocket 转发服务独立运行；SQLite 持久化用户、设备、分组、授权关系、会话和审计信息。
 
-## 本次实现
+## 管理后台页面
 
-- HTTP 与 WebSocket 进程通过共享 SQLite 会话表验证同一套登录身份。
-- 登录口令使用 bcrypt；登录 bearer token 只以 SHA-256 哈希保存并设置 12 小时有效期。
-- WebSocket 采用短时（60 秒）、单次使用 ticket；长期 bearer token 不放在 WebSocket URL。
-- 管理员可以创建用户、设备组、设备组成员关系和用户组到设备组的权限。
-- 服务端对设备列表、实时事件、观看请求和断开/启用操作逐次执行权限校验。
-- 设备在线、离线和状态变化通过管理 WebSocket 推送，不要求网页轮询。
-- 观看信令仅在经过授权的单个活跃观看会话内转发；服务端不接收媒体帧。
-- Android MediaProjection 必须由设备使用者按系统流程授权；不会静默采集或绕过系统授权。
+启动 HTTP 服务后打开 `http://<server>:8080/`。页面由纯 HTML/CSS/JavaScript 构成，无需 Node 构建工具。登录后可查看设备、实时接收在线/离线/心跳事件、创建设备和用户、创建组、分配用户/设备到组、设置组访问权限，以及断开/启用设备和发起经设备端用户授权的屏幕共享。
+
+如果 WebSocket 服务和 HTTP 服务使用不同主机/端口，可在浏览器控制台设置 WS 地址：
+
+```js
+localStorage.setItem('wsBase', 'wss://relay.example.com')
+```
+
+然后刷新页面。服务端需把管理页面准确 Origin 配置到 `WS_ALLOWED_ORIGINS`。页面登录 token 保存在当前浏览器标签页的 `sessionStorage`；设备 token 创建后只显示一次，请安全保存。
 
 ## 运行
 
@@ -32,12 +33,12 @@ go run ./cmd/http-server
 ```sh
 export DB_PATH=./data/wanxiang.db
 export WS_ADDR=:8081
-# 浏览器管理后台部署时设为精确的 Origin，例如 https://console.example.com
-export WS_ALLOWED_ORIGINS=https://console.example.com
-go run ./cmd/websocket-server
+export WS_ALLOWED_ORIGINS=http://localhost:8080
+# 正式部署使用 HTTPS/WSS，并设置实际管理页面 Origin
+ go run ./cmd/websocket-server
 ```
 
-本机命令行/原生 App 不带 `Origin` 可连接。浏览器 WebSocket 的 Origin 必须与 `WS_ALLOWED_ORIGINS` 中某个值完全匹配。生产环境必须通过 TLS/WSS 暴露服务。
+WebSocket Origin 必须与 `WS_ALLOWED_ORIGINS` 中某个值完全匹配；无 Origin 的原生客户端可连接。生产环境必须通过 TLS/WSS 暴露服务。
 
 ## API
 
@@ -56,7 +57,7 @@ go run ./cmd/websocket-server
 - `POST /api/admin/ws-ticket`：获取管理端一次性 WebSocket ticket
 - `POST /api/device/ws-ticket`：设备用长期设备令牌作为 Bearer 获取一次性 ticket，JSON `{"deviceId":"..."}`
 
-设备 WebSocket：`/ws/device?ticket=<one-time-ticket>`。管理 WebSocket：`/ws/admin?ticket=<one-time-ticket>`。WS 协议和 WebRTC 信令见 [`docs/protocol-v1.md`](docs/protocol-v1.md)。
+设备 WebSocket：`/ws/device?ticket=<one-time-ticket>`。管理 WebSocket：`/ws/admin?ticket=<one-time-ticket>`。WebRTC 屏幕采集必须经过 Android 系统 MediaProjection 授权；服务端只转发协商信令，不接收媒体帧。
 
 ## 权限模型
 
