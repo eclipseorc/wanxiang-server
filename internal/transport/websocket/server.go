@@ -16,11 +16,15 @@ import (
 )
 
 const (
+	// writeWait 是写出 JSON 时给单次写操作的超时时间，防止连接卡住导致 goroutine 堵死。
 	writeWait = 10 * time.Second
-	pongWait  = 70 * time.Second
+	// pongWait 是客户端发来 Pong 或服务端读到消息时允许的最长空闲时间。
+	pongWait = 70 * time.Second
+	// pingEvery 是服务端定期发送 WebSocket 控制帧 Ping 的时间间隔。
 	pingEvery = 55 * time.Second
 )
 
+// client 表示一个已升级的单连接客户端，既可能是设备端，也可能是管理端。
 type client struct {
 	conn *websocket.Conn
 	mu   sync.Mutex
@@ -30,10 +34,12 @@ type client struct {
 	once sync.Once
 }
 
+// newClient 创建一个底层 WebSocket 连接对象，并记录它的角色和主体 ID。
 func newClient(conn *websocket.Conn, kind, id string) *client {
 	return &client{conn: conn, kind: kind, id: id, done: make(chan struct{})}
 }
 
+// send 统一发 JSON 消息，并在发送前设置写超时，避免长时间卡住。
 func (c *client) send(value any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -41,6 +47,7 @@ func (c *client) send(value any) error {
 	return c.conn.WriteJSON(value)
 }
 
+// close 安全关闭连接：只允许首次调用关闭，避免重复 close 造成 panic。
 func (c *client) close() {
 	c.once.Do(func() {
 		close(c.done)
@@ -48,19 +55,24 @@ func (c *client) close() {
 	})
 }
 
+// Hub 是 WebSocket 中枢，保存设备连接、管理员连接和当前监看会话状态。
 type Hub struct {
 	store *sqlite.Store
 	mu    sync.RWMutex
 
+	// devices 表示当前在线的设备连接，以 deviceID 为键。
 	devices map[string]*client
-	admins  map[*client]sqlite.User
+	// admins 表示当前在线的管理员连接，key 是客户端对象本身。
+	admins map[*client]sqlite.User
 
+	// watchMu 保护 watch 相关全局状态；viewer 表示当前正在看设备的管理员客户端。
 	watchMu   sync.Mutex
 	viewer    *client
 	sessionID string
 	deviceID  string
 }
 
+// NewHub 创建一个新的 WebSocket 中枢，并在内存中保留设备/管理员连接映射。
 func NewHub(store *sqlite.Store) *Hub {
 	return &Hub{
 		store:   store,
@@ -69,10 +81,13 @@ func NewHub(store *sqlite.Store) *Hub {
 	}
 }
 
+// Handler 负责把 HTTP 请求升级成 WebSocket 连接，并把来自设备/管理员的消息交给对应处理函数。
 type Handler struct{ hub *Hub }
 
+// NewHandler 创建 WebSocket 处理器。
 func NewHandler(hub *Hub) *Handler { return &Handler{hub: hub} }
 
+// ServeMux 注册设备端和管理员端的 WebSocket 路由。
 func (h *Handler) ServeMux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/device", h.device)
@@ -86,6 +101,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     originAllowed,
 }
 
+// originAllowed 用于限制 WebSocket 来源，避免跨站请求被接受。
 func originAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
@@ -100,6 +116,7 @@ func originAllowed(r *http.Request) bool {
 	return false
 }
 
+// upgrade 使用一次性 ticket 完成 WebSocket 握手，并确保只有合法设备/管理员才可连接。
 func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request, kind string) (*client, error) {
 	rawTicket := r.URL.Query().Get("ticket")
 	if rawTicket == "" {
@@ -125,6 +142,7 @@ func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request, kind string) (
 	return newClient(conn, kind, ticket.SubjectID), nil
 }
 
+// device 是设备端 WebSocket 入口：连接成功后记录在线状态，并开始读取设备消息。
 func (h *Handler) device(w http.ResponseWriter, r *http.Request) {
 	c, err := h.upgrade(w, r, "device")
 	if err != nil {
@@ -167,6 +185,7 @@ func (h *Handler) device(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// admin 是管理员 WebSocket 入口：登录后推送设备快照，并持续处理管理指令。
 func (h *Handler) admin(w http.ResponseWriter, r *http.Request) {
 	c, err := h.upgrade(w, r, "admin")
 	if err != nil {
@@ -201,6 +220,7 @@ func (h *Handler) admin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pingLoop 是 WebSocket 控制帧 heartbeat 管理器；只负责连接保活，不负责业务命令。
 func (h *Handler) pingLoop(c *client) {
 	ticker := time.NewTicker(pingEvery)
 	defer ticker.Stop()
@@ -221,6 +241,7 @@ func (h *Handler) pingLoop(c *client) {
 	}
 }
 
+// removeDevice 在设备断开时清理在线状态、广播离线事件，并释放正在进行的 watch。
 func (h *Handler) removeDevice(c *client) {
 	h.hub.mu.Lock()
 	current := h.hub.devices[c.id] == c
@@ -237,6 +258,7 @@ func (h *Handler) removeDevice(c *client) {
 	c.close()
 }
 
+// removeAdmin 在管理员断开时移除管理员映射，并结束这位管理员持有的观看会话。
 func (h *Handler) removeAdmin(c *client) {
 	h.hub.mu.Lock()
 	delete(h.hub.admins, c)
@@ -252,6 +274,7 @@ func (h *Handler) removeAdmin(c *client) {
 	c.close()
 }
 
+// handleDevice 处理设备端消息；设备消息通常是心跳、状态上报、WebRTC 信令或命令回执。
 func (h *Handler) handleDevice(c *client, message map[string]any) {
 	switch message["type"] {
 	case commandType:
@@ -280,9 +303,7 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 	case "command-result":
 		h.hub.broadcastDevice(c.id, "command-result", message)
 	case "watch-ready", "watch-denied", "watch-stopped", "offer", "answer", "candidate":
-		h.hub.watchMu.Lock()
-		viewer, sessionID, deviceID := h.hub.viewer, h.hub.sessionID, h.hub.deviceID
-		h.hub.watchMu.Unlock()
+		h.hub.watchMu.Lock(); viewer, sessionID, deviceID := h.hub.viewer, h.hub.sessionID, h.hub.deviceID; h.hub.watchMu.Unlock()
 		if viewer == nil || deviceID != c.id || sessionID == "" || message["sessionId"] != sessionID {
 			return
 		}
@@ -293,6 +314,7 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 	}
 }
 
+// sendSnapshot 把当前管理员可见的设备列表一次性发给客户端，方便浏览器初始化状态。
 func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	devices, err := h.hub.store.ListDevices()
 	if err != nil {
@@ -313,6 +335,7 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	_ = c.send(map[string]any{"type": "device-list", "devices": visible})
 }
 
+// handleAdmin 处理管理员端消息：包括权限校验、启动 watch、转发 WebRTC 信令、发送 com 命令。
 func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]any) {
 	switch message["type"] {
 	case commandType:
@@ -376,6 +399,7 @@ func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]an
 	}
 }
 
+// handleCommand 负责把 message 解析为统一的 CommandMessage，再调用命令分发器处理。
 func (h *Handler) handleCommand(c *client, raw map[string]any) {
 	encoded, err := json.Marshal(raw)
 	if err != nil {
@@ -393,6 +417,7 @@ func (h *Handler) handleCommand(c *client, raw map[string]any) {
 	}
 }
 
+// endWatch 结束当前全局 watch 会话，通知双方连接，释放全局状态，并写入审计日志。
 func (h *Hub) endWatch(sessionID string) {
 	if sessionID == "" {
 		return
@@ -419,6 +444,7 @@ func (h *Hub) endWatch(sessionID string) {
 	_ = h.store.Audit("system", "watch-ended", deviceID, sessionID)
 }
 
+// endWatchForDevice 用于设备断开或被禁用时，自动结束这个设备对应的 watch 会话。
 func (h *Hub) endWatchForDevice(id string) {
 	h.watchMu.Lock()
 	sessionID, deviceID := h.sessionID, h.deviceID
@@ -428,6 +454,7 @@ func (h *Hub) endWatchForDevice(id string) {
 	}
 }
 
+// broadcastDevice 把设备状态广播给所有有权限查看该设备的管理员。
 func (h *Hub) broadcastDevice(id, messageType string, data any) {
 	event := map[string]any{"type": messageType, "deviceId": id, "data": data}
 	h.hubAdminSnapshot(func(c *client, user sqlite.User) {
@@ -438,6 +465,7 @@ func (h *Hub) broadcastDevice(id, messageType string, data any) {
 	})
 }
 
+// hubAdminSnapshot 遍历当前所有管理员连接，并对每个管理员执行访问检查回调。
 func (h *Hub) hubAdminSnapshot(fn func(*client, sqlite.User)) {
 	h.mu.RLock()
 	admins := make([]struct {
@@ -456,6 +484,7 @@ func (h *Hub) hubAdminSnapshot(fn func(*client, sqlite.User)) {
 	}
 }
 
+// RunControlPoller 按固定频率轮询 SQLite 中待处理的控制事件，并同步到在线设备状态。
 func (h *Hub) RunControlPoller(stop <-chan struct{}) {
 	ticker := time.NewTicker(400 * time.Millisecond)
 	defer ticker.Stop()
@@ -479,6 +508,7 @@ func (h *Hub) RunControlPoller(stop <-chan struct{}) {
 	}
 }
 
+// applyEvent 根据控制事件类型执行操作：例如断开设备、广播设备状态或清理 watch。
 func (h *Hub) applyEvent(event sqlite.ControlEvent) {
 	h.mu.RLock()
 	device := h.devices[event.DeviceID]
@@ -493,6 +523,7 @@ func (h *Hub) applyEvent(event sqlite.ControlEvent) {
 	h.broadcastDevice(event.DeviceID, "device-admin-state", map[string]string{"state": event.Kind})
 }
 
+// intValue 把接口层读取的任意值统一转换成 int，兼容 float64 / int / int64 等类型。
 func intValue(value any) int {
 	switch v := value.(type) {
 	case float64:
@@ -506,6 +537,7 @@ func intValue(value any) int {
 	}
 }
 
+// newSessionID 生成一次性的 watch 会话 ID，用于单次监看请求的全局唯一标识。
 func newSessionID() string {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
