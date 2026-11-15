@@ -10,9 +10,8 @@ import (
 	"strings"
 )
 
-// Load reads path and adds its values to the process environment.
-// Existing environment variables take precedence over values in the file.
-// A missing file is allowed so deployments can configure the process directly.
+// Load 读取配置文件并将变量写入进程环境；同名的系统环境变量优先保留。
+// 文件不存在时不报错，调用方可以继续使用默认值或部署环境提供的变量。
 func Load(path string) error {
 	file, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -24,12 +23,13 @@ func Load(path string) error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	// Allow longer values (such as URLs or secrets) than Scanner's default limit.
+	// 扩大单行限制，以支持较长的 URL、证书内容或密钥配置。
 	scanner.Buffer(make([]byte, 4096), 1024*1024)
 	lineNumber := 0
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
+		// 空行和注释行不参与配置解析。
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -44,6 +44,7 @@ func Load(path string) error {
 		if err != nil {
 			return fmt.Errorf("env file line %d: %w", lineNumber, err)
 		}
+		// 不覆盖操作系统或启动脚本显式设置的环境变量。
 		if _, exists := os.LookupEnv(key); exists {
 			continue
 		}
@@ -57,7 +58,7 @@ func Load(path string) error {
 	return nil
 }
 
-// String returns the non-empty environment value, or fallback otherwise.
+// String 返回非空环境变量；变量不存在或为空时返回 fallback。
 func String(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -65,6 +66,7 @@ func String(key, fallback string) string {
 	return fallback
 }
 
+// validKey 检查变量名是否符合常见环境变量命名规则。
 func validKey(key string) bool {
 	if key == "" {
 		return false
@@ -78,6 +80,7 @@ func validKey(key string) bool {
 	return true
 }
 
+// parseValue 去掉未加引号值的首尾空格，并解析单引号或双引号包裹的值。
 func parseValue(value string) (string, error) {
 	if value == "" {
 		return "", nil

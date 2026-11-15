@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// 测试 ping 成功返回 pong，并原样保留请求编号和客户端时间戳。
 func TestDispatchPingReturnsPong(t *testing.T) {
 	message := CommandMessage{
 		Type:      commandType,
@@ -29,6 +30,7 @@ func TestDispatchPingReturnsPong(t *testing.T) {
 	}
 }
 
+// 测试服务端拒绝未列入白名单的命令，并返回可关联的错误响应。
 func TestDispatchRejectsUnknownCommand(t *testing.T) {
 	response := dispatchCommand(CommandMessage{
 		Type:      commandType,
@@ -47,6 +49,7 @@ func TestDispatchRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
+// 测试 ping 的 data 格式不正确时会返回 invalid_command，而不是崩溃。
 func TestDispatchRejectsMalformedPing(t *testing.T) {
 	response := dispatchCommand(CommandMessage{
 		Type:    commandType,

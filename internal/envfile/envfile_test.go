@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// 文件配置可读取普通值和引号值，但必须保留进程中已存在的环境变量。
 func TestLoadReadsValuesAndPreservesExistingEnvironment(t *testing.T) {
 	const existingKey = "WANXIANG_ENVFILE_EXISTING_TEST"
 	t.Setenv(existingKey, "process-value")
@@ -29,12 +30,14 @@ func TestLoadReadsValuesAndPreservesExistingEnvironment(t *testing.T) {
 	}
 }
 
+// 开发环境未创建 .env 时应允许程序继续使用默认配置。
 func TestLoadMissingFileIsOptional(t *testing.T) {
 	if err := Load(filepath.Join(t.TempDir(), "missing.env")); err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 }
 
+// 格式错误的配置行应带错误返回，避免静默忽略拼写问题。
 func TestLoadRejectsMalformedLine(t *testing.T) {
 	file := filepath.Join(t.TempDir(), ".env")
 	if err := os.WriteFile(file, []byte("not a variable\n"), 0600); err != nil {
