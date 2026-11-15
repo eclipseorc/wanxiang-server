@@ -49,8 +49,9 @@ func (c *client) close() {
 }
 
 type Hub struct {
-	store   *sqlite.Store
-	mu      sync.RWMutex
+	store *sqlite.Store
+	mu    sync.RWMutex
+
 	devices map[string]*client
 	admins  map[*client]sqlite.User
 
@@ -70,9 +71,7 @@ func NewHub(store *sqlite.Store) *Hub {
 
 type Handler struct{ hub *Hub }
 
-func NewHandler(hub *Hub) *Handler {
-	return &Handler{hub: hub}
-}
+func NewHandler(hub *Hub) *Handler { return &Handler{hub: hub} }
 
 func (h *Handler) ServeMux() http.Handler {
 	mux := http.NewServeMux()
@@ -93,7 +92,8 @@ func originAllowed(r *http.Request) bool {
 		return true
 	}
 	for _, allowed := range strings.Split(os.Getenv("WS_ALLOWED_ORIGINS"), ",") {
-		if strings.TrimSpace(allowed) != "" && strings.TrimSpace(allowed) == origin {
+		allowed = strings.TrimSpace(allowed)
+		if allowed != "" && allowed == origin {
 			return true
 		}
 	}
@@ -228,7 +228,6 @@ func (h *Handler) removeDevice(c *client) {
 		delete(h.hub.devices, c.id)
 	}
 	h.hub.mu.Unlock()
-
 	if current {
 		_ = h.hub.store.SetOnline(c.id, false)
 		h.hub.broadcastDevice(c.id, "device-offline", nil)
@@ -255,13 +254,13 @@ func (h *Handler) removeAdmin(c *client) {
 
 func (h *Handler) handleDevice(c *client, message map[string]any) {
 	switch message["type"] {
+	case commandType:
+		h.handleCommand(c, message)
 	case "join":
 		_ = c.send(map[string]string{"type": "joined", "deviceId": c.id})
 	case "out":
 		_ = c.send(map[string]string{"type": "out-ack"})
 		c.close()
-	case commandType:
-		h.handleCommand(c, message)
 	case "heartbeat":
 		battery := intValue(message["battery"])
 		if battery < 0 || battery > 100 {
@@ -318,7 +317,7 @@ func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]an
 	switch message["type"] {
 	case commandType:
 		h.handleCommand(c, message)
-	case "ping": // Retain compatibility with clients using the original heartbeat envelope.
+	case "ping":
 		_ = c.send(map[string]any{"type": "pong", "sentAt": message["sentAt"]})
 	case "watch":
 		deviceID, _ := message["deviceId"].(string)
@@ -398,41 +397,41 @@ func (h *Hub) endWatch(sessionID string) {
 	if sessionID == "" {
 		return
 	}
-	h.hub.watchMu.Lock()
-	if h.hub.sessionID != sessionID {
-		h.hub.watchMu.Unlock()
+	h.watchMu.Lock()
+	if h.sessionID != sessionID {
+		h.watchMu.Unlock()
 		return
 	}
-	viewer, deviceID := h.hub.viewer, h.hub.deviceID
-	h.hub.viewer, h.hub.deviceID, h.hub.sessionID = nil, "", ""
-	h.hub.watchMu.Unlock()
+	viewer, deviceID := h.viewer, h.deviceID
+	h.viewer, h.deviceID, h.sessionID = nil, "", ""
+	h.watchMu.Unlock()
 
-	_ = h.hub.store.EndWatch(sessionID)
+	_ = h.store.EndWatch(sessionID)
 	if viewer != nil {
 		_ = viewer.send(map[string]string{"type": "watch-ended", "sessionId": sessionID})
 	}
-	h.hub.mu.RLock()
-	device := h.hub.devices[deviceID]
-	h.hub.mu.RUnlock()
+	h.mu.RLock()
+	device := h.devices[deviceID]
+	h.mu.RUnlock()
 	if device != nil {
 		_ = device.send(map[string]string{"type": "watch-stop", "sessionId": sessionID})
 	}
-	_ = h.hub.store.Audit("system", "watch-ended", deviceID, sessionID)
+	_ = h.store.Audit("system", "watch-ended", deviceID, sessionID)
 }
 
 func (h *Hub) endWatchForDevice(id string) {
-	h.hub.watchMu.Lock()
-	sessionID, deviceID := h.hub.sessionID, h.hub.deviceID
-	h.hub.watchMu.Unlock()
+	h.watchMu.Lock()
+	sessionID, deviceID := h.sessionID, h.deviceID
+	h.watchMu.Unlock()
 	if id == deviceID {
-		h.hub.endWatch(sessionID)
+		h.endWatch(sessionID)
 	}
 }
 
 func (h *Hub) broadcastDevice(id, messageType string, data any) {
 	event := map[string]any{"type": messageType, "deviceId": id, "data": data}
 	h.hubAdminSnapshot(func(c *client, user sqlite.User) {
-		allowed, err := h.hub.store.CanAccess(user.ID, id, false)
+		allowed, err := h.store.CanAccess(user.ID, id, false)
 		if err == nil && allowed {
 			_ = c.send(event)
 		}
@@ -440,18 +439,18 @@ func (h *Hub) broadcastDevice(id, messageType string, data any) {
 }
 
 func (h *Hub) hubAdminSnapshot(fn func(*client, sqlite.User)) {
-	h.hub.mu.RLock()
+	h.mu.RLock()
 	admins := make([]struct {
 		client *client
 		user   sqlite.User
-	}, 0, len(h.hub.admins))
-	for c, user := range h.hub.admins {
+	}, 0, len(h.admins))
+	for c, user := range h.admins {
 		admins = append(admins, struct {
 			client *client
 			user   sqlite.User
-		}{c, user})
+		}{client: c, user: user})
 	}
-	h.hub.mu.RUnlock()
+	h.mu.RUnlock()
 	for _, admin := range admins {
 		fn(admin.client, admin.user)
 	}
@@ -465,14 +464,14 @@ func (h *Hub) RunControlPoller(stop <-chan struct{}) {
 		case <-stop:
 			return
 		case <-ticker.C:
-			events, err := h.hub.store.PendingEvents()
+			events, err := h.store.PendingEvents()
 			if err != nil {
 				log.Printf("control event poll failed: %v", err)
 				continue
 			}
 			for _, event := range events {
 				h.applyEvent(event)
-				if err := h.hub.store.MarkEvent(event.ID); err != nil {
+				if err := h.store.MarkEvent(event.ID); err != nil {
 					log.Printf("mark control event processed failed event_id=%d: %v", event.ID, err)
 				}
 			}
@@ -481,10 +480,9 @@ func (h *Hub) RunControlPoller(stop <-chan struct{}) {
 }
 
 func (h *Hub) applyEvent(event sqlite.ControlEvent) {
-	h.hub.mu.RLock()
-	device := h.hub.devices[event.DeviceID]
-	h.hub.mu.RUnlock()
-
+	h.mu.RLock()
+	device := h.devices[event.DeviceID]
+	h.mu.RUnlock()
 	if event.Kind == "disconnect" {
 		if device != nil {
 			_ = device.send(map[string]string{"type": "disconnect", "reason": "admin"})
@@ -496,22 +494,22 @@ func (h *Hub) applyEvent(event sqlite.ControlEvent) {
 }
 
 func intValue(value any) int {
-	switch number := value.(type) {
+	switch v := value.(type) {
 	case float64:
-		return int(number)
+		return int(v)
 	case int:
-		return number
+		return v
 	case int64:
-		return int(number)
+		return int(v)
 	default:
 		return 0
 	}
 }
 
 func newSessionID() string {
-	value := make([]byte, 16)
-	if _, err := rand.Read(value); err != nil {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
 		return time.Now().UTC().Format("20060102T150405.000000000")
 	}
-	return hex.EncodeToString(value)
+	return hex.EncodeToString(buf)
 }
