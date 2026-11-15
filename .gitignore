@@ -1,0 +1,10 @@
+# Local environment settings and secrets
+.env
+
+# Go build/test output
+/bin/
+*.test
+
+# Android/IDE or local editor output if this repository is opened as a workspace
+.vscode/
+.idea/
