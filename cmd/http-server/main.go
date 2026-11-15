@@ -84,8 +84,9 @@ func run() error {
 	}
 }
 
-// dashboardHandler injects the standalone heartbeat script into the static page,
-// keeping the dashboard HTML independent from server-side template processing.
+// dashboardHandler injects the transport framework before the inline dashboard
+// script creates a socket, then loads the heartbeat plugin after the dashboard's
+// own ws variable and connection functions have been initialized.
 func dashboardHandler(webDir string) http.Handler {
 	files := http.FileServer(http.Dir(webDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,14 +101,18 @@ func dashboardHandler(webDir string) http.Handler {
 			http.Error(w, "dashboard unavailable", http.StatusInternalServerError)
 			return
 		}
+
+		content := string(page)
+		const closingHead = "</head>"
 		const closingBody = "</body>"
-		injected := `<script src="/admin-heartbeat.js"></script></body>`
-		if !strings.Contains(string(page), closingBody) {
-			http.Error(w, "dashboard index is missing closing body tag", http.StatusInternalServerError)
+		if !strings.Contains(content, closingHead) || !strings.Contains(content, closingBody) {
+			http.Error(w, "dashboard index is missing closing head/body tag", http.StatusInternalServerError)
 			return
 		}
+		content = strings.Replace(content, closingHead, `<script src="/ws-framework.js"></script></head>`, 1)
+		content = strings.Replace(content, closingBody, `<script src="/admin-heartbeat.js"></script></body>`, 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(strings.Replace(string(page), closingBody, injected, 1)))
+		_, _ = w.Write([]byte(content))
 	})
 }
 
