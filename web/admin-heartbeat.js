@@ -1,6 +1,6 @@
 /*
- * 管理端心跳插件：只依赖通用 WanxiangWS API，不直接持有 WebSocket。
- * 以后新增业务应以插件方式注册消息/命令处理器，避免在传输框架里堆业务分支。
+ * 管理端心跳插件：通过 WanxiangWS 发送和接收命令，不直接操作 socket。
+ * 这与设备业务命令分离；未来可以独立替换为监控、状态查询等插件。
  */
 (() => {
   'use strict';
@@ -31,8 +31,7 @@
     }, responseTimeout);
 
     pending.set(requestId, { sentAt, timeout });
-    const sentRequestId = wsAPI.sendCommand('ping', { sentAt }, { socket: activeSocket, requestId });
-    if (!sentRequestId) {
+    if (!wsAPI.sendCommand('ping', { sentAt }, { socket: activeSocket, requestId })) {
       clearTimeout(timeout);
       pending.delete(requestId);
       return;
@@ -40,27 +39,26 @@
     console.info('[admin-heartbeat] sent com/ping', { requestId });
   }
 
-  // pong 是心跳插件负责的命令；其他 com 命令由各自插件处理。
   wsAPI.registerCommand('pong', message => {
-    const requestId = message.requestId;
-    const request = pending.get(requestId);
-    if (!request) return;
-
+    const request = pending.get(message.requestId);
+    if (!request) return true;
     clearTimeout(request.timeout);
-    pending.delete(requestId);
+    pending.delete(message.requestId);
     lastPongAt = Date.now();
     const latency = Math.max(0, lastPongAt - request.sentAt);
     if (status) status.textContent = `实时已连接 · ping ${latency} ms`;
-    console.info('[admin-heartbeat] received com/pong', { requestId, latencyMs: latency });
+    console.info('[admin-heartbeat] received com/pong', { requestId: message.requestId, latencyMs: latency });
+    return true;
   });
 
   wsAPI.registerCommand('error', message => {
-    console.warn('[admin-heartbeat] server command error', message.data);
     const request = pending.get(message.requestId);
     if (request) {
       clearTimeout(request.timeout);
       pending.delete(message.requestId);
     }
+    console.warn('[admin-heartbeat] command error', message.data);
+    return false;
   });
 
   wsAPI.onConnectionChange(({ socket, state }) => {
@@ -72,13 +70,11 @@
       sendPing();
       timer = setInterval(() => {
         if (!activeSocket || activeSocket.readyState !== WebSocket.OPEN) return;
-        // 超时后仍继续发心跳，方便恢复后重新显示 RTT。
         const hasPending = [...pending.values()].some(item => Date.now() - item.sentAt < responseTimeout);
         if (!hasPending && Date.now() - (lastPongAt || 0) >= heartbeatInterval) sendPing();
       }, 1000);
       return;
     }
-
     if (socket === activeSocket && (state === 'close' || state === 'error')) {
       activeSocket = null;
       if (timer) clearInterval(timer);

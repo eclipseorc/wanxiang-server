@@ -85,8 +85,8 @@ func run() error {
 }
 
 // dashboardHandler injects the transport framework before the inline dashboard
-// script creates a socket, then loads the heartbeat plugin after the dashboard's
-// own ws variable and connection functions have been initialized.
+// script creates a socket, then loads the bridge and feature modules after the
+// page's existing functions have initialized.
 func dashboardHandler(webDir string) http.Handler {
 	files := http.FileServer(http.Dir(webDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,8 @@ func dashboardHandler(webDir string) http.Handler {
 			return
 		}
 		content = strings.Replace(content, closingHead, `<script src="/ws-framework.js"></script></head>`, 1)
-		content = strings.Replace(content, closingBody, `<script src="/admin-heartbeat.js"></script></body>`, 1)
+		const modules = `<script src="/admin-dashboard-bridge.js"></script><script src="/modules/device-events.js"></script><script src="/modules/watch-events.js"></script><script src="/admin-heartbeat.js"></script></body>`
+		content = strings.Replace(content, closingBody, modules, 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(content))
 	})
