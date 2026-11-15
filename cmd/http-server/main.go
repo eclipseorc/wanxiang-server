@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,7 +29,9 @@ func run() error {
 		return err
 	}
 
-	db, err := sqlite.Open(envfile.String("DB_PATH", "./data/wanxiang.db"))
+	dbPath := envfile.String("DB_PATH", "./data/wanxiang.db")
+	log.Printf("opening SQLite database: %s", dbPath)
+	db, err := sqlite.Open(dbPath)
 	if err != nil {
 		return err
 	}
@@ -45,14 +48,16 @@ func run() error {
 	); err != nil {
 		return err
 	}
+	log.Printf("administrator account is ready")
 
+	webDir := envfile.String("WEB_DIR", "./web")
 	mux := http.NewServeMux()
 	mux.Handle("/api/", httpapi.New(service).Handler())
-	mux.Handle("/", http.FileServer(http.Dir(envfile.String("WEB_DIR", "./web"))))
+	mux.Handle("/", dashboardHandler(webDir))
 
 	server := &http.Server{
 		Addr:              envfile.String("HTTP_ADDR", ":8080"),
-		Handler:           mux,
+		Handler:           logRequests("http-api", mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -72,8 +77,47 @@ func run() error {
 		}
 		return err
 	case <-ctx.Done():
+		log.Printf("shutting down HTTP server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return server.Shutdown(shutdownCtx)
 	}
+}
+
+// dashboardHandler injects the standalone heartbeat script into the static page,
+// keeping the dashboard HTML independent from server-side template processing.
+func dashboardHandler(webDir string) http.Handler {
+	files := http.FileServer(http.Dir(webDir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" || r.Method != http.MethodGet {
+			files.ServeHTTP(w, r)
+			return
+		}
+
+		page, err := os.ReadFile(webDir + string(os.PathSeparator) + "index.html")
+		if err != nil {
+			log.Printf("read dashboard index: %v", err)
+			http.Error(w, "dashboard unavailable", http.StatusInternalServerError)
+			return
+		}
+		const closingBody = "</body>"
+		injected := `<script src="/admin-heartbeat.js"></script></body>`
+		if !strings.Contains(string(page), closingBody) {
+			http.Error(w, "dashboard index is missing closing body tag", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(strings.Replace(string(page), closingBody, injected, 1)))
+	})
+}
+
+// logRequests logs request metadata but deliberately excludes query strings,
+// which may contain short-lived WebSocket tickets.
+func logRequests(service string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		log.Printf("%s request started method=%s path=%s remote=%s", service, r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+		log.Printf("%s request completed method=%s path=%s duration=%s", service, r.Method, r.URL.Path, time.Since(started).Round(time.Millisecond))
+	})
 }

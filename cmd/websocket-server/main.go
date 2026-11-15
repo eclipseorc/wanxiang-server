@@ -27,7 +27,9 @@ func run() error {
 		return err
 	}
 
-	db, err := sqlite.Open(envfile.String("DB_PATH", "./data/wanxiang.db"))
+	dbPath := envfile.String("DB_PATH", "./data/wanxiang.db")
+	log.Printf("opening SQLite database: %s", dbPath)
+	db, err := sqlite.Open(dbPath)
 	if err != nil {
 		return err
 	}
@@ -45,7 +47,7 @@ func run() error {
 	hub := wsserver.NewHub(store)
 	server := &http.Server{
 		Addr:              envfile.String("WS_ADDR", ":8081"),
-		Handler:           wsserver.NewHandler(hub).ServeMux(),
+		Handler:           logRequests("websocket", wsserver.NewHandler(hub).ServeMux()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -72,6 +74,7 @@ func run() error {
 			return err
 		}
 	case <-ctx.Done():
+		log.Printf("shutting down WebSocket relay")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -81,4 +84,16 @@ func run() error {
 	}
 	<-pollerDone
 	return nil
+}
+
+// logRequests reports WebSocket upgrade attempts without logging query strings,
+// which can contain one-use authentication tickets. The start log appears as soon
+// as the client connects; the completion log appears when that socket closes.
+func logRequests(service string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		log.Printf("%s request started method=%s path=%s remote=%s", service, r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+		log.Printf("%s request completed method=%s path=%s duration=%s", service, r.Method, r.URL.Path, time.Since(started).Round(time.Millisecond))
+	})
 }
