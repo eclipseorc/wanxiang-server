@@ -1,10 +1,26 @@
 # Local environment settings and secrets
 .env
+.env.*
+!.env.example
 
-# Go build/test output
+# SQLite database and WAL/SHM sidecars contain password hashes, session
+# token hashes and audit records. Never commit them.
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Go build/test/coverage output
 /bin/
 *.test
+*.out
+coverage.*
 
-# Android/IDE or local editor output if this repository is opened as a workspace
+# OS and local editor output
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
+
+# Local agent workspace data (work logs, session state) — not project source
+.workbuddy/

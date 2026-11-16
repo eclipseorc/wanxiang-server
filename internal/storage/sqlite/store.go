@@ -23,32 +23,26 @@ type User struct {
 }
 
 type Device struct {
-	ID       string
-	Name     string
-	Status   string
-	Enabled  bool
-	Online   bool
-	LastSeen int64
-	Battery  int
-	RTTMS    int64
-	GroupIDs []string
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Model    string   `json:"model"`
+	Status   string   `json:"status"`
+	Enabled  bool     `json:"enabled"`
+	Online   bool     `json:"online"`
+	LastSeen int64    `json:"lastSeen"`
+	Battery  int      `json:"battery"`
+	RTTMS    int64    `json:"rttMs"`
+	GroupIDs []string `json:"groupIds"`
 }
 
 type Group struct {
-	ID   string
-	Name string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type Ticket struct {
 	Type      string
 	SubjectID string
-}
-
-type ControlEvent struct {
-	ID       int64
-	Kind     string
-	DeviceID string
-	ActorID  string
 }
 
 // NewStore creates a Store backed by db.
@@ -62,9 +56,11 @@ func Hash(value string) string {
 }
 
 func (s *Store) CreateUser(id, username, passwordHash, role string) error {
+	// users.created_at 是 TEXT 列，必须写入与 SQLite CURRENT_TIMESTAMP
+	// 相同格式的时间字符串；写入 Unix 整数会被 TEXT affinity 转成数字字符串。
 	_, err := s.DB.Exec(
 		`INSERT INTO users(id,username,password_hash,role,created_at) VALUES(?,?,?,?,?)`,
-		id, username, passwordHash, role, timeNowUnix(),
+		id, username, passwordHash, role, timeNowStamp(),
 	)
 	return err
 }
@@ -109,20 +105,51 @@ func (s *Store) DeleteSession(tokenHash string) error {
 	return err
 }
 
-func (s *Store) CreateDevice(id, name, tokenHash string) error {
+// PurgeExpired 删除已过期的会话与一次性票据。
+// 业务层在启动、登录和签发票据时惰性调用，避免这两张表无限增长。
+// audit_logs 刻意不自动删除：审计记录需要长期保留，清理应由备份/归档策略负责。
+func (s *Store) PurgeExpired() error {
+	now := time.Now().Unix()
+	for _, query := range []string{
+		`DELETE FROM sessions WHERE expires_at<=?`,
+		`DELETE FROM ws_tickets WHERE expires_at<=?`,
+	} {
+		if _, err := s.DB.Exec(query, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UpsertDevice 登记设备：设备首次上报时插入，重复上报时更新型号。
+// 设备 ID 由 App 本地生成，服务端只负责持久化，不再下发任何设备令牌。
+func (s *Store) UpsertDevice(id, model string) error {
 	_, err := s.DB.Exec(
-		`INSERT INTO devices(id,name,token_hash,created_at) VALUES(?,?,?,?)`,
-		id, name, tokenHash, time.Now().Unix(),
+		`INSERT INTO devices(id,name,model,created_at) VALUES(?,'',?,?)
+		 ON CONFLICT(id) DO UPDATE SET model=excluded.model`,
+		id, model, time.Now().Unix(),
 	)
 	return err
 }
 
-func (s *Store) DeviceAuth(id, tokenHash string) (bool, error) {
-	var count int
-	err := s.DB.QueryRow(
-		`SELECT count(*) FROM devices WHERE id=? AND token_hash=? AND enabled=1`, id, tokenHash,
-	).Scan(&count)
-	return count == 1, err
+// SetEnabled 由转发进程直接写入设备的启用/停用状态。
+func (s *Store) SetEnabled(id string, enabled bool) error {
+	value := 0
+	if enabled {
+		value = 1
+	}
+	result, err := s.DB.Exec(`UPDATE devices SET enabled=? WHERE id=?`, value, id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) DeviceEnabled(id string) (bool, error) {
@@ -155,7 +182,7 @@ func (s *Store) SetOnline(id string, online bool) error {
 
 func (s *Store) ListDevices() ([]Device, error) {
 	rows, err := s.DB.Query(
-		`SELECT d.id,d.name,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 GROUP BY d.id ORDER BY d.name,d.id`,
@@ -171,7 +198,7 @@ func (s *Store) ListDevices() ([]Device, error) {
 		var enabled, online int
 		var groupIDs sql.NullString
 		if err := rows.Scan(
-			&device.ID, &device.Name, &enabled, &online, &device.LastSeen,
+			&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
 			&device.Battery, &device.RTTMS, &device.Status, &groupIDs,
 		); err != nil {
 			return nil, err
@@ -256,17 +283,25 @@ func (s *Store) CanAccess(userID, deviceID string, manage bool) (bool, error) {
 		return true, nil
 	}
 
-	permission := "can_view"
-	if manage {
-		permission = "can_manage"
-	}
-	query := `SELECT EXISTS(
+	// 使用两条固定 SQL 而不是拼接列名，彻底消除动态 SQL 注入面。
+	const viewQuery = `SELECT EXISTS(
 		SELECT 1
 		FROM group_users ug
 		JOIN group_access ga ON ga.user_group_id=ug.group_id
 		JOIN device_groups dg ON dg.group_id=ga.device_group_id
-		WHERE ug.user_id=? AND dg.device_id=? AND ga.` + permission + `=1
+		WHERE ug.user_id=? AND dg.device_id=? AND ga.can_view=1
 	)`
+	const manageQuery = `SELECT EXISTS(
+		SELECT 1
+		FROM group_users ug
+		JOIN group_access ga ON ga.user_group_id=ug.group_id
+		JOIN device_groups dg ON dg.group_id=ga.device_group_id
+		WHERE ug.user_id=? AND dg.device_id=? AND ga.can_manage=1
+	)`
+	query := viewQuery
+	if manage {
+		query = manageQuery
+	}
 	var allowed int
 	err = s.DB.QueryRow(query, userID, deviceID).Scan(&allowed)
 	return allowed == 1, err
@@ -299,77 +334,6 @@ func (s *Store) ConsumeTicket(tokenHash string) (Ticket, error) {
 		return Ticket{}, err
 	}
 	return ticket, tx.Commit()
-}
-
-func (s *Store) Enqueue(kind, deviceID, actorID string) error {
-	if kind != "disconnect" && kind != "enable" {
-		return errors.New("unsupported control event")
-	}
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	enabled, online := 1, -1
-	if kind == "disconnect" {
-		enabled, online = 0, 0
-	}
-	result, err := tx.Exec(
-		`UPDATE devices SET enabled=?,online=CASE WHEN ? < 0 THEN online ELSE ? END WHERE id=?`,
-		enabled, online, online, deviceID,
-	)
-	if err != nil {
-		return err
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return ErrNotFound
-	}
-
-	now := time.Now().Unix()
-	if _, err := tx.Exec(
-		`INSERT INTO control_events(kind,device_id,actor_id,created_at) VALUES(?,?,?,?)`,
-		kind, deviceID, actorID, now,
-	); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(
-		`INSERT INTO audit_logs(actor_id,action,device_id,created_at) VALUES(?,?,?,?)`,
-		actorID, kind, deviceID, now,
-	); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-func (s *Store) PendingEvents() ([]ControlEvent, error) {
-	rows, err := s.DB.Query(
-		`SELECT id,kind,device_id,actor_id FROM control_events WHERE processed=0 ORDER BY id LIMIT 100`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	events := make([]ControlEvent, 0)
-	for rows.Next() {
-		var event ControlEvent
-		if err := rows.Scan(&event.ID, &event.Kind, &event.DeviceID, &event.ActorID); err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-	return events, rows.Err()
-}
-
-func (s *Store) MarkEvent(id int64) error {
-	_, err := s.DB.Exec(`UPDATE control_events SET processed=1 WHERE id=?`, id)
-	return err
 }
 
 func (s *Store) StartWatch(sessionID, deviceID, userID string) error {

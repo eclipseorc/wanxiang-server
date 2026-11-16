@@ -3,11 +3,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,43 +28,52 @@ func run() error {
 	if err := envfile.Load(".env"); err != nil {
 		return err
 	}
+	// 浏览器管理端总会带 Origin；白名单为空时这些连接会被全部拒绝。
+	// 启动时明确告警，避免只表现为前端「连接失败」而难以定位。
+	if strings.TrimSpace(os.Getenv("WS_ALLOWED_ORIGINS")) == "" {
+		log.Printf("warning: WS_ALLOWED_ORIGINS is empty; browser admin WebSocket connections will be rejected")
+	}
 
 	dbPath := envfile.String("DB_PATH", "./data/wanxiang.db")
 	log.Printf("opening SQLite database: %s", dbPath)
-	db, err := sqlite.Open(dbPath)
+	// OpenReady 同时完成连接与建表，并对两进程同时启动时的锁竞争做重试。
+	db, err := sqlite.OpenReady(dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-
-	if err := sqlite.InitSchema(db); err != nil {
-		return err
-	}
 
 	store := sqlite.NewStore(db)
 	if err := store.ResetWatch(); err != nil {
 		return err
 	}
 
+	certFile := envfile.String("TLS_CERT", "")
+	keyFile := envfile.String("TLS_KEY", "")
+	if (certFile == "") != (keyFile == "") {
+		return errors.New("TLS_CERT and TLS_KEY must be configured together")
+	}
+
 	hub := wsserver.NewHub(store)
 	server := &http.Server{
-		Addr:              envfile.String("WS_ADDR", ":8081"),
+		Addr:              envfile.String("WS_ADDR", ":9003"),
 		Handler:           logRequests("websocket", wsserver.NewHandler(hub).ServeMux()),
 		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if certFile != "" {
+		server.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pollerDone := make(chan struct{})
-	go func() {
-		hub.RunControlPoller(ctx.Done())
-		close(pollerDone)
-	}()
-
 	serverErrors := make(chan error, 1)
 	go func() {
-		log.Printf("WebSocket relay listening on %s", server.Addr)
+		log.Printf("WebSocket relay listening on %s (tls=%t)", server.Addr, certFile != "")
+		if certFile != "" {
+			serverErrors <- server.ListenAndServeTLS(certFile, keyFile)
+			return
+		}
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -70,7 +81,6 @@ func run() error {
 	case err := <-serverErrors:
 		if !errors.Is(err, http.ErrServerClosed) {
 			stop()
-			<-pollerDone
 			return err
 		}
 	case <-ctx.Done():
@@ -82,7 +92,6 @@ func run() error {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return err
 	}
-	<-pollerDone
 	return nil
 }
 

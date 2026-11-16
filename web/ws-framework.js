@@ -7,6 +7,9 @@
 (() => {
   'use strict';
 
+  // WanxiangWS 是不可配置属性；脚本被重复注入时再次定义会抛 TypeError。
+  if (window.WanxiangWS) return;
+
   const NativeWebSocket = window.WebSocket;
   const messageHandlers = new Map();
   const commandHandlers = new Map();

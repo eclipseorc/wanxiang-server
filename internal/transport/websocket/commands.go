@@ -36,14 +36,14 @@ type commandErrorData struct {
 // dispatchCommand 按白名单分发命令；未知命令不会被执行，而是返回统一错误。
 func dispatchCommand(message CommandMessage) CommandMessage {
 	if message.Type != commandType || message.Command == "" {
-		return commandError(message.RequestID, commandInvalid, "type and command are required")
+		return newCommandError(message.RequestID, commandInvalid, "type and command are required")
 	}
 
 	switch message.Command {
 	case commandPing:
 		var data pingData
 		if len(message.Data) == 0 || json.Unmarshal(message.Data, &data) != nil {
-			return commandError(message.RequestID, commandInvalid, "ping data must contain sentAt")
+			return newCommandError(message.RequestID, commandInvalid, "ping data must contain sentAt")
 		}
 		payload, _ := json.Marshal(data)
 		return CommandMessage{
@@ -53,12 +53,14 @@ func dispatchCommand(message CommandMessage) CommandMessage {
 			Data:      payload,
 		}
 	default:
-		return commandError(message.RequestID, commandUnsupported, "unsupported command")
+		return newCommandError(message.RequestID, commandUnsupported, "unsupported command")
 	}
 }
 
-// commandError 创建保留原 requestId 的标准错误响应，便于客户端匹配失败请求。
-func commandError(requestID, code, message string) CommandMessage {
+// newCommandError 创建保留原 requestId 的标准错误响应，便于客户端匹配失败请求。
+// 构造函数名不能与命令名常量 commandError 相同：Go 不允许同一包内
+// 常量与函数重名，且响应里的 Command 字段必须是字符串 "error"。
+func newCommandError(requestID, code, message string) CommandMessage {
 	data, _ := json.Marshal(commandErrorData{Code: code, Message: message})
 	return CommandMessage{
 		Type:      commandType,

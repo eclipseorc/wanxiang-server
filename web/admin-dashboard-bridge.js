@@ -6,6 +6,12 @@
 (() => {
   'use strict';
 
+  // bridge 依赖页面词法作用域里的函数；注入顺序变化时安全退出，而不是让整页报错。
+  if (window.WanxiangDashboard || typeof handleServerMessage !== 'function' || !window.WanxiangWS) {
+    console.error('[bridge] dashboard globals unavailable; plugins stay disabled');
+    return;
+  }
+
   const legacyHandler = handleServerMessage;
   window.WanxiangDashboard = Object.freeze({
     get devices() { return devices; },

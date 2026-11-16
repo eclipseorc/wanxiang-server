@@ -22,7 +22,7 @@ func TestLoadReadsValuesAndPreservesExistingEnvironment(t *testing.T) {
 	for key, want := range map[string]string{
 		"WANXIANG_ENVFILE_PLAIN_TEST":  "hello world",
 		"WANXIANG_ENVFILE_QUOTED_TEST": "value with spaces",
-		existingKey:                     "process-value",
+		existingKey:                    "process-value",
 	} {
 		if got := os.Getenv(key); got != want {
 			t.Errorf("%s = %q, want %q", key, got, want)

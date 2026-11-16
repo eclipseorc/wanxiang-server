@@ -1,13 +1,16 @@
-// Command http-server runs the management API and serves the static console.
+// Command admin-server 初始化 SQLite 和管理员账户，启动管理 API 与静态网页服务。
+// 本目录只负责进程启动、HTTP 路由装配和关闭信号处理，业务实现位于 internal 包。
 package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -15,7 +18,7 @@ import (
 	"github.com/eclipseorc/wanxiang-server/internal/envfile"
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
-	"github.com/eclipseorc/wanxiang-server/internal/transport/httpapi"
+	"github.com/eclipseorc/wanxiang-server/internal/transport/adminapi"
 )
 
 func main() {
@@ -31,17 +34,20 @@ func run() error {
 
 	dbPath := envfile.String("DB_PATH", "./data/wanxiang.db")
 	log.Printf("opening SQLite database: %s", dbPath)
-	db, err := sqlite.Open(dbPath)
+	// OpenReady 同时完成连接与建表，并对两进程同时启动时的锁竞争做重试。
+	db, err := sqlite.OpenReady(dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	if err := sqlite.InitSchema(db); err != nil {
+	store := sqlite.NewStore(db)
+	// 启动时清理一次遗留的过期凭据，避免历史数据长期堆积。
+	if err := store.PurgeExpired(); err != nil {
 		return err
 	}
 
-	service := logic.New(sqlite.NewStore(db))
+	service := logic.New(store)
 	if err := service.EnsureAdmin(
 		envfile.String("ADMIN_USERNAME", "admin"),
 		envfile.String("ADMIN_PASSWORD", ""),
@@ -50,15 +56,24 @@ func run() error {
 	}
 	log.Printf("administrator account is ready")
 
+	certFile := envfile.String("TLS_CERT", "")
+	keyFile := envfile.String("TLS_KEY", "")
+	if (certFile == "") != (keyFile == "") {
+		return errors.New("TLS_CERT and TLS_KEY must be configured together")
+	}
+
 	webDir := envfile.String("WEB_DIR", "./web")
 	mux := http.NewServeMux()
-	mux.Handle("/api/", httpapi.New(service).Handler())
+	mux.Handle("/api/", adminapi.New(service).Handler())
 	mux.Handle("/", dashboardHandler(webDir))
 
 	server := &http.Server{
-		Addr:              envfile.String("HTTP_ADDR", ":8080"),
-		Handler:           logRequests("http-api", mux),
+		Addr:              envfile.String("ADMIN_ADDR", ":9002"),
+		Handler:           logRequests("admin-api", adminapi.SecurityHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if certFile != "" {
+		server.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -66,7 +81,11 @@ func run() error {
 
 	serverErrors := make(chan error, 1)
 	go func() {
-		log.Printf("HTTP API and management UI listening on %s", server.Addr)
+		log.Printf("admin API and management UI listening on %s (tls=%t)", server.Addr, certFile != "")
+		if certFile != "" {
+			serverErrors <- server.ListenAndServeTLS(certFile, keyFile)
+			return
+		}
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -84,18 +103,49 @@ func run() error {
 	}
 }
 
+// allowedStaticExt 限制静态服务可返回的文件类型。即使 WEB_DIR 被误配到
+// 仓库根目录，也不会把 .env、go.mod、数据库等文件暴露出去。
+var allowedStaticExt = map[string]bool{
+	".html": true, ".js": true, ".css": true, ".ico": true, ".svg": true,
+	".png": true, ".jpg": true, ".woff2": true, ".map": true,
+}
+
+// justFiles 包装静态文件系统，禁止 http.FileServer 自动生成目录列表。
+// 管理后台只应暴露白名单内的文件；列出目录会泄露部署结构。
+type justFiles struct{ fs http.FileSystem }
+
+func (j justFiles) Open(name string) (http.File, error) {
+	if !allowedStaticExt[strings.ToLower(filepath.Ext(name))] {
+		return nil, os.ErrNotExist
+	}
+	file, err := j.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	if info.IsDir() {
+		_ = file.Close()
+		return nil, os.ErrNotExist
+	}
+	return file, nil
+}
+
 // dashboardHandler injects the transport framework before the inline dashboard
 // script creates a socket, then loads the bridge and feature modules after the
 // page's existing functions have initialized.
 func dashboardHandler(webDir string) http.Handler {
-	files := http.FileServer(http.Dir(webDir))
+	files := http.FileServer(justFiles{fs: http.Dir(webDir)})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" || r.Method != http.MethodGet {
 			files.ServeHTTP(w, r)
 			return
 		}
 
-		page, err := os.ReadFile(webDir + string(os.PathSeparator) + "index.html")
+		page, err := os.ReadFile(filepath.Join(webDir, "index.html"))
 		if err != nil {
 			log.Printf("read dashboard index: %v", err)
 			http.Error(w, "dashboard unavailable", http.StatusInternalServerError)
@@ -113,6 +163,7 @@ func dashboardHandler(webDir string) http.Handler {
 		const modules = `<script src="/admin-dashboard-bridge.js"></script><script src="/modules/device-events.js"></script><script src="/modules/watch-events.js"></script><script src="/admin-heartbeat.js"></script></body>`
 		content = strings.Replace(content, closingBody, modules, 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write([]byte(content))
 	})
 }

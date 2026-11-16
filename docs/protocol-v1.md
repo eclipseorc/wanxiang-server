@@ -4,8 +4,8 @@ All WebSocket messages are JSON objects with a `type` field. Device and admin co
 
 ## Device lifecycle
 
-1. Admin provisions a device using `POST /api/admin/devices`; save the returned `deviceId` and `deviceToken` securely on the device.
-2. Device requests `POST /api/device/ws-ticket` with `Authorization: Bearer <deviceToken>` and body `{"deviceId":"..."}`.
+1. The Android app generates a random `deviceId` locally on install, then requests `POST /api/device/ws-ticket` with body `{"deviceId":"...","model":"..."}` (model optional). The first request registers the device; later requests are idempotent.
+2. The device receives a one-time `ticket` in the response.
 3. Device connects to `/ws/device?ticket=<one-time-ticket>`, then remains connected.
 4. Device sends `{"type":"heartbeat","battery":80,"rttMs":30,"status":"ready"}` periodically; server replies `heartbeat-ack` and sends authorized admin clients `device-state` events.
 5. Socket close marks device offline and emits `device-offline`.

@@ -60,3 +60,43 @@ func TestDispatchRejectsMalformedPing(t *testing.T) {
 		t.Fatalf("response command = %q, want error", response.Command)
 	}
 }
+
+// 错误响应的命令名必须保持为 "error"，且带上可关联的 requestId 与错误码。
+func TestCommandErrorEnvelope(t *testing.T) {
+	response := newCommandError("req-99", commandInvalid, "bad payload")
+	if response.Type != commandType || response.Command != commandError {
+		t.Fatalf("response = %#v, want com/error", response)
+	}
+	if response.RequestID != "req-99" {
+		t.Fatalf("requestId = %q, want req-99", response.RequestID)
+	}
+	var got commandErrorData
+	if err := json.Unmarshal(response.Data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Code != commandInvalid || got.Message != "bad payload" {
+		t.Fatalf("error data = %#v", got)
+	}
+}
+
+// 缺少外层 type 的命令不能被当作合法命令执行。
+func TestDispatchRejectsMissingType(t *testing.T) {
+	response := dispatchCommand(CommandMessage{
+		Command:   commandPing,
+		RequestID: "req-100",
+		Data:      json.RawMessage(`{"sentAt":1731670000000}`),
+	})
+	if response.Command != commandError {
+		t.Fatalf("response command = %q, want error", response.Command)
+	}
+	if response.RequestID != "req-100" {
+		t.Fatalf("requestId = %q, want req-100", response.RequestID)
+	}
+	var got commandErrorData
+	if err := json.Unmarshal(response.Data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Code != commandInvalid {
+		t.Fatalf("error code = %q, want invalid_command", got.Code)
+	}
+}

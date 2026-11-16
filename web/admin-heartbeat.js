@@ -5,6 +5,10 @@
 (() => {
   'use strict';
 
+  if (!window.WanxiangWS) {
+    console.error('[admin-heartbeat] WebSocket framework unavailable');
+    return;
+  }
   const wsAPI = window.WanxiangWS;
   const status = document.getElementById('connStatus');
   const heartbeatInterval = 25000;
@@ -57,8 +61,11 @@
       clearTimeout(request.timeout);
       pending.delete(message.requestId);
     }
+    const detail = message.data?.message || '命令执行失败';
     console.warn('[admin-heartbeat] command error', message.data);
-    return false;
+    // 命令错误不会进入 legacy 消息处理器，必须由插件自己给出可见提示。
+    if (window.WanxiangDashboard) window.WanxiangDashboard.toast(detail);
+    return true;
   });
 
   wsAPI.onConnectionChange(({ socket, state }) => {

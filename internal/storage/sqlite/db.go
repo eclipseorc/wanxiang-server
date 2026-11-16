@@ -2,12 +2,17 @@ package sqlite
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // 注册纯 Go 的 SQLite 驱动，避免依赖 CGO。
 )
 
+// Open 打开（必要时创建）SQLite 数据库并统一连接行为。
+// 限制为单连接可避免多进程/多协程写入时的锁竞争被放大；WAL 让读不阻塞写，
+// busy_timeout 给跨进程写入留出 5 秒等待窗口，外键约束保证分组关系级联清理。
 func Open(path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, err
@@ -18,11 +23,25 @@ func Open(path string) (*sql.DB, error) {
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	for _, pragma := range []string{"PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000", "PRAGMA foreign_keys=ON"} {
+	// busy_timeout 必须先设置：后面的 journal_mode 需要短暂独占锁，
+	// 两个服务进程同时启动时可能立刻返回 SQLITE_BUSY。
+	for _, pragma := range []string{"PRAGMA busy_timeout=5000", "PRAGMA foreign_keys=ON"} {
 		if _, err = db.Exec(pragma); err != nil {
 			_ = db.Close()
 			return nil, err
 		}
+	}
+	// journal_mode=WAL 的锁不受 busy_timeout 完全保护，做有限重试；
+	// 若始终失败，由 OpenReady 关闭连接后整体重开。
+	for attempt := 0; attempt < 3; attempt++ {
+		if _, err = db.Exec("PRAGMA journal_mode=WAL"); err == nil {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	if err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 	if err = db.Ping(); err != nil {
 		_ = db.Close()
@@ -31,39 +50,100 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// OpenReady 打开数据库并完成表结构初始化，供两个服务进程启动时使用。
+// 两个进程同时启动一个全新的 SQLite 文件时，第二个进程可能在创建
+// WAL/SHM 共享文件的瞬间拿到 SQLITE_BUSY 或 SQLITE_READONLY；每次失败
+// 都关闭连接整体重开，避免连接停留在错误状态。
+func OpenReady(path string) (*sql.DB, error) {
+	var lastErr error
+	for attempt := 0; attempt < 6; attempt++ {
+		db, err := Open(path)
+		if err == nil {
+			if err = InitSchema(db); err == nil {
+				return db, nil
+			}
+			_ = db.Close()
+		}
+		lastErr = err
+		time.Sleep(300 * time.Millisecond)
+	}
+	return nil, fmt.Errorf("initialize sqlite database after retries: %w", lastErr)
+}
+
+// InitSchema 幂等地建立全部表与索引，并对早期原型创建的数据库做增量迁移。
+// watch_sessions 用 CHECK(id=1) 刻意固定为单行，表达「全局只允许一个观看会话」。
 func InitSchema(db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','user')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, online INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0, battery INTEGER NOT NULL DEFAULT 0, rtt_ms INTEGER NOT NULL DEFAULT 0, status_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1, online INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0, battery INTEGER NOT NULL DEFAULT 0, rtt_ms INTEGER NOT NULL DEFAULT 0, status_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS groups(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS group_users(group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(group_id,user_id))`,
 		`CREATE TABLE IF NOT EXISTS device_groups(group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, PRIMARY KEY(group_id,device_id))`,
 		`CREATE TABLE IF NOT EXISTS group_access(user_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, can_view INTEGER NOT NULL DEFAULT 0, can_manage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_group_id,device_group_id))`,
 		`CREATE TABLE IF NOT EXISTS ws_tickets(ticket_hash TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS control_events(id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, device_id TEXT NOT NULL, actor_id TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, processed INTEGER NOT NULL DEFAULT 0)`,
 		`CREATE TABLE IF NOT EXISTS watch_sessions(id INTEGER PRIMARY KEY CHECK(id=1), session_id TEXT, device_id TEXT, user_id TEXT)`,
 		`INSERT OR IGNORE INTO watch_sessions(id,session_id,device_id,user_id) VALUES(1,NULL,NULL,NULL)`,
 		`CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT, action TEXT NOT NULL, device_id TEXT, detail TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_online ON devices(online)`,
-		`CREATE INDEX IF NOT EXISTS idx_control_pending ON control_events(processed,id)`,
 	}
 	for _, q := range stmts {
 		if _, err := db.Exec(q); err != nil {
 			return err
 		}
 	}
-	// Upgrade databases created by the first prototype, whose control_events
-	// table did not yet store the actor that initiated an operation.
-	var hasActor int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('control_events') WHERE name='actor_id'`).Scan(&hasActor); err != nil {
+
+	// 旧库迁移：早期原型的 devices 表带 token_hash 列（服务端下发设备令牌），
+	// 现改为设备自注册（deviceId + model）。SQLite 的 DROP COLUMN 需要较新版本，
+	// 这里用「检测后重建表」的方式迁移，避免依赖版本特性。
+	if err := migrateDevicesTable(db); err != nil {
 		return err
 	}
-	if hasActor == 0 {
-		if _, err := db.Exec(`ALTER TABLE control_events ADD COLUMN actor_id TEXT NOT NULL DEFAULT ''`); err != nil {
-			return err
-		}
+	return nil
+}
+
+// migrateDevicesTable 把旧版 devices 表迁移到无 token_hash 的形态：
+// 若存在 token_hash 列则重建表并补齐 model 列。只读旧数据，不丢设备/分组关系。
+func migrateDevicesTable(db *sql.DB) error {
+	var hasToken int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name='token_hash'`).Scan(&hasToken); err != nil {
+		return err
+	}
+	if hasToken == 0 {
+		return nil
+	}
+
+	// 新表结构：去掉 token_hash，新增 model 列（默认空串）。
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS devices_new(
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			enabled INTEGER NOT NULL DEFAULT 1,
+			online INTEGER NOT NULL DEFAULT 0,
+			last_seen INTEGER NOT NULL DEFAULT 0,
+			battery INTEGER NOT NULL DEFAULT 0,
+			rtt_ms INTEGER NOT NULL DEFAULT 0,
+			status_json TEXT NOT NULL DEFAULT '{}',
+			created_at INTEGER NOT NULL
+		)`)
+	if err != nil {
+		return err
+	}
+	if _, err := db.Exec(`
+		INSERT OR IGNORE INTO devices_new(id,name,model,enabled,online,last_seen,battery,rtt_ms,status_json,created_at)
+		SELECT id,name,'',enabled,online,last_seen,battery,rtt_ms,status_json,created_at FROM devices`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`DROP TABLE devices`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE devices_new RENAME TO devices`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_devices_online ON devices(online)`); err != nil {
+		return err
 	}
 	return nil
 }
