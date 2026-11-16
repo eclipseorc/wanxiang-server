@@ -1,4 +1,4 @@
-// Command websocket-server runs the device and admin WebSocket relay.
+// Command websocket-server 初始化共享数据库和 WebSocket Hub，启动设备/管理端转发服务。
 package main
 
 import (
