@@ -7,56 +7,73 @@
 /* ===== 设计令牌 ===== */
 :root{
   color-scheme:light;
-  --bg:#f4f6fb; --surface:#fff; --surface-soft:#fafbfe;
-  --ink:#101828; --ink-2:#344054; --muted:#667085; --faint:#98a2b3;
-  --line:#e7ebf3; --line-2:#d9e0ec;
-  --brand:#4c63e6; --brand-deep:#3450d0; --brand-soft:#eef1ff;
-  --navy:#0b1222; --navy-2:#14203a;
-  --green:#0f9d63; --green-soft:#e7f7ef;
-  --amber:#b7791f; --amber-soft:#fff7e6;
-  --red:#e0483d; --red-soft:#fdeceb;
-  --r-lg:20px; --r-md:14px; --r-sm:9px;
-  --sh-sm:0 1px 2px rgba(16,24,40,.04),0 4px 14px rgba(16,24,40,.045);
-  --sh-md:0 12px 32px rgba(16,24,40,.09);
+  --bg:#f3f5fa; --surface:#fff; --surface-soft:#f8fafd;
+  --ink:#0e1526; --ink-2:#303b55; --muted:#64708a; --faint:#98a3ba;
+  --line:#e6eaf3; --line-2:#d6dceb;
+  --brand:#4a62e0; --brand-deep:#3550c8; --brand-soft:#edf0ff;
+  --brand-hover:#3d54cc; --brand-active:#3145b0;
+  --navy:#0a1122; --navy-2:#14203a;
+  --green:#0e9f63; --green-soft:#e6f6ee;
+  --amber:#b7791f; --amber-soft:#fff6e4;
+  --red:#df453b; --red-soft:#fdebea;
+  --r-lg:22px; --r-md:16px; --r-sm:10px;
+  --sh-sm:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.05);
+  --sh-md:0 14px 36px rgba(15,23,42,.10);
+  --ease:cubic-bezier(.25,.8,.35,1);
   --font:"Inter","SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 var(--font);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.65 var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button,input,select{font-family:inherit}
 a{color:inherit;text-decoration:none}
 h1,h2,h3,h4,p{margin:0}
 .hidden{display:none!important}
 .muted{color:var(--muted)}
-.small{font-size:12px}
+.small{font-size:12.5px}
 .ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.ico-sm{width:15px;height:15px}
+.ico-sm{width:16px;height:16px}
 .ico-lg{width:22px;height:22px}
 
 /* ===== 通用组件 ===== */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.grid{display:grid;gap:12px}
-.eyebrow{display:block;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--brand);text-transform:uppercase;margin-bottom:10px}
+.grid{display:grid;gap:14px}
+.eyebrow{display:block;font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--brand);text-transform:uppercase;margin-bottom:10px}
 .eyebrow.light{color:#8ea5ff}
-button{border:0;border-radius:var(--r-sm);background:var(--brand);color:#fff;padding:10px 15px;font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,background .15s ease;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 16px rgba(76,99,230,.24)}
-button:active:not(:disabled){transform:translateY(0)}
-button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
-button.secondary{background:#eef1f8;color:var(--ink-2);box-shadow:none}
-button.secondary:hover:not(:disabled){background:#e3e8f4;box-shadow:none}
+
+/* ===== 按钮体系：完整的状态层级 ===== */
+button{border:0;border-radius:var(--r-sm);background:var(--brand);color:#fff;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;letter-spacing:.01em;
+  transition:background .18s var(--ease),transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease),color .18s var(--ease)}
+button:hover:not(:disabled){background:var(--brand-hover);transform:translateY(-1px);box-shadow:0 6px 18px rgba(74,98,224,.28)}
+button:active:not(:disabled){background:var(--brand-active);transform:translateY(0);box-shadow:0 2px 8px rgba(74,98,224,.24)}
+button:focus-visible{outline:0;box-shadow:0 0 0 4px rgba(74,98,224,.24)}
+button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;transform:none}
+
+button.secondary{background:#eef1f8;color:var(--ink-2);box-shadow:none;border:1px solid transparent}
+button.secondary:hover:not(:disabled){background:#e4e9f5;color:var(--ink);box-shadow:none}
+button.secondary:active:not(:disabled){background:#dbe1ef;color:var(--ink)}
+button.secondary:focus-visible{box-shadow:0 0 0 4px rgba(48,59,85,.14)}
+
 button.danger,.btn-danger{background:var(--red);color:#fff}
-button.danger:hover:not(:disabled),.btn-danger:hover{box-shadow:0 6px 16px rgba(224,72,61,.28)}
-.btn-primary{background:linear-gradient(135deg,#5b71ef,#3f56d8);padding:11px 18px}
-.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line-2);padding:8px 12px;box-shadow:none}
-.btn-ghost:hover{color:var(--red);border-color:#f3c6c2;background:var(--red-soft);box-shadow:none}
+button.danger:hover:not(:disabled),button.btn-danger:hover:not(:disabled){background:#cd3a31;box-shadow:0 6px 18px rgba(223,69,59,.30)}
+button.danger:active:not(:disabled),button.btn-danger:active:not(:disabled){background:#b8332a;box-shadow:0 2px 8px rgba(223,69,59,.26)}
+button.danger:focus-visible,button.btn-danger:focus-visible{box-shadow:0 0 0 4px rgba(223,69,59,.24)}
+
+.btn-primary{background:linear-gradient(135deg,#5a72f0,#3b52d4);padding:12px 20px;font-size:14px}
+button.btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#4d66e6,#3349c2);box-shadow:0 8px 22px rgba(74,98,224,.32)}
+button.btn-primary:active:not(:disabled){background:linear-gradient(135deg,#4258d0,#2c41a8);box-shadow:0 2px 8px rgba(74,98,224,.26)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line-2);padding:9px 14px;box-shadow:none}
+button.btn-ghost:hover:not(:disabled){color:var(--red);border-color:#f3c6c2;background:var(--red-soft);box-shadow:none}
+button.btn-ghost:active:not(:disabled){background:#f9dcd9}
 .btn-block{width:100%}
-input:not([type=checkbox]),select{width:100%;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:10px 12px;font-size:13px;color:var(--ink);background:#fff;outline:none;transition:border-color .15s,box-shadow .15s;min-width:0}
-input:not([type=checkbox]):focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(76,99,230,.13)}
-input::placeholder{color:#a9b2c3}
-select{appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:32px;cursor:pointer}
-label{display:block;color:var(--ink-2);font-size:12.5px;font-weight:600}
-.stack-form{display:flex;flex-direction:column;gap:15px}
+
+input:not([type=checkbox]),select{width:100%;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:11px 13px;font-size:14px;color:var(--ink);background:#fff;outline:none;transition:border-color .18s,box-shadow .18s;min-width:0}
+input:not([type=checkbox]):focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(74,98,224,.14)}
+input::placeholder{color:#aab4c6}
+select{appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364708a' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;cursor:pointer}
+label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
+.stack-form{display:flex;flex-direction:column;gap:16px}
 .stack-form label{display:flex;flex-direction:column;gap:7px}
 .stack-form button{margin-top:3px}
 
@@ -83,8 +100,8 @@ label{display:block;color:var(--ink-2);font-size:12.5px;font-weight:600}
 .login-panel{flex:1;min-width:0;display:grid;place-items:center;padding:48px 40px;background:radial-gradient(700px 500px at 90% 0%,#eef2ff,transparent 65%),linear-gradient(180deg,#fbfcff,#f2f5fc)}
 .login-card{width:100%;max-width:400px;background:#fff;border:1px solid rgba(226,232,244,.9);border-radius:24px;padding:40px 38px;box-shadow:0 24px 64px rgba(16,24,40,.10),0 2px 8px rgba(16,24,40,.04)}
 .login-card-icon{width:46px;height:46px;border-radius:14px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin-bottom:26px}
-.login-card h2{font-size:26px;font-weight:700;letter-spacing:-.02em}
-.login-sub{font-size:13px;color:var(--muted);margin:7px 0 28px}
+.login-card h2{font-size:27px;font-weight:700;letter-spacing:-.02em}
+.login-sub{font-size:13.5px;color:var(--muted);margin:8px 0 30px}
 .input-wrap{position:relative}
 .input-wrap>.ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#98a2b3;pointer-events:none}
 .input-wrap input{padding-left:38px;height:44px}
@@ -92,79 +109,90 @@ label{display:block;color:var(--ink-2);font-size:12.5px;font-weight:600}
 
 /* ===== 应用外壳 ===== */
 .app-shell{display:flex;min-height:100vh}
-.sidebar{width:248px;flex:none;position:sticky;top:0;height:100vh;background:linear-gradient(172deg,#0a1120 0%,#111d34 58%,#0c1628 100%);color:#c3cde0;display:flex;flex-direction:column;padding:26px 15px 20px;z-index:30}
-.sidebar::before{content:"";position:absolute;inset:0 0 auto;height:220px;background:radial-gradient(320px 180px at 0% 0%,rgba(91,113,239,.22),transparent 70%);pointer-events:none}
-.brand{display:flex;align-items:center;gap:12px;padding:0 9px 30px;position:relative}
+.sidebar{width:272px;flex:none;position:sticky;top:0;height:100vh;background:linear-gradient(172deg,#0a1120 0%,#111d34 58%,#0c1628 100%);color:#c3cde0;display:flex;flex-direction:column;padding:28px 18px 22px;z-index:30}
+.sidebar::before{content:"";position:absolute;inset:0 0 auto;height:240px;background:radial-gradient(340px 200px at 0% 0%,rgba(91,113,239,.24),transparent 70%);pointer-events:none}
+.brand{display:flex;align-items:center;gap:13px;padding:0 10px 32px;position:relative}
 .brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0}
-.brand-text strong{font-size:17px;color:#fff;letter-spacing:.06em;font-weight:700}
-.brand-text span{font-size:9px;letter-spacing:.19em;color:#7b8db5;margin-top:3px;white-space:nowrap}
-.nav{display:flex;flex-direction:column;gap:3px;position:relative;flex:1}
-.nav-group-title{font-size:10px;font-weight:700;letter-spacing:.16em;color:#63739a;padding:19px 12px 8px;text-transform:uppercase}
-.nav-link{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;font-size:13.5px;font-weight:500;color:#a8b6d1;transition:background .16s,color .16s;position:relative}
-.nav-link .ico{width:17px;height:17px}
-.nav-link:hover{background:rgba(255,255,255,.055);color:#fff}
-.nav-link.active{background:linear-gradient(100deg,rgba(91,113,239,.30),rgba(91,113,239,.11));color:#fff;font-weight:600}
-.nav-link.active::before{content:"";position:absolute;left:-15px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:#7d92ff}
+.brand-text strong{font-size:18px;color:#fff;letter-spacing:.06em;font-weight:700}
+.brand-text span{font-size:10px;letter-spacing:.19em;color:#7b8db5;margin-top:4px;white-space:nowrap}
+.nav{display:flex;flex-direction:column;gap:4px;position:relative;flex:1}
+.nav-group-title{font-size:11px;font-weight:700;letter-spacing:.16em;color:#63739a;padding:20px 13px 9px;text-transform:uppercase}
+.nav-link{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:11px;font-size:14.5px;font-weight:500;color:#a8b6d1;transition:background .16s,color .16s;position:relative}
+.nav-link .ico{width:18px;height:18px}
+.nav-link:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-link.active{background:linear-gradient(100deg,rgba(91,113,239,.32),rgba(91,113,239,.12));color:#fff;font-weight:600}
+.nav-link.active::before{content:"";position:absolute;left:-18px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#7d92ff}
 .nav-link.active .ico{color:#a9baff}
-.sidebar-foot{border-top:1px solid rgba(255,255,255,.08);padding:16px 10px 0;margin-top:16px}
-.sidebar-status{display:flex;align-items:center;gap:9px;font-size:12px;color:#a8b6d1;margin-bottom:7px}
+.sidebar-foot{border-top:1px solid rgba(255,255,255,.08);padding:18px 11px 0;margin-top:18px}
+.sidebar-status{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#a8b6d1;margin-bottom:8px}
 .live-dot{width:7px;height:7px;border-radius:50%;background:#2ddb92;box-shadow:0 0 0 4px rgba(45,219,146,.13);flex:none}
-.version{font-size:10.5px;color:#5c6b90;letter-spacing:.04em}
+.version{font-size:11px;color:#5c6b90;letter-spacing:.04em}
 .workspace{flex:1;min-width:0;display:flex;flex-direction:column}
-.topbar{height:70px;flex:none;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 38px;position:sticky;top:0;z-index:25}
-.crumb{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--faint)}
+.topbar{height:74px;flex:none;background:rgba(255,255,255,.9);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 42px;position:sticky;top:0;z-index:25}
+.crumb{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--faint)}
 .crumb strong{color:var(--ink-2);font-weight:600}
 .crumb .sep{color:#cdd4e2}
-.top-actions{display:flex;align-items:center;gap:12px}
-.status-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--muted);background:#f2f4f9;border:1px solid var(--line);padding:6px 12px;border-radius:999px;white-space:nowrap}
+.top-actions{display:flex;align-items:center;gap:14px}
+.status-pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;color:var(--muted);background:#f2f4f9;border:1px solid var(--line);padding:7px 13px;border-radius:999px;white-space:nowrap}
 .status-pill::before{content:"";width:7px;height:7px;border-radius:50%;background:#b6bfd0;flex:none;transition:background .2s,box-shadow .2s}
 .status-pill.is-online{color:#0b7a4d;background:var(--green-soft);border-color:#c9ecd9}
 .status-pill.is-online::before{background:var(--green);box-shadow:0 0 0 3px rgba(15,157,99,.15)}
 .status-pill.is-error{color:#a8362d;background:var(--red-soft);border-color:#f5d3cf}
 .status-pill.is-error::before{background:var(--red)}
-.user-chip{display:flex;align-items:center;gap:9px;padding:4px 12px 4px 4px;background:#f7f9fd;border:1px solid var(--line);border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2);max-width:190px}
-.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(140deg,#6b83ff,#3a52d6);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;text-transform:uppercase}
+.user-chip{display:flex;align-items:center;gap:10px;padding:4px 13px 4px 4px;background:#f7f9fd;border:1px solid var(--line);border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-2);max-width:200px}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(140deg,#6b83ff,#3a52d6);color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:700;flex:none;text-transform:uppercase}
 #userChipName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.content{width:100%;max-width:1460px;margin:0 auto;padding:38px 40px 80px}
+.content{width:100%;max-width:1500px;margin:0 auto;padding:42px 44px 90px}
+
+/* ===== 页面切换（多页面式管理后台） ===== */
+.page{display:none;animation:pageIn .22s ease}
+.page.active{display:block}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.page-enter{display:block;animation:pageIn .22s ease}
 
 /* ===== 区块标题 ===== */
-.section{scroll-margin-top:92px;margin-bottom:38px}
-.page-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:30px}
-.page-hero h1{font-size:31px;font-weight:700;letter-spacing:-.025em;line-height:1.25;margin:8px 0 7px}
-.page-hero p{font-size:13.5px;color:var(--muted)}
-.hero-actions{display:flex;gap:10px;flex-wrap:wrap}
-.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:18px}
-.section-head h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
-.section-head p{font-size:12.5px;color:var(--muted)}
-.section-head .eyebrow{margin-bottom:7px}
+.section{margin-bottom:0}
+.page-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:32px}
+.page-hero h1{font-size:34px;font-weight:700;letter-spacing:-.025em;line-height:1.22;margin:8px 0 8px}
+.page-hero p{font-size:14.5px;color:var(--muted)}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+.section-head h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:5px}
+.section-head p{font-size:13.5px;color:var(--muted)}
+.section-head .eyebrow{margin-bottom:8px}
 
 /* ===== 统计卡片 ===== */
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:34px}
-.stat{position:relative;overflow:hidden;padding:20px 22px 22px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-sm);transition:transform .18s,box-shadow .18s}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-bottom:36px}
+.stat{position:relative;overflow:hidden;padding:24px 25px 26px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-sm);transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
 .stat:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
-.stat::after{content:"";position:absolute;right:-40px;top:-46px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(76,99,230,.07),transparent 70%);pointer-events:none}
-.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.stat-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
+.stat::after{content:"";position:absolute;right:-46px;top:-52px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(74,98,224,.08),transparent 70%);pointer-events:none}
+.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.stat-icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
 .stat-icon.green{background:var(--green-soft);color:var(--green)}
 .stat-icon.gray{background:#f1f3f8;color:#7c879c}
 .stat-icon.amber{background:var(--amber-soft);color:var(--amber)}
-.stat-tag{font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.05em}
-.stat-value{font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.stat-label{font-size:12.5px;color:var(--muted);margin-top:5px}
-.stat-bar{height:4px;border-radius:99px;background:#eef1f7;margin-top:17px;overflow:hidden}
-.stat-bar>i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#5b71ef,#8a9bff);transition:width .5s ease}
-.stat-bar.green>i{background:linear-gradient(90deg,#0f9d63,#4bd6a0)}
+.stat-tag{font-size:11px;font-weight:600;color:var(--faint);letter-spacing:.06em}
+.stat-value{font-size:36px;line-height:1.1;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat-label{font-size:13.5px;color:var(--muted);margin-top:6px}
+.stat-bar{height:5px;border-radius:99px;background:#eef1f7;margin-top:19px;overflow:hidden}
+.stat-bar>i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#5a72f0,#8a9bff);transition:width .6s var(--ease)}
+.stat-bar.green>i{background:linear-gradient(90deg,#0e9f63,#4bd6a0)}
 
 /* ===== 表格卡片 ===== */
 .table-card{overflow:hidden}
-.card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 24px;border-bottom:1px solid var(--line)}
-.card-head h3{font-size:16px;font-weight:700;letter-spacing:-.01em}
-.card-head p{font-size:12px;color:var(--muted);margin-top:3px}
-.chip{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--brand);background:var(--brand-soft);border:1px solid #dfe5ff;padding:6px 12px;border-radius:999px;white-space:nowrap}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:22px 26px;border-bottom:1px solid var(--line)}
+.card-head h3{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.card-head p{font-size:13px;color:var(--muted);margin-top:4px}
+.card-head-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.view-toggle{display:inline-flex;background:#f1f4fa;border:1px solid var(--line-2);border-radius:10px;padding:3px;gap:2px}
+.view-toggle-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;border-radius:7px;background:transparent;color:var(--muted);padding:0;box-shadow:none}
+.view-toggle-btn:hover{background:rgba(255,255,255,.7);color:var(--ink);box-shadow:none;transform:none}
+.view-toggle-btn.active{background:#fff;color:var(--brand);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--brand);background:var(--brand-soft);border:1px solid #dfe5ff;padding:7px 14px;border-radius:999px;white-space:nowrap}
 .scroll{overflow:auto}
-table{width:100%;border-collapse:collapse;min-width:860px}
-thead th{text-align:left;padding:12px 20px;background:#fafbfe;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8892a6;border-bottom:1px solid var(--line);white-space:nowrap}
-tbody td{padding:15px 20px;border-bottom:1px solid #f0f2f7;font-size:13px;color:var(--ink-2);vertical-align:middle}
+table{width:100%;border-collapse:collapse;min-width:880px}
+thead th{text-align:left;padding:13px 22px;background:#f8fafd;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8892a6;border-bottom:1px solid var(--line);white-space:nowrap}
+tbody td{padding:17px 22px;border-bottom:1px solid #f0f2f7;font-size:13.5px;color:var(--ink-2);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
 tbody tr{transition:background .14s}
 tbody tr:hover{background:#fafbff}
@@ -174,77 +202,129 @@ tbody tr:hover{background:#fafbff}
 .dot.offline{background:#b6bfd0}
 .name-cell{font-weight:600;color:var(--ink)!important}
 .num-cell,.time-cell{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)!important}
-.group-cell{color:var(--muted)!important;max-width:200px}
+.group-cell{color:var(--muted)!important;max-width:220px}
 .battery-cell{white-space:nowrap}
-.battery-value{display:inline-block;min-width:38px;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-2)}
-.battery-track{display:inline-block;vertical-align:middle;width:56px;height:5px;border-radius:99px;background:#eceff6;overflow:hidden;margin-left:4px}
+.battery-value{display:inline-block;min-width:42px;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-2)}
+.battery-track{display:inline-block;vertical-align:middle;width:60px;height:6px;border-radius:99px;background:#eceff6;overflow:hidden;margin-left:4px}
 .battery-track>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#17b978,#4bd6a0)}
 .battery-track>i.mid{background:linear-gradient(90deg,#e2a33c,#f1c46b)}
 .battery-track>i.low{background:linear-gradient(90deg,#e0483d,#f0857c)}
 .action-cell{white-space:nowrap}
-.actions{display:flex;gap:7px;flex-wrap:wrap}
-.actions button{padding:7px 12px;font-size:12px;border-radius:8px}
-.table-empty{text-align:center;padding:42px 20px!important;color:var(--faint)!important;font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{padding:8px 14px;font-size:12.5px;border-radius:9px}
+.table-empty{text-align:center;padding:48px 20px!important;color:var(--faint)!important;font-size:13.5px}
+
+/* ===== 设备卡片网格 ===== */
+.device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding:22px 26px}
+.device-card{display:flex;gap:16px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease)}
+.device-card:hover{transform:translateY(-2px);box-shadow:var(--sh-md);border-color:#dbe2f0}
+.device-card-thumb{flex:none;width:104px;height:104px;border-radius:12px;background:radial-gradient(120% 120% at 20% 0%,#1a2740 0%,#0a1120 70%);border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#5c6b90;position:relative;overflow:hidden}
+.device-card-thumb .thumb-icon{color:#3d4f78}
+.device-card-thumb .thumb-model{font-size:10px;color:#64749a;letter-spacing:.04em;max-width:88px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-thumb.has-shot{background-size:cover;background-position:center}
+.device-card-thumb.has-shot .thumb-icon,.device-card-thumb.has-shot .thumb-model{display:none}
+.device-card-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.device-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.device-card-name{font-size:15px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-model{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-status{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.device-card-status.online{color:#0b7a4d;background:var(--green-soft)}
+.device-card-status.offline{color:#64708a;background:#f1f3f8}
+.device-card-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.device-card-metric{background:var(--surface-soft);border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.device-card-metric .m-label{font-size:10.5px;color:var(--faint);letter-spacing:.03em}
+.device-card-metric .m-value{font-size:13.5px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-card-metric .m-value.low{color:var(--red)}
+.device-card-metric .m-value.mid{color:var(--amber)}
+.device-card-group{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:2px}
+.device-card-actions button{padding:7px 13px;font-size:12.5px;border-radius:8px}
+.device-grid-empty{grid-column:1/-1;text-align:center;padding:52px 20px;color:var(--faint);font-size:13.5px}
 
 /* ===== 表单卡片 ===== */
-.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.form-card{padding:22px 22px 24px;display:flex;flex-direction:column}
-.card-icon{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin-bottom:17px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.form-card{padding:25px 25px 28px;display:flex;flex-direction:column}
+.card-icon{width:46px;height:46px;border-radius:13px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin-bottom:19px}
 .card-icon.green{background:var(--green-soft);color:var(--green)}
 .card-icon.amber{background:var(--amber-soft);color:var(--amber)}
-.form-card h3{font-size:15.5px;font-weight:700;margin-bottom:5px}
-.card-desc{font-size:12px;color:var(--muted);margin-bottom:20px;min-height:36px;line-height:1.6}
+.form-card h3{font-size:17px;font-weight:700;margin-bottom:6px}
+.card-desc{font-size:13px;color:var(--muted);margin-bottom:22px;min-height:40px;line-height:1.65}
 .form-card .stack-form{margin-top:auto}
-.result-box{font-size:12px;color:var(--ink-2);background:var(--surface-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm);padding:11px 13px;margin-top:15px;line-height:1.7;word-break:break-word}
+.result-box{font-size:13px;color:var(--ink-2);background:var(--surface-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm);padding:13px 15px;margin-top:17px;line-height:1.7;word-break:break-word}
 .result-box:empty{display:none}
-.token{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;word-break:break-all;background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px 11px;margin-top:7px;color:var(--brand-deep)}
-.group-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.group-chip{font-size:11.5px;font-weight:500;color:var(--ink-2);background:#f2f5fb;border:1px solid var(--line);padding:4px 9px;border-radius:7px}
+.token{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;background:#fff;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:8px;color:var(--brand-deep)}
+.group-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
+.group-chip{font-size:12.5px;font-weight:500;color:var(--ink-2);background:#f2f5fb;border:1px solid var(--line);padding:5px 10px;border-radius:8px}
 
 /* ===== 权限区 ===== */
-.perm-card{padding:24px}
+.perm-card{padding:26px}
 .perm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
-.perm-form{padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px;border-right:1px solid var(--line)}
+.perm-form{padding:22px 24px 24px;display:flex;flex-direction:column;gap:15px;border-right:1px solid var(--line)}
 .perm-form:last-child{border-right:0}
-.perm-title{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.perm-title{display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:700;color:var(--ink);margin-bottom:2px}
 .perm-title .ico{color:var(--brand)}
-.perm-form label{display:flex;flex-direction:column;gap:7px}
+.perm-form label{display:flex;flex-direction:column;gap:8px}
 .perm-form button{margin-top:auto}
-.switch-row{display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 4px}
-.switch{position:relative;display:inline-flex!important;flex-direction:row!important;align-items:center;gap:9px;cursor:pointer;font-weight:500!important;color:var(--ink-2)!important;font-size:12.5px}
+.switch-row{display:flex;gap:18px;flex-wrap:wrap;margin:2px 0 5px}
+.switch{position:relative;display:inline-flex!important;flex-direction:row!important;align-items:center;gap:10px;cursor:pointer;font-weight:500!important;color:var(--ink-2)!important;font-size:13px}
 .switch input{position:absolute;opacity:0;width:0;height:0;min-width:0;padding:0;border:0}
-.switch-track{position:relative;display:inline-block;width:34px;height:19px;border-radius:99px;background:#d8dfec;transition:background .18s;flex:none}
-.switch-track::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.2);transition:transform .18s}
+.switch-track{position:relative;display:inline-block;width:38px;height:21px;border-radius:99px;background:#d8dfec;transition:background .2s var(--ease);flex:none}
+.switch-track::after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.2);transition:transform .2s var(--ease)}
 .switch input:checked+.switch-track{background:var(--brand)}
-.switch input:checked+.switch-track::after{transform:translateX(15px)}
-.switch input:focus-visible+.switch-track{box-shadow:0 0 0 3px rgba(76,99,230,.2)}
-.hint{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:var(--muted);line-height:1.7;background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 14px;margin-top:20px}
+.switch input:checked+.switch-track::after{transform:translateX(17px)}
+.switch input:focus-visible+.switch-track{box-shadow:0 0 0 3px rgba(74,98,224,.22)}
+.hint{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 16px;margin-top:22px}
 .hint .ico{color:var(--brand);margin-top:2px}
 
-/* ===== 屏幕查看 ===== */
-.watch-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:52px 24px;text-align:center;background:linear-gradient(180deg,#fff,#fbfcff)}
-.watch-empty .we-icon{width:60px;height:60px;border-radius:18px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;margin-bottom:4px}
-.watch-empty h3{font-size:15.5px;font-weight:700}
-.watch-empty p{font-size:12.5px;color:var(--muted);max-width:420px;line-height:1.8}
-#sec-watch:has(#watchCard:not(.hidden)) .watch-empty{display:none}
-.watch-stage{background:radial-gradient(700px 320px at 15% 0%,rgba(91,113,239,.22),transparent 70%),linear-gradient(155deg,#0b1324,#111d33 60%,#0c1629);color:#fff;border:1px solid rgba(255,255,255,.07);border-radius:22px;padding:24px;box-shadow:0 20px 50px rgba(9,17,35,.28)}
-.watch-stage-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-.watch-title{display:flex;align-items:center;gap:13px}
-.watch-title .wt-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#a9bcff;display:grid;place-items:center}
-.watch-title h3{font-size:15.5px;font-weight:700}
-.watch-title .muted{display:block;color:#8fa1c4;font-size:11.5px;margin-top:2px}
-.watch-stage .notice{background:rgba(245,166,35,.10);border:1px solid rgba(245,166,35,.24);color:#f0cd8a;border-radius:var(--r-sm);padding:11px 14px;font-size:12.5px;margin-bottom:18px}
+/* ===== 屏幕查看（已移除 WebRTC，保留 watch-title 供远程控制抽屉复用） ===== */
+.watch-title{display:flex;align-items:center;gap:14px}
+.watch-title .wt-icon{width:44px;height:44px;border-radius:13px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#a9bcff;display:grid;place-items:center}
+.watch-title h3{font-size:16.5px;font-weight:700}
+.watch-title .muted{display:block;color:#8fa1c4;font-size:12.5px;margin-top:3px}
 .screen-frame{background:#050a14;border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:10px;display:flex;justify-content:center}
-video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:8px}
+
+/* ===== 远程控制（scrcpy） ===== */
+.scrcpy-setup{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin-bottom:20px}
+.scrcpy-step{padding:24px 26px;display:flex;flex-direction:column;gap:13px;border-right:1px solid var(--line)}
+.scrcpy-step:last-child{border-right:0}
+.scrcpy-step-head{display:flex;align-items:center;gap:11px}
+.scrcpy-step-no{width:30px;height:30px;border-radius:9px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:14px;font-weight:700;flex:none}
+.scrcpy-step-head strong{font-size:15px;font-weight:700}
+.scrcpy-desc{font-size:13px;color:var(--muted);line-height:1.7;min-height:38px}
+.scrcpy-form{display:flex;flex-direction:column;gap:11px;margin-top:auto}
+.scrcpy-form label{display:flex;flex-direction:column;gap:7px}
+.scrcpy-status{font-size:13.5px;color:var(--ink-2);background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--r-sm);padding:15px 18px;margin-bottom:20px;line-height:1.6}
+.scrcpy-status.ok{color:#0b7a4d;background:var(--green-soft);border-color:#c9ecd9}
+.scrcpy-status.err{color:#a8362d;background:var(--red-soft);border-color:#f5d3cf}
+.scrcpy-stage{background:radial-gradient(700px 320px at 15% 0%,rgba(91,113,239,.22),transparent 70%),linear-gradient(155deg,#0b1324,#111d33 60%,#0c1629);color:#fff;border:1px solid rgba(255,255,255,.07);border-radius:24px;padding:26px;box-shadow:0 20px 50px rgba(9,17,35,.28)}
+.scrcpy-stage-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.scrcpy-stage .screen-frame{background:#050a14;border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:10px;display:flex;justify-content:center}
+#scrCanvas{display:block;width:auto;max-width:100%;max-height:64vh;background:#050a14;border-radius:8px;cursor:crosshair;touch-action:none;aspect-ratio:var(--scr-ratio,16/9);object-fit:contain}
+.scr-hint{color:#8fa1c4;font-size:12.5px;margin-top:15px;line-height:1.7}
+@media(max-width:1200px){.scrcpy-setup{grid-template-columns:1fr}.scrcpy-step{border-right:0;border-bottom:1px solid var(--line)}.scrcpy-step:last-child{border-bottom:0}}
+
+/* ===== 远程控制抽屉 ===== */
+.scr-drawer{position:fixed;inset:0;z-index:80;display:flex;justify-content:flex-end}
+.scr-drawer-backdrop{position:absolute;inset:0;background:rgba(9,17,35,.45);backdrop-filter:blur(3px);animation:fadeIn .2s ease}
+.scr-drawer-panel{position:relative;width:min(960px,92vw);height:100%;background:#fff;box-shadow:-24px 0 60px rgba(9,17,35,.28);display:flex;flex-direction:column;animation:slideIn .28s var(--ease)}
+.scr-drawer-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 26px;border-bottom:1px solid var(--line)}
+.scr-drawer-head .watch-title .wt-icon{background:var(--brand-soft);border-color:transparent;color:var(--brand)}
+.scr-drawer-head .watch-title h3{color:var(--ink)}
+.scr-drawer-head .watch-title .muted{color:var(--muted)}
+.scr-drawer-body{flex:1;overflow-y:auto;padding:26px}
+.scr-setup-tip{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;background:var(--surface-soft);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 16px}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+@media(max-width:720px){.scr-drawer-panel{width:100vw}}
 
 /* ===== 通知 ===== */
-.toast{position:fixed;right:26px;bottom:26px;display:none;max-width:400px;padding:14px 18px 14px 42px;background:#111d33;color:#fff;border:1px solid rgba(255,255,255,.10);border-radius:12px;box-shadow:0 18px 44px rgba(9,17,35,.30);font-size:13px;line-height:1.6;z-index:60;word-break:break-word}
-.toast::before{content:"";position:absolute;left:17px;top:20px;width:9px;height:9px;border-radius:50%;background:#7d92ff;box-shadow:0 0 0 4px rgba(125,146,255,.20)}
+.toast{position:fixed;right:28px;bottom:28px;display:none;max-width:420px;padding:15px 20px 15px 46px;background:#111d33;color:#fff;border:1px solid rgba(255,255,255,.10);border-radius:14px;box-shadow:0 18px 44px rgba(9,17,35,.30);font-size:13.5px;line-height:1.6;z-index:60;word-break:break-word}
+.toast::before{content:"";position:absolute;left:19px;top:22px;width:9px;height:9px;border-radius:50%;background:#7d92ff;box-shadow:0 0 0 4px rgba(125,146,255,.20)}
 
 /* ===== 响应式 ===== */
 @media(max-width:1200px){
-  .content{padding:32px 26px 70px}
-  .topbar{padding:0 26px}
+  .content{padding:34px 28px 80px}
+  .topbar{padding:0 28px}
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid-3,.perm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .perm-form{border-bottom:1px solid var(--line)}
@@ -282,6 +362,7 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><path d="M4 7l8 4.5L20 7M12 11.5v10"/></symbol>
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></symbol>
   <symbol id="i-device" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 9h5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.3a3.2 3.2 0 0 1 0 5.9M17.5 14.4A6.5 6.5 0 0 1 21.5 20"/></symbol>
@@ -312,11 +393,11 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
     <div class="login-brand-body">
       <span class="eyebrow light">Device Management Platform</span>
       <h1>让每一台设备<br>都在掌控之中</h1>
-      <p>统一接入、分组授权与实时屏幕会话。从登记到运维，一套控制台完成设备全生命周期管理。</p>
+      <p>统一接入、分组授权与远程屏幕控制。从登记到运维，一套控制台完成设备全生命周期管理。</p>
       <div class="login-features">
         <div class="login-feature"><div class="fi"><svg class="ico"><use href="#i-activity"/></svg></div><div><strong>实时状态同步</strong><span>在线状态、电量与链路延迟即时可见</span></div></div>
         <div class="login-feature"><div class="fi"><svg class="ico"><use href="#i-shield"/></svg></div><div><strong>细粒度授权</strong><span>用户组 × 设备组，按查看与管理分级</span></div></div>
-        <div class="login-feature"><div class="fi"><svg class="ico"><use href="#i-monitor"/></svg></div><div><strong>需确认的屏幕会话</strong><span>设备使用者授权后才会建立共享</span></div></div>
+        <div class="login-feature"><div class="fi"><svg class="ico"><use href="#i-monitor"/></svg></div><div><strong>远程屏幕控制</strong><span>通过 ADB 无线调试直接查看并操作设备</span></div></div>
       </div>
     </div>
     <div class="login-brand-foot">© 2026 万象 · 安全连接，从认证开始</div>
@@ -355,8 +436,6 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
       <div class="nav-group-title">资源管理</div>
       <a class="nav-link" data-target="sec-create" href="#sec-create"><svg class="ico"><use href="#i-plus"/></svg><span class="nav-label">创建与账号</span></a>
       <a class="nav-link" data-target="sec-access" href="#sec-access"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">分组与权限</span></a>
-      <div class="nav-group-title">实时会话</div>
-      <a class="nav-link" data-target="sec-watch" href="#sec-watch"><svg class="ico"><use href="#i-monitor"/></svg><span class="nav-label">屏幕查看</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-status"><span class="live-dot"></span><span>系统运行中</span></div>
@@ -366,7 +445,7 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
 
   <div class="workspace">
     <header class="topbar">
-      <div class="crumb"><svg class="ico ico-sm"><use href="#i-grid"/></svg><span>工作台</span><span class="sep">/</span><strong>设备总览</strong></div>
+      <div class="crumb"><svg class="ico ico-sm"><use href="#i-grid"/></svg><span id="crumbGroup">工作台</span><span class="sep">/</span><strong id="crumbTitle">设备总览</strong></div>
       <div class="top-actions">
         <span id="connStatus" class="status-pill">未连接</span>
         <div class="user-chip"><span id="userAvatar" class="avatar">A</span><span id="userChipName">管理员</span></div>
@@ -375,44 +454,53 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
     </header>
 
     <main class="content">
-      <!-- 页面标题 -->
-      <div class="page-hero" id="sec-overview">
-        <div>
-          <span class="eyebrow">Overview</span>
-          <h1>设备总览</h1>
-          <p>集中管理设备接入、分组授权与实时屏幕会话。</p>
+      <!-- 页面：总览 -->
+      <section id="sec-overview" class="page active" data-title="设备总览" data-crumb="设备总览">
+        <div class="page-hero">
+          <div>
+            <span class="eyebrow">Overview</span>
+            <h1>设备总览</h1>
+            <p>集中管理设备接入、分组授权与实时屏幕会话。</p>
+          </div>
+          <div class="hero-actions">
+            <button id="refreshBtn" class="secondary"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>刷新数据</button>
+            <button id="connectBtn" class="btn-primary"><svg class="ico ico-sm"><use href="#i-bolt"/></svg>连接实时事件</button>
+          </div>
         </div>
-        <div class="hero-actions">
-          <button id="refreshBtn" class="secondary"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>刷新数据</button>
-          <button id="connectBtn" class="btn-primary"><svg class="ico ico-sm"><use href="#i-bolt"/></svg>连接实时事件</button>
+
+        <!-- 统计 -->
+        <div class="stats">
+          <div class="stat"><div class="stat-top"><div class="stat-icon"><svg class="ico"><use href="#i-device"/></svg></div><span class="stat-tag">TOTAL</span></div><div id="statTotal" class="stat-value">0</div><div class="stat-label">可见设备总数</div><div class="stat-bar"><i id="statTotalBar"></i></div></div>
+          <div class="stat"><div class="stat-top"><div class="stat-icon green"><svg class="ico"><use href="#i-activity"/></svg></div><span class="stat-tag">ONLINE</span></div><div id="statOnline" class="stat-value">0</div><div class="stat-label">当前在线设备</div><div class="stat-bar green"><i id="statRateBar"></i></div></div>
+          <div class="stat"><div class="stat-top"><div class="stat-icon gray"><svg class="ico"><use href="#i-monitor"/></svg></div><span class="stat-tag">OFFLINE</span></div><div id="statOffline" class="stat-value">0</div><div class="stat-label">离线 / 已停用</div><div class="stat-bar"><i id="statOfflineBar"></i></div></div>
+          <div class="stat"><div class="stat-top"><div class="stat-icon amber"><svg class="ico"><use href="#i-layers"/></svg></div><span id="statRate" class="stat-tag">— 在线率</span></div><div id="statGroups" class="stat-value">0</div><div class="stat-label">已配置分组</div><div class="stat-bar"><i id="statGroupsBar"></i></div></div>
         </div>
-      </div>
+      </section>
 
-      <!-- 统计 -->
-      <div class="stats">
-        <div class="stat"><div class="stat-top"><div class="stat-icon"><svg class="ico"><use href="#i-device"/></svg></div><span class="stat-tag">TOTAL</span></div><div id="statTotal" class="stat-value">0</div><div class="stat-label">可见设备总数</div><div class="stat-bar"><i id="statTotalBar"></i></div></div>
-        <div class="stat"><div class="stat-top"><div class="stat-icon green"><svg class="ico"><use href="#i-activity"/></svg></div><span class="stat-tag">ONLINE</span></div><div id="statOnline" class="stat-value">0</div><div class="stat-label">当前在线设备</div><div class="stat-bar green"><i id="statRateBar"></i></div></div>
-        <div class="stat"><div class="stat-top"><div class="stat-icon gray"><svg class="ico"><use href="#i-monitor"/></svg></div><span class="stat-tag">OFFLINE</span></div><div id="statOffline" class="stat-value">0</div><div class="stat-label">离线 / 已停用</div><div class="stat-bar"><i id="statOfflineBar"></i></div></div>
-        <div class="stat"><div class="stat-top"><div class="stat-icon amber"><svg class="ico"><use href="#i-layers"/></svg></div><span id="statRate" class="stat-tag">— 在线率</span></div><div id="statGroups" class="stat-value">0</div><div class="stat-label">已配置分组</div><div class="stat-bar"><i id="statGroupsBar"></i></div></div>
-      </div>
-
-      <!-- 设备清单 -->
-      <section id="sec-devices" class="section">
+      <!-- 页面：设备清单 -->
+      <section id="sec-devices" class="section page" data-title="设备清单" data-crumb="设备清单">
         <div class="section-head"><div><span class="eyebrow">01 / Devices</span><h2>设备清单</h2><p>所有对你可见的终端及其最近一次上报的运行状态</p></div></div>
         <div class="card table-card">
           <div class="card-head">
             <div><h3>已接入设备</h3><p>状态随实时事件自动更新，也可手动刷新</p></div>
-            <span id="summary" class="chip">正在加载…</span>
+            <div class="card-head-right">
+              <div class="view-toggle" role="group" aria-label="视图切换">
+                <button id="viewListBtn" class="view-toggle-btn active" title="列表视图"><svg class="ico ico-sm"><use href="#i-list"/></svg></button>
+                <button id="viewGridBtn" class="view-toggle-btn" title="卡片视图"><svg class="ico ico-sm"><use href="#i-grid"/></svg></button>
+              </div>
+              <span id="summary" class="chip">正在加载…</span>
+            </div>
           </div>
-          <div class="scroll"><table>
+          <div class="scroll" id="deviceListView"><table>
             <thead><tr><th>状态</th><th>设备</th><th>电量</th><th>RTT</th><th>分组</th><th>最后在线</th><th>操作</th></tr></thead>
             <tbody id="deviceRows"><tr><td colspan="7" class="muted">暂无设备</td></tr></tbody>
           </table></div>
+          <div class="device-grid hidden" id="deviceGridView"></div>
         </div>
       </section>
 
-      <!-- 资源创建 -->
-      <section id="sec-create" class="section">
+      <!-- 页面：创建与账号 -->
+      <section id="sec-create" class="section page" data-title="创建与账号" data-crumb="创建与账号">
         <div class="section-head"><div><span class="eyebrow">02 / Resources</span><h2>创建与账号</h2><p>开通账号并维护分组目录；设备由 App 自动注册</p></div></div>
         <div class="grid-3">
           <div class="card form-card">
@@ -442,8 +530,8 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
         </div>
       </section>
 
-      <!-- 分组与权限 -->
-      <section id="sec-access" class="section">
+      <!-- 页面：分组与权限 -->
+      <section id="sec-access" class="section page" data-title="分组与权限" data-crumb="分组与权限">
         <div class="section-head"><div><span class="eyebrow">03 / Access Control</span><h2>分组与权限</h2><p>通过「用户组 × 设备组」建立可见性与管理权限</p></div></div>
         <div class="card perm-card">
           <div class="perm-grid">
@@ -473,25 +561,59 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
           <p class="hint"><svg class="ico ico-sm"><use href="#i-info"/></svg><span>用户组与设备组可同名，但应作为独立授权关系管理；普通用户只有获得组间权限后才能看到对应设备。管理员拥有全部权限，管理操作最终由服务端校验。</span></p>
         </div>
       </section>
-
-      <!-- 屏幕查看 -->
-      <section id="sec-watch" class="section">
-        <div class="section-head"><div><span class="eyebrow">04 / Live Session</span><h2>实时屏幕查看</h2><p>需设备使用者确认授权后才开始共享，全程有审计记录</p></div></div>
-        <div class="card watch-empty">
-          <div class="we-icon"><svg class="ico ico-lg"><use href="#i-monitor"/></svg></div>
-          <h3>尚无进行中的屏幕会话</h3>
-          <p>在上方设备清单中选择一台在线设备，点击「查看屏幕」发起请求。设备端确认授权后，画面会在此处呈现。</p>
-        </div>
-        <div id="watchCard" class="watch-stage hidden">
-          <div class="watch-stage-head">
-            <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-monitor"/></svg></div><div><h3>屏幕会话进行中</h3><span id="watchInfo" class="muted small"></span></div></div>
-            <button id="stopWatchBtn" class="btn-danger"><svg class="ico ico-sm"><use href="#i-stop"/></svg>停止查看</button>
-          </div>
-          <p id="watchNotice" class="notice">等待设备端用户确认系统屏幕共享授权。未经确认不会采集屏幕。</p>
-          <div class="screen-frame"><video id="screen" autoplay playsinline controls></video></div>
-        </div>
-      </section>
     </main>
+  </div>
+</div>
+
+<!-- ===== 远程控制抽屉 ===== -->
+<div id="scrDrawer" class="scr-drawer hidden">
+  <div class="scr-drawer-backdrop" id="scrDrawerBackdrop"></div>
+  <div class="scr-drawer-panel">
+    <div class="scr-drawer-head">
+      <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-monitor"/></svg></div><div><h3>远程控制</h3><span id="scrInfo" class="muted small">尚未连接</span></div></div>
+      <button id="scrCloseBtn" class="btn-ghost"><svg class="ico ico-sm"><use href="#i-close"/></svg>关闭</button>
+    </div>
+    <div class="scr-drawer-body">
+      <!-- 步骤 1：配置连接（首次/未连接时显示） -->
+      <div id="scrSetup" class="scr-setup-box">
+        <p class="scr-setup-tip">通过 ADB 无线调试连接设备。设备需在「开发者选项 → 无线调试」中开启并显示配对信息。</p>
+        <div class="scrcpy-setup">
+          <div class="scrcpy-step">
+            <div class="scrcpy-step-head"><span class="scrcpy-step-no">1</span><strong>配对设备</strong></div>
+            <p class="scrcpy-desc">填写无线调试页的配对端口与 6 位配对码。</p>
+            <div class="scrcpy-form">
+              <label>设备 IP<input id="scrIp" placeholder="如 192.168.1.100"></label>
+              <label>配对端口<input id="scrPairPort" placeholder="如 35711"></label>
+              <label>配对码<input id="scrPairCode" placeholder="6 位配对码"></label>
+              <button id="scrPairBtn"><svg class="ico ico-sm"><use href="#i-key"/></svg>配对</button>
+            </div>
+          </div>
+          <div class="scrcpy-step">
+            <div class="scrcpy-step-head"><span class="scrcpy-step-no">2</span><strong>建立连接</strong></div>
+            <p class="scrcpy-desc">配对成功后，用连接端口建立 ADB 连接。</p>
+            <div class="scrcpy-form">
+              <label>连接端口<input id="scrConnPort" placeholder="如 35583"></label>
+              <button id="scrConnBtn"><svg class="ico ico-sm"><use href="#i-bolt"/></svg>连接</button>
+            </div>
+          </div>
+          <div class="scrcpy-step">
+            <div class="scrcpy-step-head"><span class="scrcpy-step-no">3</span><strong>开始控制</strong></div>
+            <p class="scrcpy-desc">连接就绪后，点击开始进入远程画面。</p>
+            <button id="scrStartBtn" class="btn-primary btn-block"><svg class="ico ico-sm"><use href="#i-monitor"/></svg>开始控制</button>
+          </div>
+        </div>
+        <div id="scrStatus" class="scrcpy-status">尚未连接设备</div>
+      </div>
+      <!-- 控制画面 -->
+      <div id="scrStage" class="scrcpy-stage hidden">
+        <div class="scrcpy-stage-head">
+          <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-monitor"/></svg></div><div><h3>远程控制进行中</h3><span id="scrStageInfo" class="muted small"></span></div></div>
+          <button id="scrStopBtn" class="btn-danger"><svg class="ico ico-sm"><use href="#i-stop"/></svg>停止</button>
+        </div>
+        <div class="screen-frame"><canvas id="scrCanvas"></canvas></div>
+        <p class="scr-hint">在画面上拖动鼠标即可控制设备；点击=触摸，滚轮=滚动，键盘输入=文本。</p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -499,7 +621,7 @@ video{display:block;width:100%;max-height:62vh;background:#050a14;border-radius:
 
 <script>
 'use strict';
-const $=id=>document.getElementById(id);let token=sessionStorage.getItem('adminToken')||'';let user=null,ws=null,wsTicketBusy=false;let devices=[];let groups=[];let pc=null;let currentWatch='';let candidates=[];let reconnectTimer=null;
+const $=id=>document.getElementById(id);let token=sessionStorage.getItem('adminToken')||'';let user=null,ws=null,wsTicketBusy=false;let devices=[];let groups=[];let reconnectTimer=null;
 const apiBase=location.origin;const wsBase=localStorage.getItem('wsBase')||`${location.protocol==='https:'?'wss:':'ws:'}//${location.hostname}:9003`;
 function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',3600)}
 async function api(path,options={}){const headers=new Headers(options.headers||{});if(token)headers.set('Authorization',`Bearer ${token}`);if(options.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');const res=await fetch(apiBase+path,{...options,headers});let data=null;const text=await res.text();if(text){try{data=JSON.parse(text)}catch{data={error:text}}}if(!res.ok)throw new Error(data?.error||`HTTP ${res.status}`);return data}
@@ -507,18 +629,46 @@ function showApp(){const yes=!!token;$('loginCard').classList.toggle('hidden',ye
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{const data=await api('/api/admin/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});token=data.token;user=data;sessionStorage.setItem('adminToken',token);showApp();toast('登录成功')}catch(err){toast(err.message)}});
 $('logoutBtn').onclick=async()=>{try{await api('/api/admin/logout',{method:'POST'})}catch{};token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()};
 $('refreshBtn').onclick=loadAll;$('connectBtn').onclick=connectRealtime;
+// 设备清单视图切换（列表/卡片），偏好记到 localStorage
+$('viewListBtn').onclick=()=>setDeviceView('list');
+$('viewGridBtn').onclick=()=>setDeviceView('grid');
+(function(){try{const saved=localStorage.getItem('deviceView');if(saved==='list'||saved==='grid')deviceView=saved}catch(_){}})();
 async function loadAll(){try{const [ds,gs]=await Promise.all([api('/api/admin/devices'),api('/api/admin/groups')]);devices=ds||[];groups=gs||[];renderDevices();renderGroups()}catch(e){toast(e.message);if(/unauthorized/i.test(e.message))logoutLocal()}}
 function logoutLocal(){token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()}
-function renderDevices(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="7" class="muted">没有可见设备</td></tr>';$('summary').textContent='0 台设备';fillDeviceSelect();return}let online=0;for(const d of devices){if(d.online)online++;const tr=document.createElement('tr');const state=document.createElement('td');state.innerHTML=`<span class="dot ${d.online?'online':'offline'}"></span>${d.online?'在线':'离线'}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=d.name||d.model||('设备 '+d.id.slice(0,8));const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const group=document.createElement('td');group.textContent=(d.groupIds||[]).map(id=>groups.find(g=>g.id===id)?.name||id).join(', ')||'—';const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');const box=document.createElement('div');box.className='actions';const watch=document.createElement('button');watch.textContent='查看屏幕';watch.disabled=!d.online||!d.enabled;watch.onclick=()=>startWatch(d.id,d.name);box.append(watch);if(user){/* 普通用户也可能被授予 can_manage；最终权限由服务端 CanAccess 判定 */const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'断开/停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle)}actions.append(box);tr.append(state,name,battery,rtt,group,last,actions);body.append(tr)}$('summary').textContent=`${devices.length} 台设备，${online} 台在线${ws?.readyState===WebSocket.OPEN?' · 实时更新中':' · 实时连接未连接'}`;fillDeviceSelect()}
+let deviceView='list';
+function deviceDisplayName(d){return d.name||d.model||('设备 '+d.id.slice(0,8))}
+function deviceGroupLabel(d){return (d.groupIds||[]).map(id=>groups.find(g=>g.id===id)?.name||id).join(', ')||'—'}
+function deviceActions(d){const box=document.createElement('div');box.className='actions';const remote=document.createElement('button');remote.textContent='远程控制';remote.className='secondary';remote.disabled=!d.online||!d.enabled;remote.onclick=()=>openScrcpy(d);box.append(remote);if(user){const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'断开/停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle)}return box}
+function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="7" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const state=document.createElement('td');state.innerHTML=`<span class="dot ${d.online?'online':'offline'}"></span>${d.online?'在线':'离线'}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(state,name,battery,rtt,group,last,actions);body.append(tr)}}
+function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren();if(!devices.length){const empty=document.createElement('div');empty.className='device-grid-empty';empty.textContent='没有可见设备';grid.append(empty);return}for(const d of devices){const card=document.createElement('div');card.className='device-card';
+  // 缩略图：优先用 d.screenshot，否则深色占位图（图标 + 型号）
+  const thumb=document.createElement('div');thumb.className='device-card-thumb';if(d.screenshot){thumb.classList.add('has-shot');thumb.style.backgroundImage=`url(${d.screenshot})`;}else{const ic=document.createElement('svg');ic.className='ico ico-lg thumb-icon';ic.innerHTML='<use href="#i-device"></use>';const model=document.createElement('span');model.className='thumb-model';model.textContent=d.model||deviceDisplayName(d);thumb.append(ic,model);}
+  // 信息区
+  const body=document.createElement('div');body.className='device-card-body';
+  const top=document.createElement('div');top.className='device-card-top';
+  const nameBox=document.createElement('div');nameBox.style.minWidth='0';nameBox.style.flex='1';
+  const name=document.createElement('div');name.className='device-card-name';name.textContent=deviceDisplayName(d);
+  const model=document.createElement('div');model.className='device-card-model';model.textContent=d.model||'—';
+  nameBox.append(name,model);
+  const st=document.createElement('span');st.className='device-card-status '+(d.online?'online':'offline');st.textContent=d.online?(d.enabled?'在线':'已停用'):'离线';
+  top.append(nameBox,st);
+  const metrics=document.createElement('div');metrics.className='device-card-metrics';
+  const mk=(label,value,cls)=>{const m=document.createElement('div');m.className='device-card-metric';const l=document.createElement('span');l.className='m-label';l.textContent=label;const v=document.createElement('span');v.className='m-value'+(cls?' '+cls:'');v.textContent=value;m.append(l,v);return m};
+  metrics.append(mk('电量',d.online?`${d.battery}%`:'—',d.battery<=20?'low':(d.battery<=50?'mid':'')));
+  metrics.append(mk('延迟',d.online?`${d.rttMs}ms`:'—'));
+  metrics.append(mk('状态',d.online?(d.status||'运行中'):'离线'));
+  const grp=document.createElement('div');grp.className='device-card-group';grp.textContent='分组：'+deviceGroupLabel(d);
+  const acts=document.createElement('div');acts.className='device-card-actions';acts.append(deviceActions(d));
+  body.append(top,metrics,grp,acts);
+  card.append(thumb,body);grid.append(card);}}
+function renderDevices(){renderDeviceList();renderDeviceCards();let online=0;for(const d of devices)if(d.online)online++;$('summary').textContent=`${devices.length} 台设备，${online} 台在线${ws?.readyState===WebSocket.OPEN?' · 实时更新中':' · 实时连接未连接'}`;fillDeviceSelect();applyDeviceView()}
+function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGridView');const listBtn=$('viewListBtn'),gridBtn=$('viewGridBtn');if(!listEl||!gridEl)return;const isList=deviceView==='list';listEl.classList.toggle('hidden',!isList);gridEl.classList.toggle('hidden',isList);if(listBtn&&gridBtn){listBtn.classList.toggle('active',isList);gridBtn.classList.toggle('active',!isList)}}
+function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
 function fillDeviceSelect(){const s=$('dgDevice');const old=s.value;s.replaceChildren();for(const d of devices){const o=document.createElement('option');o.value=d.id;o.textContent=`${d.name||d.model||'设备 '+d.id.slice(0,8)} (${d.id.slice(0,8)})`;s.append(o)}if([...s.options].some(o=>o.value===old))s.value=old}
 function renderGroups(){const labels=groups.map(g=>`${g.name} (${g.id.slice(0,8)})`);$('groupList').textContent=groups.length?labels.join(' · '):'暂无设备组';for(const id of ['ugGroup','dgGroup','accessUG','accessDG']){const el=$(id),old=el.value;el.replaceChildren();for(const g of groups){const o=document.createElement('option');o.value=g.id;o.textContent=g.name;el.append(o)}if([...el.options].some(o=>o.value===old))el.value=old}}
-async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';if(currentWatch)cleanupWatch(false);clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
+async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
-async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}renderDevices()}else loadAll();return}if(m.type==='watch-started'){currentWatch=m.sessionId;$('watchCard').classList.remove('hidden');$('watchInfo').textContent=`会话 ${m.sessionId} · 设备 ${m.deviceId}`;$('watchNotice').textContent='已请求设备端开始共享；等待设备使用者确认系统授权…';return}if(m.type==='watch-ready'){$('watchNotice').textContent='设备已授权，正在建立视频连接…';return}if(m.type==='watch-denied'){$('watchNotice').textContent='设备使用者拒绝了屏幕共享请求。';toast('设备拒绝共享');return}if(m.type==='offer'){await acceptOffer(m);return}if(m.type==='candidate'){await addCandidate(m);return}if(m.type==='watch-ended'||m.type==='watch-stopped'){cleanupWatch(false);toast('屏幕查看已结束');return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
-async function startWatch(id,name){if(!ws||ws.readyState!==WebSocket.OPEN){await connectRealtime();if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪');return}}if(currentWatch)stopWatch();$('watchCard').classList.remove('hidden');$('watchInfo').textContent=`设备：${name}`;$('watchNotice').textContent='正在请求设备端授权…';sendWS({type:'watch',deviceId:id})}
-async function acceptOffer(m){try{if(pc)pc.close();pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});pc.ontrack=e=>{$('screen').srcObject=e.streams[0];$('watchNotice').textContent='屏幕共享已连接。'};pc.onicecandidate=e=>{if(e.candidate)sendWS({type:'candidate',sessionId:currentWatch,candidate:e.candidate.candidate,sdpMid:e.candidate.sdpMid,sdpMLineIndex:e.candidate.sdpMLineIndex})};await pc.setRemoteDescription({type:'offer',sdp:m.sdp});for(const c of candidates)await pc.addIceCandidate(c);candidates=[];const answer=await pc.createAnswer();await pc.setLocalDescription(answer);sendWS({type:'answer',sessionId:m.sessionId||currentWatch,sdp:answer.sdp})}catch(e){toast(`建立屏幕连接失败：${e.message}`)}}
-async function addCandidate(m){const c={candidate:m.candidate,sdpMid:m.sdpMid,sdpMLineIndex:m.sdpMLineIndex};if(pc?.remoteDescription){try{await pc.addIceCandidate(c)}catch(e){console.warn('ICE candidate rejected',e)}}else candidates.push(c)}
-function stopWatch(){if(currentWatch)sendWS({type:'watch-stop',sessionId:currentWatch});cleanupWatch(false)}function cleanupWatch(hide=true){if(pc){pc.close();pc=null}candidates=[];$('screen').srcObject=null;currentWatch='';if(hide)$('watchCard').classList.add('hidden');else if(!$('watchCard').classList.contains('hidden'))$('watchNotice').textContent='会话已结束。'}$('stopWatchBtn').onclick=stopWatch;
+async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
 async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定停用并断开此设备？':'确定重新启用此设备？'))return;if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪，无法下发控制指令');return}sendWS({type:'device-control',deviceId:id,action:action})}
 $('userForm').addEventListener('submit',async e=>{e.preventDefault();try{const x=await api('/api/admin/users',{method:'POST',body:JSON.stringify({username:$('newUsername').value.trim(),password:$('newPassword').value})});$('newUserResult').textContent=`用户已创建，ID：${x.userId}（可复制到用户组分配表单）`;$('ugUserId').value=x.userId;$('newUsername').value='';$('newPassword').value='';toast('用户创建成功')}catch(err){toast(err.message)}});
 $('groupForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/admin/groups',{method:'POST',body:JSON.stringify({name:$('groupName').value.trim()})});$('groupName').value='';await loadAll();toast('设备组已创建')}catch(err){toast(err.message)}});
@@ -621,27 +771,55 @@ if(token)showApp();
     paint();
   }
 
-  /* 侧栏导航：平滑滚动到区块并高亮当前项。 */
+  /* 侧栏导航：多页面切换（显示对应页面、隐藏其他、联动面包屑与高亮）。 */
   const links = [...document.querySelectorAll('.nav-link[data-target]')];
+  const pages = [...document.querySelectorAll('main .page')];
+  const crumbGroupEl = el('crumbGroup');
+  const crumbTitleEl = el('crumbTitle');
   const setActive = link => links.forEach(item => item.classList.toggle('active', item === link));
+
+  // 根据当前激活的 nav-link 所属分组名更新面包屑「分组」段。
+  function navGroupOf(link) {
+    let prev = link.previousElementSibling;
+    while (prev) {
+      if (prev.classList.contains('nav-group-title')) return prev.textContent.trim();
+      prev = prev.previousElementSibling;
+    }
+    return '工作台';
+  }
+
+  function showPage(targetId, link) {
+    // 切换页面显隐
+    for (const page of pages) page.classList.toggle('active', page.id === targetId);
+    // 更新高亮
+    setActive(link);
+    // 联动面包屑
+    if (crumbGroupEl && crumbTitleEl && link) {
+      const page = pages.find(p => p.id === targetId);
+      crumbGroupEl.textContent = navGroupOf(link);
+      crumbTitleEl.textContent = (page && page.dataset.title) || link.dataset.target;
+    }
+    // 回到页面顶部（独立页面切换后，回到顶部开始浏览）
+    window.scrollTo(0, 0);
+  }
+
   for (const link of links) {
     link.addEventListener('click', event => {
       event.preventDefault();
-      const target = el(link.dataset.target);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setActive(link);
+      showPage(link.dataset.target, link);
+      // 同步 URL hash，便于刷新/分享时保持当前页
+      if (history.replaceState) history.replaceState(null, '', '#' + link.dataset.target);
     });
   }
-  if (typeof IntersectionObserver !== 'undefined') {
-    const observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const link = links.find(item => item.dataset.target === entry.target.id);
-        if (link) setActive(link);
-      }
-    }, { rootMargin: '-88px 0px -62% 0px', threshold: 0 });
-    for (const link of links) { const target = el(link.dataset.target); if (target) observer.observe(target); }
+
+  // 初始/刷新时：根据 URL hash 还原所在页，否则默认总览。
+  function restorePage() {
+    const hash = (location.hash || '').replace('#', '');
+    const link = links.find(item => item.dataset.target === hash) || links[0];
+    if (link) showPage(link.dataset.target, link);
   }
+  restorePage();
+  window.addEventListener('hashchange', restorePage);
 
   updateStats();
   syncUser();

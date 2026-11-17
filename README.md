@@ -4,7 +4,7 @@ Go 实现的设备消息转发器与管理 API。三个独立进程共享同一�
 
 管理后台页面：启动 admin-server 后打开 `http://localhost:9002/`。页面由纯 HTML/CSS/JavaScript 构成，无需 Node 构建工具。
 
-WebRTC 协议流程与消息样例见 [`docs/webrtc-client-flow.md`](docs/webrtc-client-flow.md)。屏幕采集必须经过 Android 系统 MediaProjection 授权；Go 服务只转发信令，不接收媒体帧。
+远程屏幕控制通过 ADB 无线调试 + scrcpy 实现，见下文「scrcpy 远程控制」一节。
 
 ## 架构与端口
 
@@ -13,6 +13,7 @@ WebRTC 协议流程与消息样例见 [`docs/webrtc-client-flow.md`](docs/webrtc
 | `web-server` | `:9001` | 安卓设备端 | 设备 HTTP API：以 deviceId 换一次性 ticket |
 | `admin-server` | `:9002` | 管理后台浏览器 | 管理员登录、设备/用户/组/权限 API + 静态页面 |
 | `websocket-server` | `:9003` | 设备端 + 管理端 | `/ws/device` 与 `/ws/admin` 实时转发 |
+| `scrcpy-server` | `:9004` | 管理后台浏览器 | ADB 无线调试 + scrcpy 远程观看/控制 |
 
 设备不登录：App 安装时本地生成 deviceId，首次调用换票接口即自动登记（可带型号）。管理端仍用管理员账密 + session。设备控制（断开/启用）通过管理端的 WebSocket 连接下发，不再经过 HTTP 服务。
 
@@ -27,20 +28,32 @@ Copy-Item .env.example .env
 go run ./cmd/web-server        # 设备端 HTTP API（9001）
 go run ./cmd/admin-server      # 管理后台（9002）
 go run ./cmd/websocket-server  # WebSocket 转发（9003）
+go run ./cmd/scrcpy-server     # ADB 远程控制（9004）
 ```
 
-三个服务都必须从项目根目录运行，并使用 `.env` 中同一个本地 SQLite 文件；不要把 SQLite 文件放在网络共享盘。多主机部署需改用服务端数据库和节点间事件/路由机制。
+四个服务都必须从项目根目录运行，并使用 `.env` 中同一个本地 SQLite 文件；不要把 SQLite 文件放在网络共享盘。多主机部署需改用服务端数据库和节点间事件/路由机制。
+
+## scrcpy 远程控制（scrcpy-server，`:9004`）
+
+管理后台通过 ADB 无线调试 + scrcpy 远程观看并操作设备屏幕。设备上无需预装 App：`scrcpy-server` 进程在浏览器发起观看时，通过 `adb push` 把 `tools/scrcpy-server`（Android 端 jar）部署到设备的 `/data/local/tmp/scrcpy-server` 并用 `app_process` 启动，随后经 `adb forward` 建立视频（H.264）与控制两条通道，浏览器用 WebCodecs 解码 H.264 并回传触摸/按键/文本/滚动控制事件。
+
+- **配对/连接**走 admin-server 的 `/api/admin/scrcpy/pair` 与 `/connect`，视频与控制流走 scrcpy-server 的 `/api/scrcpy/ws`。
+- **scrcpy-server 版本**：对应上游 Genymobile/scrcpy **4.0**（git revision `048c747cc10b3a7fe2d313d8ad2ed41d26c90ae7`，2026-05-12 的 "Bump version to 4.0" 提交）。启动命令硬编码的版本参数 `4.0` 必须与 `tools/scrcpy-server` 的 jar 真实版本严格一致，否则 scrcpy-server 会因版本不匹配直接退出。
+- **部署优化**：`deploy` 按文件大小比对决定是否重新 push（设备上已有的同名文件大小一致则跳过）。若更换了不同版本的 jar，需留意大小恰好相同时可能不会触发重推，建议必要时手动 `adb push` 或清理设备上的旧文件。
+- **分辨率/码率/帧率**：默认 `MaxSize=1920`、`BitRate=8 Mbps`、`MaxFPS=60`（局域网带宽充足），见 `internal/scrcpy/tunnel.go` 的 `DefaultScrcpyConfig`，需重启 scrcpy-server 进程后生效。
+- **依赖**：`tools/adb`（Windows 为 `tools/adb.exe`）与 `tools/scrcpy-server` 均随仓库分发，clone 后即可运行，无需额外安装 adb 或 scrcpy。
 
 ## `.env` 配置项
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `DB_PATH` | `./data/wanxiang.db` | SQLite 文件位置；三个服务必须相同 |
+| `DB_PATH` | `./data/wanxiang.db` | SQLite 文件位置；四个服务必须相同 |
 | `ADMIN_USERNAME` | `admin` | 首次启动创建的管理员用户名 |
 | `ADMIN_PASSWORD` | 无 | 必填；请设置强密码 |
-| `WEB_ADDR` | `:9001` | 设备端 HTTP API 监听地址 |
-| `ADMIN_ADDR` | `:9002` | 管理后台监听地址 |
-| `WS_ADDR` | `:9003` | WebSocket 转发监听地址 |
+| `WEB_PORT` | `:9001` | 设备端 HTTP API 监听地址 |
+| `ADMIN_PORT` | `:9002` | 管理后台监听地址 |
+| `WS_PORT` | `:9003` | WebSocket 转发监听地址 |
+| `SCRCPY_PORT` | `:9004` | ADB 远程控制（scrcpy）监听地址 |
 | `WS_ALLOWED_ORIGINS` | 空 | 浏览器管理页面的精确 Origin，逗号分隔；例如 `http://localhost:9002` |
 | `WEB_DIR` | `./web` | 管理后台静态文件目录 |
 | `TLS_CERT` / `TLS_KEY` | 空 | 可选的内置 TLS 证书与私钥；必须同时设置，否则启动报错。仅 admin-server 与 websocket-server 使用；设备端 web-server 默认明文 HTTP |
@@ -79,4 +92,4 @@ go run ./cmd/websocket-server  # WebSocket 转发（9003）
 
 - `POST /api/device/ws-ticket`：以 deviceId 换一次性 WebSocket ticket，JSON `{"deviceId":"...","model":"..."}`（model 可选）。首次调用自动登记设备，重复调用幂等。
 
-此版本是单 SQLite 主机、单转发节点、单全局观看会话的开发原型，不是多节点生产集群。已内置进程内登录限速，但上线前仍需 TLS/WSS、网关层限速、备份恢复、审计查询、密钥轮换、TURN 配置及部署安全评估。项目约定与完整限制清单见 [`AGENTS.md`](AGENTS.md)。
+此版本是单 SQLite 主机、单转发节点、单全局远程控制会话的开发原型，不是多节点生产集群。已内置进程内登录限速，但上线前仍需 TLS/WSS、网关层限速、备份恢复、审计查询、密钥轮换及部署安全评估。项目约定与完整限制清单见 [`AGENTS.md`](AGENTS.md)。
