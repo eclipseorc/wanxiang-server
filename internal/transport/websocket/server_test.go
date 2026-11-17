@@ -22,62 +22,6 @@ func newTestHub(t *testing.T) *Hub {
 	return NewHub(sqlite.NewStore(db))
 }
 
-// 设备被同 ID 的新连接替换时，removeDevice 的 current=false 分支也必须释放
-// watch 会话；否则 watch_sessions 会永久占用，之后所有观看请求都会失败。
-func TestRemoveDeviceReleasesWatchWhenReplaced(t *testing.T) {
-	hub := newTestHub(t)
-	handler := NewHandler(hub)
-
-	old := newClient(nil, "device", "dev-1")
-	replacement := newClient(nil, "device", "dev-1")
-	viewer := newClient(nil, "admin", "user-1")
-
-	hub.mu.Lock()
-	hub.devices["dev-1"] = replacement
-	hub.mu.Unlock()
-	hub.watchMu.Lock()
-	hub.viewer, hub.sessionID, hub.deviceID = viewer, "session-1", "dev-1"
-	hub.watchMu.Unlock()
-
-	handler.removeDevice(old)
-
-	hub.watchMu.Lock()
-	sessionID, activeViewer := hub.sessionID, hub.viewer
-	hub.watchMu.Unlock()
-	if sessionID != "" || activeViewer != nil {
-		t.Fatalf("watch session still active: session=%q viewer=%v", sessionID, activeViewer)
-	}
-	var remaining int
-	if err := hub.store.DB.QueryRow(
-		`SELECT COUNT(*) FROM watch_sessions WHERE session_id IS NOT NULL`,
-	).Scan(&remaining); err != nil {
-		t.Fatal(err)
-	}
-	if remaining != 0 {
-		t.Fatalf("database watch slot still reserved: %d", remaining)
-	}
-}
-
-func TestEndWatchRecordsRealActor(t *testing.T) {
-	hub := newTestHub(t)
-	viewer := newClient(nil, "admin", "user-42")
-	hub.watchMu.Lock()
-	hub.viewer, hub.sessionID, hub.deviceID = viewer, "session-2", "dev-2"
-	hub.watchMu.Unlock()
-
-	hub.endWatch("session-2")
-
-	var actor string
-	if err := hub.store.DB.QueryRow(
-		`SELECT actor_id FROM audit_logs WHERE action='watch-ended' AND detail='session-2'`,
-	).Scan(&actor); err != nil {
-		t.Fatal(err)
-	}
-	if actor != "user-42" {
-		t.Fatalf("audit actor = %q, want user-42", actor)
-	}
-}
-
 func TestBoundedPayloadTruncatesBroadcastData(t *testing.T) {
 	long := strings.Repeat("x", maxPayloadBytes+100)
 	got := boundedPayload(long)

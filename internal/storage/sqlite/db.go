@@ -73,7 +73,6 @@ func OpenReady(path string) (*sql.DB, error) {
 }
 
 // InitSchema 幂等地建立全部表与索引，并对早期原型创建的数据库做增量迁移。
-// watch_sessions 用 CHECK(id=1) 刻意固定为单行，表达「全局只允许一个观看会话」。
 func InitSchema(db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','user')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
@@ -84,8 +83,6 @@ func InitSchema(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS device_groups(group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, PRIMARY KEY(group_id,device_id))`,
 		`CREATE TABLE IF NOT EXISTS group_access(user_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, can_view INTEGER NOT NULL DEFAULT 0, can_manage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_group_id,device_group_id))`,
 		`CREATE TABLE IF NOT EXISTS ws_tickets(ticket_hash TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS watch_sessions(id INTEGER PRIMARY KEY CHECK(id=1), session_id TEXT, device_id TEXT, user_id TEXT)`,
-		`INSERT OR IGNORE INTO watch_sessions(id,session_id,device_id,user_id) VALUES(1,NULL,NULL,NULL)`,
 		`CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT, action TEXT NOT NULL, device_id TEXT, detail TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_online ON devices(online)`,

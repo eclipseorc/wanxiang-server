@@ -13,14 +13,12 @@ All WebSocket messages are JSON objects with a `type` field. Device and admin co
 
 ## Admin lifecycle and access
 
-Admin logs in over HTTP, obtains a websocket ticket from `POST /api/admin/ws-ticket`, then opens `/ws/admin?ticket=...`. The first message is a permission-filtered `device-list`. Online and state changes are pushed as `device-online`, `device-offline`, and `device-state` messages. The server checks authorization for every watch request and for each pushed device event.
+Admin logs in over HTTP, obtains a websocket ticket from `POST /api/admin/ws-ticket`, then opens `/ws/admin?ticket=...`. The first message is a permission-filtered `device-list`. Online and state changes are pushed as `device-online`, `device-offline`, and `device-state` messages. The server checks authorization for each pushed device event.
 
 Access policy: admins have full access. A regular user sees a device only when they belong to a user group, the device belongs to a device group, and `group_access` grants `can_view`; management actions require `can_manage`.
 
-## Message routing and WebRTC
+## Remote control
 
-Each message must carry a valid `type`; all watch-scoped messages must carry the active `sessionId`. `watch` starts a single global view session, and the Android app must use explicit user action plus Android MediaProjection system consent before capture. The Android side creates the offer; `offer`, `answer`, and trickled `candidate` messages are relayed only between the authorized viewer and selected device. Queue candidates received before the remote SDP is set, and discard stale session IDs. The server relays signaling only and does not receive screen frames.
-
-Exact message examples, the full sequence, cleanup rules, TURN setup, and a test checklist are in [`webrtc-client-flow.md`](webrtc-client-flow.md). Screen capture must be visibly consented to; this protocol does not support silent collection.
+Remote screen control is handled by a separate `scrcpy-server` process (`:9004`) rather than the WebSocket relay. It bridges H.264 video and control events between the browser and a device over ADB; pairing/connection are HTTP endpoints on the admin server, and the viewing session is a dedicated WebSocket. See the scrcpy section of `README.md` for details.
 
 Use the existing Node protocol's explicit lifecycle style (`join`/`out`) when integrating legacy clients by mapping those messages to connect/disconnect events. Do not treat arbitrary commands as trusted.

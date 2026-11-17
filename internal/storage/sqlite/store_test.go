@@ -20,7 +20,7 @@ func newTestStore(t *testing.T) *Store {
 	return NewStore(db)
 }
 
-// OpenReady 会被两个服务进程调用；重复初始化必须安全，且全局 watch 槽位始终存在。
+// OpenReady 会被两个服务进程调用；重复初始化必须安全。
 func TestOpenReadyIsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ready.db")
 	db1, err := OpenReady(path)
@@ -33,14 +33,6 @@ func TestOpenReadyIsIdempotent(t *testing.T) {
 		t.Fatalf("second OpenReady: %v", err)
 	}
 	defer db2.Close()
-
-	var count int
-	if err := db2.QueryRow(`SELECT COUNT(*) FROM watch_sessions WHERE id=1`).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	if count != 1 {
-		t.Fatalf("watch_sessions rows = %d, want 1", count)
-	}
 }
 
 func TestCreateUserWritesReadableTimestamp(t *testing.T) {

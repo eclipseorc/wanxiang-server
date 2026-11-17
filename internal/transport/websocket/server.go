@@ -3,8 +3,6 @@
 package websocket
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
@@ -94,7 +92,7 @@ func (c *client) allowMessage(now time.Time) bool {
 	return c.readCount <= maxMessagesPerSecond
 }
 
-// Hub 是 WebSocket 中枢，保存设备连接、管理员连接和当前监看会话状态。
+// Hub 是 WebSocket 中枢，保存设备连接与管理员连接。
 type Hub struct {
 	store *sqlite.Store
 	mu    sync.RWMutex
@@ -105,12 +103,6 @@ type Hub struct {
 	// key 是客户端对象本身。它不等于管理员集合：普通用户连 /ws/admin 后
 	// 只能看到自己获授权的设备，任何可见性判断都必须走 Store.CanAccess。
 	admins map[*client]sqlite.User
-
-	// watchMu 保护 watch 相关全局状态；viewer 表示当前正在看设备的管理员客户端。
-	watchMu   sync.Mutex
-	viewer    *client
-	sessionID string
-	deviceID  string
 }
 
 // NewHub 创建一个新的 WebSocket 中枢，并在内存中保留设备/管理员连接映射。
@@ -320,7 +312,7 @@ func (h *Handler) pingLoop(c *client) {
 	}
 }
 
-// removeDevice 在设备断开时清理在线状态、广播离线事件，并释放正在进行的 watch。
+// removeDevice 在设备断开时清理在线状态并广播离线事件。
 func (h *Handler) removeDevice(c *client) {
 	h.hub.mu.Lock()
 	current := h.hub.devices[c.id] == c
@@ -333,30 +325,19 @@ func (h *Handler) removeDevice(c *client) {
 		h.hub.broadcastDevice(c.id, "device-offline", nil)
 		log.Printf("websocket device disconnected device_id=%s", c.id)
 	}
-	// 即使该连接已被同设备的新连接替换（current=false），旧连接承载的
-	// watch 会话也必须释放，否则数据库会一直保留 session_id，之后所有
-	// watch 请求都会以「another watch session active」失败。
-	h.hub.endWatchForDevice(c.id)
 	c.close()
 }
 
-// removeAdmin 在管理员断开时移除管理员映射，并结束这位管理员持有的观看会话。
+// removeAdmin 在管理员断开时移除管理员映射。
 func (h *Handler) removeAdmin(c *client) {
 	h.hub.mu.Lock()
 	delete(h.hub.admins, c)
 	h.hub.mu.Unlock()
-
-	h.hub.watchMu.Lock()
-	sessionID, viewer := h.hub.sessionID, h.hub.viewer
-	h.hub.watchMu.Unlock()
-	if viewer == c && sessionID != "" {
-		h.hub.endWatch(sessionID)
-	}
 	log.Printf("websocket admin disconnected user_id=%s", c.id)
 	c.close()
 }
 
-// handleDevice 处理设备端消息；设备消息通常是心跳、状态上报、WebRTC 信令或命令回执。
+// handleDevice 处理设备端消息；设备消息通常是心跳、状态上报或命令回执。
 func (h *Handler) handleDevice(c *client, message map[string]any) {
 	switch message["type"] {
 	case commandType:
@@ -397,17 +378,6 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 			}
 		}
 		h.hub.broadcastDevice(c.id, "command-result", payload)
-	case "watch-ready", "watch-denied", "watch-stopped", "offer", "answer", "candidate":
-		h.hub.watchMu.Lock()
-		viewer, sessionID, deviceID := h.hub.viewer, h.hub.sessionID, h.hub.deviceID
-		h.hub.watchMu.Unlock()
-		if viewer == nil || deviceID != c.id || sessionID == "" || message["sessionId"] != sessionID {
-			return
-		}
-		_ = viewer.send(message)
-		if message["type"] == "watch-denied" || message["type"] == "watch-stopped" {
-			h.hub.endWatch(sessionID)
-		}
 	}
 }
 
@@ -432,7 +402,7 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	_ = c.send(map[string]any{"type": "device-list", "devices": visible})
 }
 
-// handleAdmin 处理管理员端消息：包括权限校验、启动 watch、转发 WebRTC 信令、发送 com 命令。
+// handleAdmin 处理管理员端消息：包括权限校验、设备控制与命令下发。
 func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]any) {
 	switch message["type"] {
 	case commandType:
@@ -441,64 +411,6 @@ func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]an
 		h.handleDeviceControl(c, user, message)
 	case "ping":
 		_ = c.send(map[string]any{"type": "pong", "sentAt": message["sentAt"]})
-	case "watch":
-		deviceID, _ := message["deviceId"].(string)
-		allowed, err := h.hub.store.CanAccess(user.ID, deviceID, false)
-		if err != nil || !allowed {
-			_ = c.send(map[string]string{"type": "error", "message": "not authorized"})
-			return
-		}
-
-		h.hub.mu.RLock()
-		device := h.hub.devices[deviceID]
-		h.hub.mu.RUnlock()
-		if device == nil {
-			_ = c.send(map[string]string{"type": "error", "message": "device offline"})
-			return
-		}
-
-		// 内存会话槽与数据库占位必须在同一把锁内完成，避免并发 watch
-		// 与 endWatch 交错时出现「DB 已占用但内存无 viewer」的僵死状态。
-		h.hub.watchMu.Lock()
-		if h.hub.viewer != nil {
-			h.hub.watchMu.Unlock()
-			_ = c.send(map[string]string{"type": "error", "message": "watch already active"})
-			return
-		}
-		sessionID := newSessionID()
-		if err := h.hub.store.StartWatch(sessionID, deviceID, user.ID); err != nil {
-			h.hub.watchMu.Unlock()
-			// 数据库错误只写日志，不把内部细节回传给客户端。
-			log.Printf("start watch failed user_id=%s device_id=%s: %v", user.ID, deviceID, err)
-			_ = c.send(map[string]string{"type": "error", "message": "could not start watch session"})
-			return
-		}
-		h.hub.viewer, h.hub.sessionID, h.hub.deviceID = c, sessionID, deviceID
-		h.hub.watchMu.Unlock()
-
-		_ = h.hub.store.Audit(user.ID, "watch-request", deviceID, sessionID)
-		_ = device.send(map[string]any{"type": "watch-request", "sessionId": sessionID, "requestedBy": user.ID})
-		_ = c.send(map[string]string{"type": "watch-started", "sessionId": sessionID, "deviceId": deviceID})
-	case "watch-stop":
-		h.hub.watchMu.Lock()
-		sessionID, viewer := h.hub.sessionID, h.hub.viewer
-		h.hub.watchMu.Unlock()
-		if viewer == c {
-			h.hub.endWatch(sessionID)
-		}
-	case "offer", "answer", "candidate":
-		h.hub.watchMu.Lock()
-		deviceID, sessionID, viewer := h.hub.deviceID, h.hub.sessionID, h.hub.viewer
-		h.hub.watchMu.Unlock()
-		if viewer != c || sessionID == "" || message["sessionId"] != sessionID {
-			return
-		}
-		h.hub.mu.RLock()
-		device := h.hub.devices[deviceID]
-		h.hub.mu.RUnlock()
-		if device != nil {
-			_ = device.send(message)
-		}
 	}
 }
 
@@ -517,49 +429,6 @@ func (h *Handler) handleCommand(c *client, raw map[string]any) {
 	response := dispatchCommand(message)
 	if err := c.send(response); err != nil {
 		log.Printf("websocket command response failed kind=%s id=%s command=%s: %v", c.kind, c.id, response.Command, err)
-	}
-}
-
-// endWatch 结束当前全局 watch 会话，通知双方连接，释放全局状态，并写入审计日志。
-func (h *Hub) endWatch(sessionID string) {
-	if sessionID == "" {
-		return
-	}
-	h.watchMu.Lock()
-	if h.sessionID != sessionID {
-		h.watchMu.Unlock()
-		return
-	}
-	viewer, deviceID := h.viewer, h.deviceID
-	h.viewer, h.deviceID, h.sessionID = nil, "", ""
-	h.watchMu.Unlock()
-
-	// 记录实际发起观看的用户，而不是笼统的 "system"，保证审计可追溯。
-	actorID := "system"
-	if viewer != nil && viewer.kind == "admin" && viewer.id != "" {
-		actorID = viewer.id
-	}
-
-	_ = h.store.EndWatch(sessionID)
-	if viewer != nil {
-		_ = viewer.send(map[string]string{"type": "watch-ended", "sessionId": sessionID})
-	}
-	h.mu.RLock()
-	device := h.devices[deviceID]
-	h.mu.RUnlock()
-	if device != nil {
-		_ = device.send(map[string]string{"type": "watch-stop", "sessionId": sessionID})
-	}
-	_ = h.store.Audit(actorID, "watch-ended", deviceID, sessionID)
-}
-
-// endWatchForDevice 用于设备断开或被禁用时，自动结束这个设备对应的 watch 会话。
-func (h *Hub) endWatchForDevice(id string) {
-	h.watchMu.Lock()
-	sessionID, deviceID := h.sessionID, h.deviceID
-	h.watchMu.Unlock()
-	if id == deviceID {
-		h.endWatch(sessionID)
 	}
 }
 
@@ -620,7 +489,7 @@ func (h *Handler) handleDeviceControl(c *client, user sqlite.User, message map[s
 		return
 	}
 
-	// 断开时若设备在线，发 disconnect 帧并关闭连接；结束后一并清理 watch。
+	// 断开时若设备在线，发 disconnect 帧并关闭连接。
 	if action == "disconnect" {
 		h.hub.mu.RLock()
 		device := h.hub.devices[deviceID]
@@ -629,7 +498,6 @@ func (h *Handler) handleDeviceControl(c *client, user sqlite.User, message map[s
 			_ = device.send(map[string]string{"type": "disconnect", "reason": "admin"})
 			device.close()
 		}
-		h.hub.endWatchForDevice(deviceID)
 	}
 
 	_ = h.hub.store.Audit(user.ID, action, deviceID, "")
@@ -674,13 +542,4 @@ func intValue(value any) int {
 	default:
 		return 0
 	}
-}
-
-// newSessionID 生成一次性的 watch 会话 ID，用于单次监看请求的全局唯一标识。
-func newSessionID() string {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return time.Now().UTC().Format("20060102T150405.000000000")
-	}
-	return hex.EncodeToString(buf)
 }

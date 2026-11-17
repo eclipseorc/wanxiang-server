@@ -45,7 +45,7 @@ func run() error {
 	mux.Handle("/api/", webapi.New(service).Handler())
 
 	server := &http.Server{
-		Addr:              envfile.String("WEB_ADDR", ":9001"),
+		Addr:              envfile.String("WEB_PORT", ":9001"),
 		Handler:           logRequests("web-api", mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

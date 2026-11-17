@@ -44,9 +44,6 @@ func run() error {
 	defer db.Close()
 
 	store := sqlite.NewStore(db)
-	if err := store.ResetWatch(); err != nil {
-		return err
-	}
 
 	certFile := envfile.String("TLS_CERT", "")
 	keyFile := envfile.String("TLS_KEY", "")
@@ -56,7 +53,7 @@ func run() error {
 
 	hub := wsserver.NewHub(store)
 	server := &http.Server{
-		Addr:              envfile.String("WS_ADDR", ":9003"),
+		Addr:              envfile.String("WS_PORT", ":9003"),
 		Handler:           logRequests("websocket", wsserver.NewHandler(hub).ServeMux()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

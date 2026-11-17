@@ -1,14 +1,13 @@
 # 管理端 WebSocket 客户端架构
 
-管理页面的 WebSocket 客户端按“连接传输层 + 消息总线 + 业务插件”分层。参考 yfyk_panel 前端的连接生命周期与消息分发方式，但继续使用本项目的 `/ws/admin` 一次性 ticket 认证和 `watch` 协议。
+管理页面的 WebSocket 客户端按“连接传输层 + 消息总线 + 业务插件”分层。参考 yfyk_panel 前端的连接生命周期与消息分发方式，但继续使用本项目的 `/ws/admin` 一次性 ticket 认证。
 
 ## 分层职责
 
 - `web/index.html`：保留管理 UI、ticket 获取、WebSocket 建连和原有页面业务函数。
-- `web/ws-framework.js`：通用传输观察、JSON 收发、消息路由和 `com` 命令注册；不包含设备状态或 watch 业务。
+- `web/ws-framework.js`：通用传输观察、JSON 收发、消息路由和 `com` 命令注册；不包含设备状态业务。
 - `web/admin-dashboard-bridge.js`：把已有页面的词法状态封装为小型 API，允许插件渐进迁移页面业务。
 - `web/modules/device-events.js`：消费设备列表及设备状态事件。
-- `web/modules/watch-events.js`：消费 watch 生命周期和 WebRTC 信令消息。
 - `web/admin-heartbeat.js`：心跳插件，负责 `com/ping`、`com/pong` 和响应超时。
 
 HTTP 服务在首页响应中按顺序注入框架、bridge、业务模块和心跳插件。框架只观察 `/ws/admin`，不会干扰设备连接或其他 WebSocket 路径；也不会覆盖原连接的 `onmessage`。bridge 将入站消息送到插件：插件返回 `true` 表示负责处理该类消息，未消费的消息继续走旧处理器。这种方式支持按消息类别逐步拆分，而不是一次性重写整页。

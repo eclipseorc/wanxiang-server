@@ -336,39 +336,6 @@ func (s *Store) ConsumeTicket(tokenHash string) (Ticket, error) {
 	return ticket, tx.Commit()
 }
 
-func (s *Store) StartWatch(sessionID, deviceID, userID string) error {
-	result, err := s.DB.Exec(
-		`UPDATE watch_sessions SET session_id=?,device_id=?,user_id=?
-		 WHERE id=1 AND session_id IS NULL
-		 AND EXISTS(SELECT 1 FROM devices WHERE id=? AND online=1 AND enabled=1)`,
-		sessionID, deviceID, userID, deviceID,
-	)
-	if err != nil {
-		return err
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return errors.New("device offline or another watch session active")
-	}
-	return nil
-}
-
-func (s *Store) EndWatch(sessionID string) error {
-	_, err := s.DB.Exec(
-		`UPDATE watch_sessions SET session_id=NULL,device_id=NULL,user_id=NULL WHERE id=1 AND session_id=?`,
-		sessionID,
-	)
-	return err
-}
-
-func (s *Store) ResetWatch() error {
-	_, err := s.DB.Exec(`UPDATE watch_sessions SET session_id=NULL,device_id=NULL,user_id=NULL WHERE id=1`)
-	return err
-}
-
 func (s *Store) Audit(actorID, action, deviceID, detail string) error {
 	_, err := s.DB.Exec(
 		`INSERT INTO audit_logs(actor_id,action,device_id,detail,created_at) VALUES(?,?,?,?,?)`,
