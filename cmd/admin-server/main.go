@@ -17,6 +17,7 @@ import (
 
 	"github.com/eclipseorc/wanxiang-server/internal/envfile"
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
+	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
 	"github.com/eclipseorc/wanxiang-server/internal/transport/adminapi"
 )
@@ -64,11 +65,21 @@ func run() error {
 
 	webDir := envfile.String("WEB_DIR", "./web")
 	mux := http.NewServeMux()
-	mux.Handle("/api/", adminapi.New(service).Handler())
+
+	// 远程控制需要 adb 能力；定位失败时不阻塞管理后台启动，
+	// 只在有配对/连接请求时返回「scrcpy not configured」。
+	router := adminapi.New(service)
+	if adb, err := scrcpy.NewADB("."); err == nil {
+		router.WithScrcpy(adb)
+	} else {
+		log.Printf("warning: scrcpy disabled: %v", err)
+	}
+
+	mux.Handle("/api/", router.Handler())
 	mux.Handle("/", dashboardHandler(webDir))
 
 	server := &http.Server{
-		Addr:              envfile.String("ADMIN_ADDR", ":9002"),
+		Addr:              envfile.String("ADMIN_PORT", ":9002"),
 		Handler:           logRequests("admin-api", adminapi.SecurityHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
@@ -160,7 +171,7 @@ func dashboardHandler(webDir string) http.Handler {
 			return
 		}
 		content = strings.Replace(content, closingHead, `<script src="/ws-framework.js"></script></head>`, 1)
-		const modules = `<script src="/admin-dashboard-bridge.js"></script><script src="/modules/device-events.js"></script><script src="/modules/watch-events.js"></script><script src="/admin-heartbeat.js"></script></body>`
+		const modules = `<script src="/admin-dashboard-bridge.js"></script><script src="/modules/device-events.js"></script><script src="/admin-heartbeat.js"></script><script src="/scrcpy-control.js"></script></body>`
 		content = strings.Replace(content, closingBody, modules, 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")

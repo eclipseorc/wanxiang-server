@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
+	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
 )
 
@@ -25,6 +26,7 @@ type Router struct {
 	svc     *logic.Service
 	limiter *loginLimiter
 	tickets *fixedWindowLimiter
+	scrcpy  *scrcpy.ADB
 }
 
 func New(s *logic.Service) *Router {
@@ -33,6 +35,12 @@ func New(s *logic.Service) *Router {
 		limiter: newLoginLimiter(),
 		tickets: newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
 	}
+}
+
+// WithScrcpy 注入 adb 封装，启用远程控制的配对/连接接口。
+func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
+	r.scrcpy = adb
+	return r
 }
 
 func (r *Router) Handler() http.Handler {
@@ -207,6 +215,10 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.addDeviceGroup(w, req, u)
 	case "group-access":
 		r.setGroupAccess(w, req, u)
+	case "scrcpy/pair":
+		r.handleScrcpyPair(w, req, u)
+	case "scrcpy/connect":
+		r.handleScrcpyConnect(w, req, u)
 	default:
 		http.NotFound(w, req)
 	}
