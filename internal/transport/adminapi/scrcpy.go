@@ -15,6 +15,22 @@ import (
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
 )
 
+// friendlyAdbError 把 adb 命令返回的常见英文错误转成对普通用户友好的中文提示。
+// 其它未识别的错误原样透传（错误信息本身仍有诊断价值）。
+func friendlyAdbError(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "unauthorized"):
+		return "设备未授权：请在手机上点击弹窗「允许 USB 调试 / 允许调试」后重试。若未弹窗，请拔插 USB 线或在开发者选项撤销授权后重连。"
+	case strings.Contains(msg, "offline"):
+		return "设备离线：请检查 USB 线是否插好、手机是否已解锁，或无线调试开关是否已开启。"
+	case strings.Contains(msg, "not found") || strings.Contains(msg, "no devices"):
+		return "未找到设备：请确认设备已通过 USB 连接并开启「USB 调试」。"
+	default:
+		return msg
+	}
+}
+
 // handleScrcpyPair 处理无线调试配对：接收设备 IP、配对端口与 6 位配对码。
 func (r *Router) handleScrcpyPair(w http.ResponseWriter, req *http.Request, u sqlite.User) {
 	if !requireMethod(w, req, http.MethodPost) {
@@ -43,7 +59,7 @@ func (r *Router) handleScrcpyPair(w http.ResponseWriter, req *http.Request, u sq
 		return
 	}
 	if err := r.scrcpy.Pair(req.Context(), body.Host, body.PairPort, body.Code); err != nil {
-		fail(w, http.StatusBadRequest, "pair failed: "+err.Error())
+		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
 	_ = r.svc.Store.Audit(u.ID, "scrcpy-pair", "", body.Host)
@@ -76,7 +92,7 @@ func (r *Router) handleScrcpyConnect(w http.ResponseWriter, req *http.Request, u
 		return
 	}
 	if err := r.scrcpy.Connect(req.Context(), body.Host, body.Port); err != nil {
-		fail(w, http.StatusBadRequest, "connect failed: "+err.Error())
+		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
 	// 连接成功后自动切固定端口 5555，使设备监听稳定的 tcpip 端口，供后续
@@ -173,7 +189,7 @@ func (r *Router) handleScrcpyTcpip(w http.ResponseWriter, req *http.Request, u s
 		body.Port = 5555 // 传统 adb tcpip 默认端口
 	}
 	if err := r.scrcpy.Tcpip(req.Context(), body.Serial, body.Port); err != nil {
-		fail(w, http.StatusBadRequest, "tcpip failed: "+err.Error())
+		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
 	_ = r.svc.Store.Audit(u.ID, "scrcpy-tcpip", "", body.Serial)
