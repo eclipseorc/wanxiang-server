@@ -99,6 +99,13 @@ type Hub struct {
 
 	// devices 表示当前在线的设备连接，以 deviceID 为键。
 	devices map[string]*client
+	// deviceIPs 记录设备最近一次心跳上报的本机 IP，用于「业务在线但 ADB 离线」
+	// 的判断（把 deviceId 关联到 adb 的 serial 前缀 IP）。IP 可能随网络变化，
+	// 因此每次心跳动态刷新，只做内存态、不落库。
+	deviceIPs map[string]string
+	// adbOnline 记录每个 deviceId 当前的 ADB 连接状态，由 ADBMonitor 扫描更新，
+	// 供设备快照与状态广播携带「业务在线但 ADB 离线」的区分标记。
+	adbOnline map[string]bool
 	// admins 表示所有已认证的「管理端通道」连接（管理员 + 普通用户），
 	// key 是客户端对象本身。它不等于管理员集合：普通用户连 /ws/admin 后
 	// 只能看到自己获授权的设备，任何可见性判断都必须走 Store.CanAccess。
@@ -108,9 +115,11 @@ type Hub struct {
 // NewHub 创建一个新的 WebSocket 中枢，并在内存中保留设备/管理员连接映射。
 func NewHub(store *sqlite.Store) *Hub {
 	return &Hub{
-		store:   store,
-		devices: make(map[string]*client),
-		admins:  make(map[*client]sqlite.User),
+		store:     store,
+		devices:   make(map[string]*client),
+		deviceIPs: make(map[string]string),
+		adbOnline: make(map[string]bool),
+		admins:    make(map[*client]sqlite.User),
 	}
 }
 
@@ -318,6 +327,7 @@ func (h *Handler) removeDevice(c *client) {
 	current := h.hub.devices[c.id] == c
 	if current {
 		delete(h.hub.devices, c.id)
+		delete(h.hub.deviceIPs, c.id)
 	}
 	h.hub.mu.Unlock()
 	if current {
@@ -360,6 +370,15 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		if len(status) > maxPayloadBytes {
 			status = status[:maxPayloadBytes]
 		}
+		// 记录设备上报的本机 IP，供 ADB 掉线判断使用（deviceId → IP 内存映射）。
+		if ip, _ := message["ip"].(string); ip != "" {
+			if len(ip) > 64 {
+				ip = ip[:64]
+			}
+			h.hub.mu.Lock()
+			h.hub.deviceIPs[c.id] = ip
+			h.hub.mu.Unlock()
+		}
 		if err := h.hub.store.UpdateDeviceState(c.id, battery, rtt, status); err != nil {
 			log.Printf("device heartbeat state update failed device_id=%s: %v", c.id, err)
 		}
@@ -381,6 +400,14 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 	}
 }
 
+// snapshotDevice 在设备快照中附加 ADB 在线状态（内存态，由 ADBMonitor 维护），
+// 让前端区分「业务在线」「ADB 掉线」等状态。内嵌 sqlite.Device 保留其全部
+// JSON 字段与标签。
+type snapshotDevice struct {
+	sqlite.Device
+	ADBOnline bool `json:"adbOnline"`
+}
+
 // sendSnapshot 把当前管理员可见的设备列表一次性发给客户端，方便浏览器初始化状态。
 func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	devices, err := h.hub.store.ListDevices()
@@ -388,7 +415,8 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 		log.Printf("load websocket device snapshot failed user_id=%s: %v", user.ID, err)
 		return
 	}
-	visible := make([]sqlite.Device, 0, len(devices))
+	// 先在锁外做权限过滤（DB 查询较慢，不应持锁）。
+	visible := make([]snapshotDevice, 0, len(devices))
 	for _, device := range devices {
 		allowed, err := h.hub.store.CanAccess(user.ID, device.ID, false)
 		if err != nil {
@@ -396,9 +424,17 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 			continue
 		}
 		if allowed {
-			visible = append(visible, device)
+			visible = append(visible, snapshotDevice{Device: device, ADBOnline: true})
 		}
 	}
+	// 再在锁内补充 adbOnline 状态（内存态）。
+	h.hub.mu.RLock()
+	for i := range visible {
+		if v, ok := h.hub.adbOnline[visible[i].ID]; ok {
+			visible[i].ADBOnline = v
+		}
+	}
+	h.hub.mu.RUnlock()
 	_ = c.send(map[string]any{"type": "device-list", "devices": visible})
 }
 
