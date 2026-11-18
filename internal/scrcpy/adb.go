@@ -152,6 +152,74 @@ func parseOnlineSerials(out string) []string {
 	return serials
 }
 
+// UsbSerials 返回 adb 中通过 USB 有线连接的设备序列号列表（非 ip:port 形式）。
+// 用于「传统模式」切 tcpip 时，让前端下拉选择设备、免去用户手填序列号。
+// 包含 device 与 unauthorized 状态：刚插线尚未点「允许 USB 调试」时是
+// unauthorized，也应列出（前端提示用户去手机授权）。
+func (a *ADB) UsbSerials(ctx context.Context) ([]string, error) {
+	out, err := a.run(ctx, "devices")
+	if err != nil {
+		return nil, err
+	}
+	return parseUsbSerials(out), nil
+}
+
+// parseUsbSerials 从 `adb devices` 输出中提取 USB 有线设备的序列号。
+// 规则：serial 不含冒号（无线设备是 ip:port 含冒号），且状态为 device 或
+// unauthorized（offline 的忽略，因为那是连接异常，非正常待切换状态）。
+func parseUsbSerials(out string) []string {
+	var serials []string
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		serial, state := fields[0], fields[1]
+		if strings.Contains(serial, ":") {
+			continue // 跳过无线设备（ip:port）
+		}
+		if state == "device" || state == "unauthorized" {
+			serials = append(serials, serial)
+		}
+	}
+	return serials
+}
+
+// MdnsServices 返回 mDNS 发现的「无线调试」服务列表，每项形如 "192.168.1.100:35583"。
+// 依赖 `adb mdns services`（adb 31.0.2+ 默认开启），用于设备重启后 IP/端口都变化
+// 时自动发现设备当前的真实连接地址。
+func (a *ADB) MdnsServices(ctx context.Context) ([]string, error) {
+	out, err := a.run(ctx, "mdns", "services")
+	if err != nil {
+		return nil, err
+	}
+	return parseMdnsServices(out), nil
+}
+
+// parseMdnsServices 从 `adb mdns services` 输出中提取 ip:port 列表。
+// 输出形如：
+//
+//	List of discovered mdns services
+//	adb-ZY22L4X5X7-qurAZn	_adb-tls-connect._tcp	192.168.41.177:35583
+//
+// 只提取「无线调试」的 TLS 连接服务（_adb-tls-connect._tcp），这是配对后
+// 用于建立连接的动态端口；忽略其它服务类型。
+func parseMdnsServices(out string) []string {
+	var addrs []string
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		// 需要至少 3 列：服务名、服务类型、地址。
+		if len(fields) < 3 {
+			continue
+		}
+		if fields[1] != "_adb-tls-connect._tcp" {
+			continue
+		}
+		addrs = append(addrs, fields[2])
+	}
+	return addrs
+}
+
 // Pair 执行无线调试配对。pairPort 是设备「无线调试」页显示的配对端口，
 // code 是 6 位配对码。设备已配对过时返回 nil（幂等），避免重复配对报错。
 func (a *ADB) Pair(ctx context.Context, host string, pairPort int, code string) error {
@@ -169,9 +237,36 @@ func (a *ADB) Pair(ctx context.Context, host string, pairPort int, code string) 
 }
 
 // Connect 建立无线调试连接。port 是设备「无线调试」页显示的连接端口（非配对端口）。
+// adb connect 命令即使目标不在线也可能返回成功（状态为 offline/unauthorized），
+// 因此 connect 后轮询等待设备进入 device 状态，超时则返回明确错误，避免上层
+// 误以为已连接成功。
 func (a *ADB) Connect(ctx context.Context, host string, port int) error {
-	_, err := a.run(ctx, "connect", fmt.Sprintf("%s:%d", host, port))
-	return err
+	if _, err := a.run(ctx, "connect", fmt.Sprintf("%s:%d", host, port)); err != nil {
+		return err
+	}
+	serial := fmt.Sprintf("%s:%d", host, port)
+	// 设备从 connect 到真正进入 device 状态需要几秒，轮询等待。
+	deadline := time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		online, err := a.IsDeviceOnline(ctx, serial)
+		if err != nil {
+			return err
+		}
+		if online {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(400 * time.Millisecond):
+		}
+	}
+	// 超时仍未 device：区分 unauthorized（未授权）与 offline（掉线）给出更明确提示。
+	out, _ := a.run(ctx, "devices")
+	if strings.Contains(out, serial+"\tunauthorized") {
+		return fmt.Errorf("device %s unauthorized（请在手机上确认允许 USB 调试/无线调试授权）", serial)
+	}
+	return fmt.Errorf("device %s not online after connect (adb devices 中无 device 状态，可能无线调试已关闭或端口已变)", serial)
 }
 
 // Reconnect 对掉线的无线设备重连。serial 形如 host:port。
@@ -199,6 +294,17 @@ func splitHostPort(serial string) (string, int, error) {
 // Disconnect 断开与指定 serial 的连接。
 func (a *ADB) Disconnect(ctx context.Context, serial string) error {
 	_, err := a.run(ctx, "disconnect", serial)
+	return err
+}
+
+// Tcpip 把一台通过 USB 连接的设备（serial 为设备序列号）切换到 TCP 监听模式，
+// 供拔线后走 Wi-Fi 连接（adb connect ip:port）。适用于没有「无线调试」菜单的
+// Android 11 及更早设备。port 通常为 5555。
+func (a *ADB) Tcpip(ctx context.Context, serial string, port int) error {
+	if port <= 0 || port > 65535 {
+		return fmt.Errorf("invalid tcpip port %d", port)
+	}
+	_, err := a.run(ctx, "-s", serial, "tcpip", strconv.Itoa(port))
 	return err
 }
 

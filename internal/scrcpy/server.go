@@ -83,27 +83,30 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 同一设备同一时刻只允许一个观看会话。
-	if !s.tryAcquire(serial) {
-		writeError(w, http.StatusConflict, "device already being controlled")
-		return
-	}
-	defer s.release(serial)
-
-	// 先完成准备流程（部署 + 启动 + forward），成功后再升级 WS。
-	port, err := s.prepare(r.Context(), serial)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	defer s.cleanup(serial, port)
-
+	// 先升级 WS，再做准备流程，这样 prepare/acquire 的错误能通过 WS 的
+	// error 消息下发给前端（而非退化为一个无法带错误信息的 HTTP 响应），
+	// 前端据此能展示真实原因，而不是笼统的「会话已结束」。
 	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+
+	// 同一设备同一时刻只允许一个观看会话。
+	if !s.tryAcquire(serial) {
+		_ = conn.WriteJSON(map[string]string{"type": "error", "message": "device already being controlled"})
+		return
+	}
+	defer s.release(serial)
+
+	// 完成准备流程（部署 + 启动 + forward）。
+	port, err := s.prepare(r.Context(), serial)
+	if err != nil {
+		_ = conn.WriteJSON(map[string]string{"type": "error", "message": err.Error()})
+		return
+	}
+	defer s.cleanup(serial, port)
 
 	// 建立视频 + 控制两条 TCP 通道。
 	tun, err := establish(r.Context(), port)

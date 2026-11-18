@@ -97,7 +97,15 @@ func (c ScrcpyConfig) deploy(ctx context.Context, adb *ADB, serial string) error
 }
 
 // start 在设备上启动 scrcpy-server（后台 shell 命令），并等待其 socket 就绪。
+// 启动前会先清理设备上残留的旧 scrcpy-server 进程：上次会话异常结束（浏览器
+// 断连、设备进程被杀后重连）时，旧 app_process 可能仍活着并占着
+// localabstract:scrcpy socket，导致新会话连到僵尸 socket 而立即失败。
 func (c ScrcpyConfig) start(ctx context.Context, adb *ADB, serial string) error {
+	// 杀掉旧 scrcpy-server 进程并等待其 socket 释放，避免僵尸 socket 残留。
+	// pkill 找不到进程时返回非零，属正常场景，忽略错误。
+	_, _ = adb.Shell(ctx, serial, "pkill -f genymobile.scrcpy.Server")
+	_ = waitScrcpySocket(ctx, adb, serial, false, 3*time.Second)
+
 	command := c.buildScrcpyCommand()
 	// 使用 shell 后台执行（&），因为 adb shell 是同步阻塞的，scrcpy-server 常驻。
 	if _, err := adb.Shell(ctx, serial, command+" >/dev/null 2>&1 &"); err != nil {

@@ -219,6 +219,12 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleScrcpyPair(w, req, u)
 	case "scrcpy/connect":
 		r.handleScrcpyConnect(w, req, u)
+	case "scrcpy/status":
+		r.handleScrcpyStatus(w, req, u)
+	case "scrcpy/tcpip":
+		r.handleScrcpyTcpip(w, req, u)
+	case "scrcpy/usb-devices":
+		r.handleScrcpyUsbDevices(w, req, u)
 	default:
 		http.NotFound(w, req)
 	}
