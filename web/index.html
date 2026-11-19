@@ -24,7 +24,7 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.65 var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.65 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 button,input,select{font-family:inherit}
 a{color:inherit;text-decoration:none}
 h1,h2,h3,h4,p{margin:0}
@@ -113,18 +113,18 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .sidebar::before{content:"";position:absolute;inset:0 0 auto;height:240px;background:radial-gradient(340px 200px at 0% 0%,rgba(91,113,239,.24),transparent 70%);pointer-events:none}
 .brand{display:flex;align-items:center;gap:13px;padding:0 10px 32px;position:relative}
 .brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0}
-.brand-text strong{font-size:18px;color:#fff;letter-spacing:.06em;font-weight:700}
-.brand-text span{font-size:10px;letter-spacing:.19em;color:#7b8db5;margin-top:4px;white-space:nowrap}
+.brand-text strong{font-size:18px;color:#fff;letter-spacing:.05em;font-weight:700;-webkit-font-smoothing:antialiased}
+.brand-text span{font-size:10.5px;letter-spacing:.16em;color:#8b9cc0;margin-top:4px;white-space:nowrap}
 .nav{display:flex;flex-direction:column;gap:4px;position:relative;flex:1}
-.nav-group-title{font-size:11px;font-weight:700;letter-spacing:.16em;color:#63739a;padding:20px 13px 9px;text-transform:uppercase}
-.nav-link{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:11px;font-size:14.5px;font-weight:500;color:#a8b6d1;transition:background .16s,color .16s;position:relative}
+.nav-group-title{font-size:12px;font-weight:700;letter-spacing:.14em;color:#8290b0;padding:20px 13px 9px;text-transform:uppercase}
+.nav-link{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:11px;font-size:15px;font-weight:500;color:#c6d0e4;transition:background .16s,color .16s;position:relative;letter-spacing:.01em;-webkit-font-smoothing:antialiased}
 .nav-link .ico{width:18px;height:18px}
 .nav-link:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-link.active{background:linear-gradient(100deg,rgba(91,113,239,.32),rgba(91,113,239,.12));color:#fff;font-weight:600}
 .nav-link.active::before{content:"";position:absolute;left:-18px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#7d92ff}
 .nav-link.active .ico{color:#a9baff}
 .sidebar-foot{border-top:1px solid rgba(255,255,255,.08);padding:18px 11px 0;margin-top:18px}
-.sidebar-status{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#a8b6d1;margin-bottom:8px}
+.sidebar-status{display:flex;align-items:center;gap:9px;font-size:13px;color:#c6d0e4;margin-bottom:8px}
 .live-dot{width:7px;height:7px;border-radius:50%;background:#2ddb92;box-shadow:0 0 0 4px rgba(45,219,146,.13);flex:none}
 .version{font-size:11px;color:#5c6b90;letter-spacing:.04em}
 .workspace{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -352,10 +352,16 @@ tbody tr:hover{background:#fafbff}
 /* 窗口标题栏（拖拽把手，顶到窗口最上方，整条可拖） */
 .scr-window-bar{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14171f;border-bottom:1px solid rgba(255,255,255,.06);cursor:move;user-select:none}
 .scr-window-bar .scr-win-title{flex:1;min-width:0;color:#e6e9f2;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr-window-bar .scr-win-fps{flex:none;font-size:11px;font-weight:500;color:#7d8ba8;font-variant-numeric:tabular-nums;white-space:nowrap}
 .scr-window-bar .scr-win-status{flex:none;width:8px;height:8px;border-radius:50%;background:#b6bfd0}
 .scr-window-bar .scr-win-status.on{background:#16b978;box-shadow:0 0 0 3px rgba(22,185,120,.15)}
 .scr-window-bar .scr-win-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
 .scr-window-bar .scr-win-close:hover{background:rgba(255,255,255,.08);color:#fff}
+.scr-window-bar .scr-win-file{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
+.scr-window-bar .scr-win-file:hover{background:rgba(255,255,255,.08);color:#7d92ff}
+.scr-window-bar .scr-win-min{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
+.scr-window-bar .scr-win-min:hover{background:rgba(255,255,255,.08);color:#fff}
+.scr-window-bar .scr-win-min .ico{color:currentColor}
 /* 窗口内容区 */
 .scr-window-body{flex:1;min-height:0;display:flex;flex-direction:column;background:#05070b}
 .scr-window .screen-frame{border:none;padding:0;border-radius:0;background:#05070b}
@@ -374,15 +380,184 @@ tbody tr:hover{background:#fafbff}
 /* 缩放把手（右下角） */
 .scr-window .scr-win-resize{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize}
 .scr-window .scr-win-resize::after{content:"";position:absolute;right:4px;bottom:4px;width:8px;height:8px;border-right:2px solid rgba(255,255,255,.35);border-bottom:2px solid rgba(255,255,255,.35)}
+/* 窗口最小化：隐藏窗口主体，改为左下角依次排列的缩略条 */
+.scr-window.is-minimized{display:none}
+.scr-min-dock{position:fixed;left:12px;bottom:12px;z-index:120;display:flex;gap:8px;align-items:flex-end}
+.scr-min-tab{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 6px 0 12px;border-radius:8px;background:#14171f;border:1px solid rgba(255,255,255,.1);box-shadow:0 6px 20px rgba(0,0,0,.4);cursor:pointer;user-select:none;animation:minIn .2s var(--ease)}
+.scr-min-tab:hover{background:#1c202b;border-color:rgba(255,255,255,.2)}
+.scr-min-tab .dot{flex:none;width:7px;height:7px;border-radius:50%;background:#16b978}
+.scr-min-tab .dot.off{background:#b6bfd0}
+.scr-min-tab .name{font-size:12px;font-weight:600;color:#e6e9f2;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.scr-min-tab .restore{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:5px;background:transparent;color:#9aa3b5;cursor:pointer}
+.scr-min-tab .restore:hover{background:rgba(255,255,255,.08);color:#fff}
+@keyframes minIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 /* 传统模式：USB 设备序列号下拉 + 刷新按钮 */
 .scr-usb-serial{display:flex;gap:6px;align-items:center}
 .scr-usb-serial select{flex:1;min-width:0}
 .scr-usb-refresh{flex:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--surface-soft);color:var(--muted);cursor:pointer}
 .scr-usb-refresh:hover{color:var(--ink);background:#fff}
 
+/* ===== 群控（镜像操作）面板 ===== */
+.sync-panel{position:fixed;top:80px;right:24px;z-index:90;width:340px;background:#0b0d12;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.08);overflow:hidden;animation:winIn .22s var(--ease)}
+.sync-panel-bar{display:flex;align-items:center;gap:8px;padding:12px 14px;background:#14171f;border-bottom:1px solid rgba(255,255,255,.06);cursor:move;user-select:none}
+.sync-panel-title{flex:1;color:#e6e9f2;font-size:13.5px;font-weight:600}
+.sync-panel-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
+.sync-panel-close:hover{background:rgba(255,255,255,.08);color:#fff}
+.sync-panel-body{padding:14px;background:#10131a}
+.sync-panel-hint{font-size:12px;color:#8fa1c4;line-height:1.6;margin:0 0 12px}
+.sync-members{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:12px}
+.sync-member{display:flex;align-items:center;gap:8px;padding:9px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;cursor:pointer}
+.sync-member:hover{background:rgba(255,255,255,.07)}
+.sync-member input[type="checkbox"]{flex:none;width:16px;height:16px;accent-color:#5b71ef}
+.sync-member-name{flex:1;min-width:0;color:#e6e9f2;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-member-serial{flex:none;font-size:11px;color:#7d8ba8;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.sync-empty{font-size:12.5px;color:#8fa1c4;line-height:1.6;margin:0;padding:8px 0}
+.sync-actions{display:flex;flex-direction:column;gap:8px}
+.sync-status{font-size:12px;color:#8fa1c4;line-height:1.6;margin-top:10px;word-break:break-word}
+.sync-status.err{color:#ff6b60}
+
+/* ===== 设备清单批量选择栏 ===== */
+.device-select-bar{display:flex;align-items:center;gap:16px;padding:9px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--line-2)}
+.device-select-all{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);cursor:pointer;font-weight:500}
+.device-select-all input{width:16px;height:16px;accent-color:#5b71ef;cursor:pointer}
+.device-select-count{font-size:12.5px;color:var(--muted)}
+table .col-select{width:34px;text-align:center;padding:0}
+.device-check{width:16px;height:16px;accent-color:#5b71ef;cursor:pointer}
+/* 安装/卸载弹窗内的说明与状态 */
+.app-hint{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 12px}
+.app-hint strong{color:var(--ink)}
+.app-status{font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;word-break:break-word;white-space:pre-wrap}
+.app-status .ok{color:#16b978}
+.app-status .err{color:#ff6b60}
+/* 上传框：包裹原生 file input 的统一样式 */
+.file-upload-label{display:block;margin-bottom:4px}
+.file-upload-label input[type="file"]{width:100%;padding:8px;border:1px dashed var(--line-2);border-radius:8px;background:rgba(255,255,255,.02);color:var(--muted);font-size:13px;cursor:pointer}
+.file-upload-label input[type="file"]:hover{border-color:var(--brand)}
+
+/* ===== 文件管理面板 ===== */
+.file-panel{position:fixed;top:100px;left:160px;z-index:90;width:420px;max-height:min(78vh,620px);background:#0b0d12;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.08);overflow:hidden;animation:winIn .22s var(--ease);display:flex;flex-direction:column}
+.file-panel-bar{flex:none;display:flex;align-items:center;gap:8px;padding:12px 14px;background:#14171f;border-bottom:1px solid rgba(255,255,255,.06);cursor:move;user-select:none}
+.file-panel-bar .ico{color:#7d92ff}
+.file-panel-title{flex:1;min-width:0;color:#e6e9f2;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-panel-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
+.file-panel-close:hover{background:rgba(255,255,255,.08);color:#fff}
+.file-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px;background:#10131a}
+.file-pathbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.file-up{flex:none;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.10);border-radius:8px;background:rgba(255,255,255,.04);color:#c3cadb;cursor:pointer}
+.file-up:hover{background:rgba(255,255,255,.10)}
+.file-path-input{flex:1;min-width:0;height:34px;padding:0 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);border-radius:8px;color:#e6e9f2;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.file-go{flex:none;height:34px;padding:0 14px;border:1px solid rgba(255,255,255,.10);border-radius:8px;background:rgba(91,113,239,.18);color:#a9b6ff;font-size:12.5px;cursor:pointer}
+.file-go:hover{background:rgba(91,113,239,.30)}
+.file-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.file-row{display:flex;align-items:center;gap:9px;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;cursor:pointer;user-select:none}
+.file-row:hover{background:rgba(255,255,255,.07)}
+.file-row.is-dir{cursor:pointer}
+.file-check{flex:none;width:15px;height:15px;accent-color:#5b71ef}
+.file-ico-dir{flex:none;color:#e6b64c}
+.file-ico-file{flex:none;color:#8fa1c4}
+.file-thumb{flex:none;width:34px;height:34px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;color:#7d8ba8}
+.file-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.file-thumb.file-thumb-none{opacity:.35}
+.file-name{flex:1;min-width:0;color:#e6e9f2;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-size{flex:none;font-size:11.5px;color:#7d8ba8;font-variant-numeric:tabular-nums}
+.file-actions{display:flex;gap:8px}
+.file-actions .btn-primary{flex:1}
+.file-actions .btn-ghost{flex:none}
+.file-status{font-size:12px;color:#8fa1c4;line-height:1.6;margin-top:10px;word-break:break-word;min-height:18px}
+.file-status.err{color:#ff6b60}
+.file-empty{font-size:12.5px;color:#8fa1c4;line-height:1.6;padding:16px 0;text-align:center}
+
+/* ===== 镜像工作台（主机大屏 + 从机自适应网格） ===== */
+.mirror-workbench{position:fixed;inset:0;z-index:200;background:#080a0f;display:flex;flex-direction:column;animation:winIn .22s var(--ease)}
+.mirror-bar{flex:none;display:flex;align-items:center;gap:12px;padding:12px 18px;background:#10131a;border-bottom:1px solid rgba(255,255,255,.08)}
+.mirror-title{flex:1;color:#e6e9f2;font-size:14px;font-weight:600}
+.mirror-meta{flex:none;font-size:12px;color:#7d8ba8}
+.mirror-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;border-radius:7px;background:transparent;color:#9aa3b5;cursor:pointer}
+.mirror-close:hover{background:rgba(255,255,255,.08);color:#fff}
+.mirror-layout{flex:1;min-height:0;display:flex;gap:16px;padding:16px;overflow:hidden}
+.mirror-master-zone{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mirror-grid-zone{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mirror-zone-label{flex:none;font-size:11px;font-weight:700;letter-spacing:.12em;color:#63739a;text-transform:uppercase}
+.mirror-master-slot{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.mirror-master-slot .mirror-tile{width:100%;height:100%}
+.mirror-grid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;align-content:start}
+.mirror-tile{position:relative;display:flex;flex-direction:column;background:#14171f;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.mirror-tile:hover{border-color:rgba(125,146,255,.45)}
+.mirror-tile.is-master{border-color:rgba(125,146,255,.7);box-shadow:0 0 0 1px rgba(125,146,255,.35)}
+.mirror-tile-head{flex:none;display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.05)}
+.mirror-tile-badge{flex:none;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(125,146,255,.22);color:#a9b6ff}
+.mirror-tile-badge.hidden{display:none}
+.mirror-tile-name{flex:1;min-width:0;color:#e6e9f2;font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mirror-tile-state{flex:none;font-size:10.5px;color:#7d8ba8;font-variant-numeric:tabular-nums}
+.mirror-tile-state.err{color:#ff6b60}
+.mirror-tile-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000}
+.mirror-tile-body canvas{max-width:100%;max-height:100%;aspect-ratio:var(--mirror-ratio,16/9);display:block}
+.mirror-kb-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* ===== 固定镜像组管理（群控面板内） ===== */
+.mirror-groups{margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
+.mirror-groups-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mirror-groups-head>span{font-size:12px;font-weight:700;letter-spacing:.04em;color:#c3cadb}
+.mirror-groups-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto}
+.mirror-group-item{display:flex;align-items:center;gap:10px;padding:9px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px}
+.mirror-group-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mirror-group-name{color:#e6e9f2;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mirror-group-members{font-size:11px;color:#7d8ba8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mirror-group-actions{flex:none;display:flex;gap:6px}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:7px}
+.mirror-save-btn:hover:not(:disabled){color:var(--brand);border-color:var(--brand);background:var(--brand-soft)}
+
+/* ===== 固定镜像组编辑面板（浅色主题，对齐通用 modal）===== */
+.mirror-edit-panel{position:fixed;top:120px;left:50%;transform:translateX(-50%);z-index:220;width:440px;max-width:calc(100vw - 40px);max-height:min(80vh,640px);background:var(--surface);border-radius:16px;box-shadow:0 24px 70px rgba(9,17,35,.35);overflow:hidden;animation:winIn .22s var(--ease);display:flex;flex-direction:column}
+.mirror-edit-bar{flex:none;display:flex;align-items:center;gap:8px;padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--line);cursor:move;user-select:none}
+.mirror-edit-title{flex:1;color:var(--ink);font-size:15px;font-weight:700}
+.mirror-edit-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:15px}
+.mirror-edit-close:hover{background:var(--surface-soft);color:var(--ink)}
+.mirror-edit-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:20px 22px 24px;background:var(--surface);overflow-y:auto}
+.mirror-edit-field{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--ink-2);font-weight:500}
+.mirror-edit-field input{height:40px;padding:0 12px;background:#fff;border:1px solid var(--line-2);border-radius:var(--r-sm);color:var(--ink);font-size:14px;outline:none;transition:border-color .18s,box-shadow .18s}
+.mirror-edit-field input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.mirror-edit-label{font-size:13px;font-weight:600;color:var(--ink-2)}
+.mirror-edit-hint{font-size:12px;line-height:1.6;color:var(--muted);background:var(--brand-soft);border:1px solid #dfe5ff;border-radius:9px;padding:10px 12px}
+.mirror-edit-members{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto}
+.mirror-edit-member{display:flex;align-items:center;gap:10px;padding:8px 11px;background:var(--surface-soft);border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s}
+.mirror-edit-member:hover{background:var(--brand-soft);border-color:#dfe5ff}
+.mirror-edit-check{flex:none;width:16px;height:16px;accent-color:var(--brand)}
+.mirror-edit-member-name{flex:1;min-width:0;color:var(--ink-2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mirror-edit-member-serial{flex:none;font-size:11px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.mirror-edit-master{height:40px;padding:0 10px;background:#fff;border:1px solid var(--line-2);border-radius:var(--r-sm);color:var(--ink);font-size:14px;outline:none}
+.mirror-edit-actions{display:flex;gap:10px;margin-top:4px}
+.mirror-edit-actions .btn-primary{flex:1;padding:11px 18px;font-size:14px;font-weight:600}
+.mirror-edit-actions .btn-ghost{flex:1;padding:11px 18px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font-weight:600;font-size:14px}
+.mirror-edit-actions .btn-ghost:hover{color:var(--ink);border-color:var(--line-2);background:var(--surface-soft)}
+
 /* ===== 通知 ===== */
 .toast{position:fixed;right:28px;bottom:28px;display:none;max-width:420px;padding:15px 20px 15px 46px;background:#111d33;color:#fff;border:1px solid rgba(255,255,255,.10);border-radius:14px;box-shadow:0 18px 44px rgba(9,17,35,.30);font-size:13.5px;line-height:1.6;z-index:60;word-break:break-word}
 .toast::before{content:"";position:absolute;left:19px;top:22px;width:9px;height:9px;border-radius:50%;background:#7d92ff;box-shadow:0 0 0 4px rgba(125,146,255,.20)}
+
+/* ===== 通用添加弹窗 ===== */
+.modal{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center}
+.modal.hidden{display:none}
+.modal-backdrop{position:absolute;inset:0;background:rgba(9,17,35,.46);backdrop-filter:blur(2px)}
+.modal-panel{position:relative;width:440px;max-width:calc(100vw - 40px);max-height:calc(100vh - 60px);background:var(--surface);border-radius:16px;box-shadow:0 24px 70px rgba(9,17,35,.35);overflow:hidden;display:flex;flex-direction:column;animation:winIn .2s var(--ease)}
+.modal-head{flex:none;display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
+.modal-head h3{font-size:16px;font-weight:700;color:var(--ink)}
+.modal-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:15px}
+.modal-close:hover{background:var(--surface-soft);color:var(--ink)}
+.modal-body{flex:1;min-height:0;overflow-y:auto;padding:20px 22px 24px}
+.modal-body .stack-form{gap:14px}
+.modal-body label{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--ink-2)}
+.modal-body .stack-form label{font-weight:500}
+.modal-body .perm-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.modal-body .switch-row{display:flex;gap:18px;flex-wrap:wrap;margin:4px 0 6px}
+.modal-body .switch{position:relative;display:inline-flex!important;flex-direction:row!important;align-items:center;gap:10px;cursor:pointer;font-weight:500!important;color:var(--ink-2)!important;font-size:13px}
+.modal-body .switch input{position:absolute;opacity:0;width:0;height:0}
+.modal-body .switch-track{position:relative;display:inline-block;width:38px;height:21px;border-radius:99px;background:#d8dfec;transition:background .2s var(--ease);flex:none}
+.modal-body .switch-track::after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.2);transition:transform .2s var(--ease)}
+.modal-body .switch input:checked+.switch-track{background:var(--brand)}
+.modal-body .switch input:checked+.switch-track::after{transform:translateX(17px)}
+.modal-body .modal-actions{display:flex;gap:10px;margin-top:8px}
+.modal-body .modal-actions .btn-primary{flex:1}
 
 /* ===== 响应式 ===== */
 @media(max-width:1200px){
@@ -406,6 +581,8 @@ tbody tr:hover{background:#fafbff}
   .content{padding:26px 20px 60px}
   .login-brand{display:none}
   .login-panel{padding:36px 20px}
+  .mirror-layout{flex-direction:column;overflow-y:auto}
+  .mirror-master-zone,.mirror-grid-zone{flex:none;min-height:45vh}
 }
 @media(max-width:680px){
   .stats,.grid-3,.perm-grid{grid-template-columns:1fr}
@@ -445,6 +622,14 @@ tbody tr:hover{background:#fafbff}
   <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></symbol>
   <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 9v5M12 17.5v.5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 21V4A1.5 1.5 0 0 1 5.5 2.5z"/><path d="M14 2.5V7h4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v11M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.6"/><path d="M3 17l5-5 4 4 3-3 6 6"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><path d="M4 7l8 4.5L20 7M12 11.5v10"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M4 20h16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></symbol>
 </svg>
 
 <!-- ===== 登录视图 ===== -->
@@ -498,9 +683,11 @@ tbody tr:hover{background:#fafbff}
       <div class="nav-group-title">工作台</div>
       <a class="nav-link active" data-target="sec-overview" href="#sec-overview"><svg class="ico"><use href="#i-grid"/></svg><span class="nav-label">总览</span></a>
       <a class="nav-link" data-target="sec-devices" href="#sec-devices"><svg class="ico"><use href="#i-device"/></svg><span class="nav-label">设备清单</span></a>
+      <a class="nav-link" data-target="sec-device-groups" href="#sec-device-groups"><svg class="ico"><use href="#i-layers"/></svg><span class="nav-label">设备分组</span></a>
       <div class="nav-group-title">资源管理</div>
-      <a class="nav-link" data-target="sec-create" href="#sec-create"><svg class="ico"><use href="#i-plus"/></svg><span class="nav-label">创建与账号</span></a>
-      <a class="nav-link" data-target="sec-access" href="#sec-access"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">分组与权限</span></a>
+      <a class="nav-link" data-target="sec-accounts" href="#sec-accounts"><svg class="ico"><use href="#i-users"/></svg><span class="nav-label">账号管理</span></a>
+      <a class="nav-link" data-target="sec-groups" href="#sec-groups"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">角色管理</span></a>
+      <a class="nav-link" data-target="sec-perms" href="#sec-perms"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">权限管理</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-status"><span class="live-dot"></span><span>系统运行中</span></div>
@@ -549,6 +736,9 @@ tbody tr:hover{background:#fafbff}
           <div class="card-head">
             <div><h3>已接入设备</h3><p>状态随实时事件自动更新，也可手动刷新</p></div>
             <div class="card-head-right">
+              <button id="syncPanelBtn" class="secondary" title="把多台已连接的设备编组，主控操作同步到组内所有设备"><svg class="ico ico-sm"><use href="#i-layers"/></svg>群控</button>
+              <button id="installAppBtn" class="secondary" title="对列表中勾选的设备批量安装 APK"><svg class="ico ico-sm"><use href="#i-download"/></svg>安装应用</button>
+              <button id="uninstallAppBtn" class="secondary" title="对列表中勾选的设备批量卸载应用"><svg class="ico ico-sm"><use href="#i-trash"/></svg>卸载应用</button>
               <div class="view-toggle" role="group" aria-label="视图切换">
                 <button id="viewListBtn" class="view-toggle-btn active" title="列表视图"><svg class="ico ico-sm"><use href="#i-list"/></svg></button>
                 <button id="viewGridBtn" class="view-toggle-btn" title="卡片视图"><svg class="ico ico-sm"><use href="#i-grid"/></svg></button>
@@ -556,74 +746,87 @@ tbody tr:hover{background:#fafbff}
               <span id="summary" class="chip">正在加载…</span>
             </div>
           </div>
+          <div class="device-select-bar" id="deviceSelectBar">
+            <label class="device-select-all"><input type="checkbox" id="deviceSelectAll"> 全选</label>
+            <span class="device-select-count" id="deviceSelectCount">已选 0 台</span>
+          </div>
           <div class="scroll" id="deviceListView"><table>
-            <thead><tr><th>状态</th><th>设备</th><th>电量</th><th>RTT</th><th>分组</th><th>最后在线</th><th>操作</th></tr></thead>
-            <tbody id="deviceRows"><tr><td colspan="7" class="muted">暂无设备</td></tr></tbody>
+            <thead><tr><th class="col-select"></th><th>状态</th><th>设备</th><th>电量</th><th>RTT</th><th>分组</th><th>最后在线</th><th>操作</th></tr></thead>
+            <tbody id="deviceRows"><tr><td colspan="8" class="muted">暂无设备</td></tr></tbody>
           </table></div>
           <div class="device-grid hidden" id="deviceGridView"></div>
         </div>
       </section>
 
-      <!-- 页面：创建与账号 -->
-      <section id="sec-create" class="section page" data-title="创建与账号" data-crumb="创建与账号">
-        <div class="section-head"><div><span class="eyebrow">02 / Resources</span><h2>创建与账号</h2><p>开通账号并维护分组目录；设备由 App 自动注册</p></div></div>
-        <div class="grid-3">
-          <div class="card form-card">
-            <div class="card-icon"><svg class="ico ico-lg"><use href="#i-device"/></svg></div>
-            <h3>设备接入</h3><p class="card-desc">设备由 App 安装后自动生成唯一 ID 并上报注册，无需在此手动创建</p>
-            <div class="result-box" style="display:block">在 App 的「配置」页填写服务器地址后，设备会自行注册并出现在左侧设备清单中。</div>
+      <!-- 页面：设备分组 -->
+      <section id="sec-device-groups" class="section page" data-title="设备分组" data-crumb="设备分组">
+        <div class="section-head"><div><span class="eyebrow">Devices / Groups</span><h2>设备分组</h2><p>把多台设备编成固定的镜像组，一键镜像时主控操作同步到组内所有设备</p></div></div>
+        <div class="card table-card">
+          <div class="card-head">
+            <div><h3>镜像组列表</h3><p>勾选已连接设备新建分组，或编辑已有分组；一键镜像进入主机+从机网格工作台</p></div>
+            <div class="card-head-right">
+              <button class="secondary" data-syncgroup-add><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加</button>
+              <button class="danger" data-syncgroup-del disabled><svg class="ico ico-sm"><use href="#i-stop"/></svg>删除</button>
+            </div>
           </div>
-          <div class="card form-card">
-            <div class="card-icon green"><svg class="ico ico-lg"><use href="#i-users"/></svg></div>
-            <h3>创建用户</h3><p class="card-desc">开通普通账号，创建后可在下方分配用户组</p>
-            <form id="userForm" class="stack-form">
-              <label>用户名<input id="newUsername" placeholder="登录用户名" required></label>
-              <label>初始密码<input id="newPassword" type="password" placeholder="至少 12 位密码" minlength="12" required></label>
-              <button type="submit"><svg class="ico ico-sm"><use href="#i-plus"/></svg>创建用户</button>
-            </form>
-            <div id="newUserResult" class="result-box"></div>
-          </div>
-          <div class="card form-card">
-            <div class="card-icon amber"><svg class="ico ico-lg"><use href="#i-layers"/></svg></div>
-            <h3>创建分组</h3><p class="card-desc">分组是授权的基本单位，可用于用户或设备归类</p>
-            <form id="groupForm" class="stack-form">
-              <label>分组名称<input id="groupName" placeholder="新组名称" required></label>
-              <button type="submit"><svg class="ico ico-sm"><use href="#i-plus"/></svg>创建组</button>
-            </form>
-            <div id="groupList" class="result-box">加载中…</div>
-          </div>
+          <div class="scroll"><table>
+            <thead><tr><th style="width:40px"></th><th>镜像组名称</th><th>成员</th><th>主控</th><th style="width:220px">操作</th></tr></thead>
+            <tbody id="syncGroupRows"><tr><td colspan="5" class="table-empty">加载中…</td></tr></tbody>
+          </table></div>
         </div>
       </section>
 
-      <!-- 页面：分组与权限 -->
-      <section id="sec-access" class="section page" data-title="分组与权限" data-crumb="分组与权限">
-        <div class="section-head"><div><span class="eyebrow">03 / Access Control</span><h2>分组与权限</h2><p>通过「用户组 × 设备组」建立可见性与管理权限</p></div></div>
-        <div class="card perm-card">
-          <div class="perm-grid">
-            <form id="userGroupForm" class="perm-form">
-              <div class="perm-title"><svg class="ico"><use href="#i-users"/></svg>把用户加入用户组</div>
-              <label>用户 ID<input id="ugUserId" placeholder="粘贴用户 ID" required></label>
-              <label>选择用户组<select id="ugGroup" required></select></label>
-              <button type="submit">分配用户组</button>
-            </form>
-            <form id="deviceGroupForm" class="perm-form">
-              <div class="perm-title"><svg class="ico"><use href="#i-device"/></svg>把设备加入设备组</div>
-              <label>选择设备<select id="dgDevice" required></select></label>
-              <label>选择设备组<select id="dgGroup" required></select></label>
-              <button type="submit">分配设备组</button>
-            </form>
-            <form id="accessForm" class="perm-form">
-              <div class="perm-title"><svg class="ico"><use href="#i-shield"/></svg>用户组访问设备组</div>
-              <label>用户组<select id="accessUG" required></select></label>
-              <label>设备组<select id="accessDG" required></select></label>
-              <div class="switch-row">
-                <label class="switch"><input id="canView" type="checkbox" checked><span class="switch-track"></span><span>允许查看</span></label>
-                <label class="switch"><input id="canManage" type="checkbox"><span class="switch-track"></span><span>允许管理</span></label>
-              </div>
-              <button type="submit">保存权限</button>
-            </form>
+      <!-- 页面：账号管理 -->
+      <section id="sec-accounts" class="section page" data-title="账号管理" data-crumb="账号管理">
+        <div class="section-head"><div><span class="eyebrow">02 / Resources</span><h2>账号管理</h2><p>开通登录账号；管理员账号不可删除，普通账号可创建、删除</p></div></div>
+        <div class="card table-card">
+          <div class="card-head">
+            <div><h3>账号列表</h3><p>勾选后点右上角「删除」批量移除普通账号</p></div>
+            <div class="card-head-right">
+              <button class="secondary" data-user-add><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加</button>
+              <button class="danger" data-user-del disabled><svg class="ico ico-sm"><use href="#i-stop"/></svg>删除</button>
+            </div>
           </div>
-          <p class="hint"><svg class="ico ico-sm"><use href="#i-info"/></svg><span>用户组与设备组可同名，但应作为独立授权关系管理；普通用户只有获得组间权限后才能看到对应设备。管理员拥有全部权限，管理操作最终由服务端校验。</span></p>
+          <div class="scroll"><table>
+            <thead><tr><th style="width:40px"></th><th>用户名</th><th>角色</th><th>用户 ID</th><th>创建时间</th></tr></thead>
+            <tbody id="userRows"><tr><td colspan="5" class="table-empty">加载中…</td></tr></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- 页面：角色管理 -->
+      <section id="sec-groups" class="section page" data-title="角色管理" data-crumb="角色管理">
+        <div class="section-head"><div><span class="eyebrow">03 / Resources</span><h2>角色管理</h2><p>角色是授权的基本单位，用于对账号和设备归类授权</p></div></div>
+        <div class="card table-card">
+          <div class="card-head">
+            <div><h3>角色列表</h3><p>勾选后点右上角「删除」批量移除角色</p></div>
+            <div class="card-head-right">
+              <button class="secondary" data-group-add><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加</button>
+              <button class="danger" data-group-del disabled><svg class="ico ico-sm"><use href="#i-stop"/></svg>删除</button>
+            </div>
+          </div>
+          <div class="scroll"><table>
+            <thead><tr><th style="width:40px"></th><th>角色名称</th><th>角色 ID</th></tr></thead>
+            <tbody id="groupRows"><tr><td colspan="3" class="table-empty">加载中…</td></tr></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- 页面：权限管理 -->
+      <section id="sec-perms" class="section page" data-title="权限管理" data-crumb="权限管理">
+        <div class="section-head"><div><span class="eyebrow">04 / Access Control</span><h2>权限管理</h2><p>通过「用户组 × 设备组」建立查看与管理权限</p></div></div>
+        <div class="card table-card">
+          <div class="card-head">
+            <div><h3>授权关系</h3><p>勾选后点右上角「删除」移除授权关系</p></div>
+            <div class="card-head-right">
+              <button class="secondary" data-perm-add><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加</button>
+              <button class="danger" data-perm-del disabled><svg class="ico ico-sm"><use href="#i-stop"/></svg>删除</button>
+            </div>
+          </div>
+          <div class="scroll"><table>
+            <thead><tr><th style="width:40px"></th><th>用户组</th><th>设备组</th><th>查看</th><th>管理</th></tr></thead>
+            <tbody id="permRows"><tr><td colspan="5" class="table-empty">加载中…</td></tr></tbody>
+          </table></div>
         </div>
       </section>
     </main>
@@ -760,9 +963,21 @@ tbody tr:hover{background:#fafbff}
 
 <div id="toast" class="toast"></div>
 
+<!-- ===== 通用添加弹窗（账号/分组/权限三个列表页复用） ===== -->
+<div id="addModal" class="modal hidden">
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h3 id="addModalTitle">添加</h3>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body" id="addModalBody"></div>
+  </div>
+</div>
+
 <script>
 'use strict';
-const $=id=>document.getElementById(id);let token=sessionStorage.getItem('adminToken')||'';let user=null,ws=null,wsTicketBusy=false;let devices=[];let groups=[];let reconnectTimer=null;
+const $=id=>document.getElementById(id);let token=sessionStorage.getItem('adminToken')||'';let user=null,ws=null,wsTicketBusy=false;let devices=[];let groups=[];let users=[];let accesses=[];let reconnectTimer=null;
 const apiBase=location.origin;const wsBase=localStorage.getItem('wsBase')||`${location.protocol==='https:'?'wss:':'ws:'}//${location.hostname}:9003`;
 function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',3600)}
 async function api(path,options={}){const headers=new Headers(options.headers||{});if(token)headers.set('Authorization',`Bearer ${token}`);if(options.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');const res=await fetch(apiBase+path,{...options,headers});let data=null;const text=await res.text();if(text){try{data=JSON.parse(text)}catch{data={error:text}}}if(!res.ok)throw new Error(data?.error||`HTTP ${res.status}`);return data}
@@ -770,19 +985,44 @@ function showApp(){const yes=!!token;$('loginCard').classList.toggle('hidden',ye
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{const data=await api('/api/admin/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});token=data.token;user=data;sessionStorage.setItem('adminToken',token);showApp();toast('登录成功')}catch(err){toast(err.message)}});
 $('logoutBtn').onclick=async()=>{try{await api('/api/admin/logout',{method:'POST'})}catch{};token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()};
 $('refreshBtn').onclick=loadAll;$('connectBtn').onclick=connectRealtime;
-// 设备清单视图切换（列表/卡片），偏好记到 localStorage
+$('syncPanelBtn').onclick=()=>{ if(typeof window.openSyncPanel==='function') window.openSyncPanel(); else toast('远程控制模块未加载'); };
+$('installAppBtn').onclick=()=>{ openInstallModal(); };
+$('uninstallAppBtn').onclick=()=>{ openUninstallModal(); };
+// selectedDevices 记录在主列表勾选的设备 id（Set），供批量安装/卸载复用。
+const selectedDevices=new Set();
+// 判断设备是否可被选中（在线 + adb 在线 + 未停用）。
+function deviceSelectable(d){return !!d.online&&d.adbOnline===true&&d.enabled}
+bindDeviceSelectBar();
 $('viewListBtn').onclick=()=>setDeviceView('list');
 $('viewGridBtn').onclick=()=>setDeviceView('grid');
 (function(){try{const saved=localStorage.getItem('deviceView');if(saved==='list'||saved==='grid')deviceView=saved}catch(_){}})();
-async function loadAll(){try{const [ds,gs]=await Promise.all([api('/api/admin/devices'),api('/api/admin/groups')]);devices=ds||[];groups=gs||[];renderDevices();renderGroups()}catch(e){toast(e.message);if(/unauthorized/i.test(e.message))logoutLocal()}}
+async function loadAll(){try{const [ds,gs]=await Promise.all([api('/api/admin/devices'),api('/api/admin/groups')]);devices=ds||[];groups=gs||[];users=[];accesses=[];// users/accesses 仅管理员可见，失败或无权时静默为空，不阻断主流程
+  try{const [us,ac]=await Promise.all([api('/api/admin/users'),api('/api/admin/group-access')]);users=us||[];accesses=ac||[]}catch(_){}
+  renderDevices();renderGroupPage()}catch(e){toast(e.message);if(/unauthorized/i.test(e.message))logoutLocal()}}
 function logoutLocal(){token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()}
 let deviceView='list';
 function deviceDisplayName(d){return d.name||d.model||('设备 '+d.id.slice(0,8))}
 // 设备状态：区分「在线」「ADB 掉线」「离线」三种。adbOnline 缺省视为 true（旧数据/未扫描时）。
 function deviceStatusInfo(d){if(!d.online)return{dot:'offline',label:'离线'};if(d.adbOnline===false)return{dot:'adb-offline',label:'ADB 掉线'};return{dot:'online',label:'在线'}}
 function deviceGroupLabel(d){return (d.groupIds||[]).map(id=>groups.find(g=>g.id===id)?.name||id).join(', ')||'—'}
-function deviceActions(d){const box=document.createElement('div');box.className='actions';const remote=document.createElement('button');remote.textContent='远程控制';remote.className='secondary';remote.disabled=!d.enabled;remote.onclick=()=>openScrcpy(d);box.append(remote);if(user){const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'断开/停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle)}return box}
-function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="7" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const st=deviceStatusInfo(d);const state=document.createElement('td');state.innerHTML=`<span class="dot ${st.dot}"></span>${st.label}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(state,name,battery,rtt,group,last,actions);body.append(tr)}}
+function deviceActions(d){const box=document.createElement('div');box.className='actions';
+  // 已连接：业务在线（online）且 adb 明确在线（adbOnline===true）。
+  // 任何缺失/未知/未授权（adbOnline 非 true）都视为未连接，避免把「未授权」
+  // 或「尚未扫描」的设备误判为可操作而点亮按钮。
+  const connected=!!d.online&&d.adbOnline===true;
+  // 远程控制：未连接时置灰（需先「连接设备」）。禁用设备同样置灰。
+  const remote=document.createElement('button');remote.textContent='远程控制';remote.className='secondary';remote.disabled=!(d.enabled&&connected);remote.onclick=()=>openScrcpy(d);box.append(remote);
+  // 读取文件：常态显示，未连接（或未取到 IP）时置灰，与「远程控制」保持一致。
+  const files=document.createElement('button');files.textContent='读取文件';files.className='secondary';files.disabled=!(d.enabled&&connected&&d.adbIp);files.onclick=()=>{const ip=d.adbIp;if(!ip){toast('未获取到设备 IP，请重新连接');return;}const port=(d.adbPort&&d.adbPort>0)?d.adbPort:5555;if(typeof window.openFilePanel==='function')window.openFilePanel(ip+':'+port,deviceDisplayName(d));else toast('文件模块未加载')};box.append(files);
+  // 连接/断开：未连接显示「连接设备」，已连接显示「断开」。
+  if(!connected){
+    const conn=document.createElement('button');conn.textContent='连接设备';conn.className='primary';conn.disabled=!d.enabled;conn.onclick=()=>openScrcpy(d);box.append(conn);
+  }else{
+    const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
+  }
+  if(user){const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle)}
+  return box}
+function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="8" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const sel=document.createElement('td');sel.className='col-select';const cb=document.createElement('input');cb.type='checkbox';cb.className='device-check';cb.dataset.deviceId=d.id;cb.checked=selectedDevices.has(d.id);cb.disabled=!(d.online&&d.adbOnline===true&&d.enabled);cb.addEventListener('change',()=>{if(cb.checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id);updateDeviceSelectBar()});sel.append(cb);const st=deviceStatusInfo(d);const state=document.createElement('td');state.innerHTML=`<span class="dot ${st.dot}"></span>${st.label}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(sel,state,name,battery,rtt,group,last,actions);body.append(tr)}updateDeviceSelectBar()}
 function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren();if(!devices.length){const empty=document.createElement('div');empty.className='device-grid-empty';empty.textContent='没有可见设备';grid.append(empty);return}for(const d of devices){const card=document.createElement('div');card.className='device-card';
   // 缩略图：优先用 d.screenshot，否则深色占位图（图标 + 型号）
   const thumb=document.createElement('div');thumb.className='device-card-thumb';if(d.screenshot){thumb.classList.add('has-shot');thumb.style.backgroundImage=`url(${d.screenshot})`;}else{const ic=document.createElement('svg');ic.className='ico ico-lg thumb-icon';ic.innerHTML='<use href="#i-device"></use>';const model=document.createElement('span');model.className='thumb-model';model.textContent=d.model||deviceDisplayName(d);thumb.append(ic,model);}
@@ -804,21 +1044,169 @@ function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren
   const acts=document.createElement('div');acts.className='device-card-actions';acts.append(deviceActions(d));
   body.append(top,metrics,grp,acts);
   card.append(thumb,body);grid.append(card);}}
-function renderDevices(){renderDeviceList();renderDeviceCards();let online=0,adbOff=0;for(const d of devices){if(d.online){online++;if(d.adbOnline===false)adbOff++}}$('summary').textContent=`${devices.length} 台设备，${online} 台在线${adbOff?`（${adbOff} 台 ADB 掉线）`:''}${ws?.readyState===WebSocket.OPEN?' · 实时更新中':' · 实时连接未连接'}`;fillDeviceSelect();applyDeviceView()}
+function renderDevices(){renderDeviceList();renderDeviceCards();let online=0,adbOff=0;for(const d of devices){if(d.online){online++;if(d.adbOnline===false)adbOff++}}$('summary').textContent=`${devices.length} 台设备，${online} 台在线${adbOff?`（${adbOff} 台 ADB 掉线）`:''}${ws?.readyState===WebSocket.OPEN?' · 实时更新中':' · 实时连接未连接'}`;applyDeviceView()}
 function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGridView');const listBtn=$('viewListBtn'),gridBtn=$('viewGridBtn');if(!listEl||!gridEl)return;const isList=deviceView==='list';listEl.classList.toggle('hidden',!isList);gridEl.classList.toggle('hidden',isList);if(listBtn&&gridBtn){listBtn.classList.toggle('active',isList);gridBtn.classList.toggle('active',!isList)}}
 function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
-function fillDeviceSelect(){const s=$('dgDevice');const old=s.value;s.replaceChildren();for(const d of devices){const o=document.createElement('option');o.value=d.id;o.textContent=`${d.name||d.model||'设备 '+d.id.slice(0,8)} (${d.id.slice(0,8)})`;s.append(o)}if([...s.options].some(o=>o.value===old))s.value=old}
-function renderGroups(){const labels=groups.map(g=>`${g.name} (${g.id.slice(0,8)})`);$('groupList').textContent=groups.length?labels.join(' · '):'暂无设备组';for(const id of ['ugGroup','dgGroup','accessUG','accessDG']){const el=$(id),old=el.value;el.replaceChildren();for(const g of groups){const o=document.createElement('option');o.value=g.id;o.textContent=g.name;el.append(o)}if([...el.options].some(o=>o.value===old))el.value=old}}
 async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
-async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
+async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
 async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定停用并断开此设备？':'确定重新启用此设备？'))return;if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪，无法下发控制指令');return}sendWS({type:'device-control',deviceId:id,action:action})}
-$('userForm').addEventListener('submit',async e=>{e.preventDefault();try{const x=await api('/api/admin/users',{method:'POST',body:JSON.stringify({username:$('newUsername').value.trim(),password:$('newPassword').value})});$('newUserResult').textContent=`用户已创建，ID：${x.userId}（可复制到用户组分配表单）`;$('ugUserId').value=x.userId;$('newUsername').value='';$('newPassword').value='';toast('用户创建成功')}catch(err){toast(err.message)}});
-$('groupForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/admin/groups',{method:'POST',body:JSON.stringify({name:$('groupName').value.trim()})});$('groupName').value='';await loadAll();toast('设备组已创建')}catch(err){toast(err.message)}});
-$('userGroupForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/admin/groups/users',{method:'POST',body:JSON.stringify({userId:$('ugUserId').value.trim(),groupId:$('ugGroup').value})});toast('用户组分配成功')}catch(err){toast(err.message)}});
-$('deviceGroupForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/admin/groups/devices',{method:'POST',body:JSON.stringify({deviceId:$('dgDevice').value,groupId:$('dgGroup').value})});await loadAll();toast('设备组分配成功')}catch(err){toast(err.message)}});
-$('accessForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/admin/group-access',{method:'POST',body:JSON.stringify({userGroupId:$('accessUG').value,deviceGroupId:$('accessDG').value,canView:$('canView').checked,canManage:$('canManage').checked})});toast('组权限已保存')}catch(err){toast(err.message)}});
+
+/* ===== 资源管理：账号 / 分组 / 权限 三个列表页 ===== */
+
+// renderGroupPage 渲染三个列表（账号、分组、权限）。
+function renderGroupPage(){renderUserList();renderGroupList();renderPermList()}
+
+function roleLabel(r){return r==='admin'?'管理员':'普通用户'}
+function fmtCreatedAt(t){if(!t)return'—';try{const d=new Date(t);if(!isNaN(d))return d.toLocaleString()}catch(_){}return t}
+
+// renderUserList 渲染账号列表。
+function renderUserList(){const body=$('userRows');if(!body)return;body.replaceChildren();if(!users.length){body.innerHTML='<tr><td colspan="5" class="table-empty">暂无账号</td></tr>';updateDelState('user');return}
+  for(const u of users){const tr=document.createElement('tr');const ck=document.createElement('td');const cb=document.createElement('input');cb.type='checkbox';cb.className='row-check';cb.dataset.key=u.id;cb.disabled=(u.role==='admin');ck.append(cb);const un=document.createElement('td');un.textContent=u.username;un.className='name-cell';const role=document.createElement('td');role.textContent=roleLabel(u.role);const id=document.createElement('td');id.textContent=u.id;id.className='num-cell';const ca=document.createElement('td');ca.textContent=fmtCreatedAt(u.createdAt);ca.className='time-cell';tr.append(ck,un,role,id,ca);body.append(tr)}
+  updateDelState('user')}
+
+// renderGroupList 渲染分组列表。
+function renderGroupList(){const body=$('groupRows');if(!body)return;body.replaceChildren();if(!groups.length){body.innerHTML='<tr><td colspan="3" class="table-empty">暂无角色</td></tr>';updateDelState('group');return}
+  for(const g of groups){const tr=document.createElement('tr');const ck=document.createElement('td');const cb=document.createElement('input');cb.type='checkbox';cb.className='row-check';cb.dataset.key=g.id;ck.append(cb);const nm=document.createElement('td');nm.textContent=g.name;nm.className='name-cell';const id=document.createElement('td');id.textContent=g.id;id.className='num-cell';tr.append(ck,nm,id);body.append(tr)}
+  updateDelState('group')}
+
+// renderPermList 渲染权限（授权关系）列表。
+function renderPermList(){const body=$('permRows');if(!body)return;body.replaceChildren();if(!accesses.length){body.innerHTML='<tr><td colspan="5" class="table-empty">暂无授权关系</td></tr>';updateDelState('perm');return}
+  for(const a of accesses){const tr=document.createElement('tr');const ck=document.createElement('td');const cb=document.createElement('input');cb.type='checkbox';cb.className='row-check';cb.dataset.key=`${a.userGroupId}||${a.deviceGroupId}`;ck.append(cb);const ug=document.createElement('td');ug.textContent=a.userGroupName||a.userGroupId;ug.className='name-cell';const dg=document.createElement('td');dg.textContent=a.deviceGroupName||a.deviceGroupId;const view=document.createElement('td');view.textContent=a.canView?'允许':'—';const manage=document.createElement('td');manage.textContent=a.canManage?'允许':'—';tr.append(ck,ug,dg,view,manage);body.append(tr)}
+  updateDelState('perm')}
+
+// 三种列表勾选联动删除按钮；给 tbody 挂一次 change 委托。
+function bindListChecks(){for(const [tb,btn] of [['userRows','user'],['groupRows','group'],['permRows','perm']]){const tbody=$(tb);if(!tbody)continue;tbody.addEventListener('change',()=>updateDelState(btn))}}
+function updateDelState(kind){const btn=document.querySelector(kind==='user'?'[data-user-del]':kind==='group'?'[data-group-del]':'[data-perm-del]');const rows=$(kind==='user'?'userRows':kind==='group'?'groupRows':'permRows');if(!btn||!rows)return;const any=[...rows.querySelectorAll('.row-check:checked')].length>0;btn.disabled=!any}
+
+// openModal / closeModal 通用弹窗。
+function openModal(title,bodyHtml){$('addModalTitle').textContent=title;$('addModalBody').innerHTML=bodyHtml;$('addModal').classList.remove('hidden')}
+function closeModal(){$('addModal').classList.add('hidden');$('addModalBody').innerHTML=''}
+document.querySelectorAll('[data-modal-close]').forEach(el=>el.addEventListener('click',closeModal));
+
+// groupOptions 生成分组下拉选项。
+function groupOptions(selected){return groups.map(g=>`<option value="${escapeHTML(g.id)}"${selected===g.id?' selected':''}>${escapeHTML(g.name)}</option>`).join('')}
+// deviceOptions 生成设备下拉选项。
+function deviceOptions(selected){return devices.map(d=>`<option value="${escapeHTML(d.id)}"${selected===d.id?' selected':''}>${escapeHTML(deviceDisplayName(d))} (${escapeHTML(d.id.slice(0,8))})</option>`).join('')}
+
+// —— 账号：添加（创建用户）——
+document.querySelector('[data-user-add]').addEventListener('click',()=>{openModal('添加账号',`
+  <form id="modalUserForm" class="stack-form">
+    <label>用户名<input id="muName" placeholder="登录用户名" required></label>
+    <label>初始密码<input id="muPass" type="password" placeholder="至少 12 位密码" minlength="12" required></label>
+    <div class="modal-actions"><button class="btn-primary" type="submit">创建账号</button></div>
+  </form>`)});
+document.addEventListener('submit',async e=>{if(e.target.id!=='modalUserForm')return;e.preventDefault();try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({username:$('muName').value.trim(),password:$('muPass').value})});closeModal();toast('账号创建成功');await loadAll()}catch(err){toast(err.message)}});
+
+// —— 角色：添加（创建角色）——
+document.querySelector('[data-group-add]').addEventListener('click',()=>{openModal('添加角色',`
+  <form id="modalGroupForm" class="stack-form">
+    <label>角色名称<input id="mgName" placeholder="新角色名称" required></label>
+    <div class="modal-actions"><button class="btn-primary" type="submit">创建角色</button></div>
+  </form>`)});
+document.addEventListener('submit',async e=>{if(e.target.id!=='modalGroupForm')return;e.preventDefault();try{await api('/api/admin/groups',{method:'POST',body:JSON.stringify({name:$('mgName').value.trim()})});closeModal();toast('角色创建成功');await loadAll()}catch(err){toast(err.message)}});
+
+// —— 权限：添加（授权关系）——
+document.querySelector('[data-perm-add]').addEventListener('click',()=>{if(!groups.length){toast('请先在「角色管理」创建角色（可作为用户组或设备组）');return}openModal('添加授权关系',`
+  <form id="modalPermForm" class="stack-form">
+    <label>用户组<select id="mpUG" required><option value="">选择用户组</option>${groupOptions()}</select></label>
+    <label>设备组<select id="mpDG" required><option value="">选择设备组</option>${groupOptions()}</select></label>
+    <div class="switch-row">
+      <label class="switch"><input id="mpView" type="checkbox" checked><span class="switch-track"></span><span>允许查看</span></label>
+      <label class="switch"><input id="mpManage" type="checkbox"><span class="switch-track"></span><span>允许管理</span></label>
+    </div>
+    <div class="modal-actions"><button class="btn-primary" type="submit">保存授权</button></div>
+  </form>`)});
+document.addEventListener('submit',async e=>{if(e.target.id!=='modalPermForm')return;e.preventDefault();try{await api('/api/admin/group-access',{method:'POST',body:JSON.stringify({userGroupId:$('mpUG').value,deviceGroupId:$('mpDG').value,canView:$('mpView').checked,canManage:$('mpManage').checked})});closeModal();toast('授权关系已保存');await loadAll()}catch(err){toast(err.message)}});
+
+// —— 删除（批量）——
+async function delChecked(kind){const tbId=kind==='user'?'userRows':kind==='group'?'groupRows':'permRows';const cbs=[...document.querySelectorAll(`#${tbId} .row-check:checked`)];if(!cbs.length)return;const n=cbs.length;if(!confirm(`确定删除选中的 ${n} 项？`))return;let ok=0,fail=0;for(const cb of cbs){const key=cb.dataset.key;try{if(kind==='user'){await api('/api/admin/users/'+encodeURIComponent(key),{method:'DELETE'})}else if(kind==='group'){await api('/api/admin/groups/'+encodeURIComponent(key),{method:'DELETE'})}else{const [ug,dg]=key.split('||');await api(`/api/admin/group-access?userGroupId=${encodeURIComponent(ug)}&deviceGroupId=${encodeURIComponent(dg)}`,{method:'DELETE'})}ok++}catch(e){fail++}}toast(fail?`删除完成：成功 ${ok}，失败 ${fail}`:`已删除 ${ok} 项`);await loadAll()}
+document.querySelector('[data-user-del]').addEventListener('click',()=>delChecked('user'));
+document.querySelector('[data-group-del]').addEventListener('click',()=>delChecked('group'));
+document.querySelector('[data-perm-del]').addEventListener('click',()=>delChecked('perm'));
+
+bindListChecks();
+
+// —— 设备分组（镜像组）页面：添加 / 删除 / 勾选联动 ——
+// 渲染逻辑在 scrcpy-control.js 里（renderDeviceGroupsPage），这里只绑定按钮与勾选委托。
+document.querySelector('[data-syncgroup-add]').addEventListener('click',()=>{
+  if (typeof window.openDeviceGroupAdd === 'function') window.openDeviceGroupAdd();
+  else toast('镜像组功能未加载');
+});
+document.querySelector('[data-syncgroup-del]').addEventListener('click',()=>{
+  if (typeof window.deleteSelectedDeviceGroups === 'function') window.deleteSelectedDeviceGroups();
+});
+const sgBody = $('syncGroupRows');
+if (sgBody) sgBody.addEventListener('change', ()=>{
+  const btn = document.querySelector('[data-syncgroup-del]');
+  if (!btn) return;
+  btn.disabled = sgBody.querySelectorAll('.row-check:checked').length === 0;
+});
+
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* ===== 批量安装 / 卸载应用（设备在主列表勾选） ===== */
+let uploadedApkId=null;
+// getSelectedDeviceIds 返回当前勾选且仍可选的设备 id 列表（过滤已离线/断开/停用的残留勾选）。
+function getSelectedDeviceIds(){const byId={};for(const d of devices)byId[d.id]=d;return Array.from(selectedDevices).filter(id=>{const d=byId[id];return d&&deviceSelectable(d)})}
+// updateDeviceSelectBar 刷新全选勾选态与已选计数。
+function updateDeviceSelectBar(){const all=$('deviceSelectAll');const count=$('deviceSelectCount');const selectable=devices.filter(deviceSelectable);const selected=selectable.filter(d=>selectedDevices.has(d.id));
+  if(all)all.checked=selectable.length>0&&selected.length===selectable.length;
+  if(count)count.textContent=`已选 ${selected.length} 台`}
+// bindDeviceSelectBar 绑定全选与选择栏事件（在 DOM 就绪后调用一次）。
+function bindDeviceSelectBar(){const all=$('deviceSelectAll');if(all)all.addEventListener('change',e=>{
+    const checked=e.target.checked;
+    devices.forEach(d=>{if(!deviceSelectable(d))return;if(checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id)});
+    // 同步列表里每一行的 checkbox
+    document.querySelectorAll('.device-check').forEach(cb=>{if(checked)cb.checked=true;else cb.checked=false});
+    updateDeviceSelectBar();
+  })}
+// openInstallModal 打开「安装应用」弹窗：只含上传框 + 安装按钮。
+function openInstallModal(){
+  if(!getSelectedDeviceIds().length){toast('请先在设备清单勾选要安装的设备');return}
+  openModal('安装应用',`
+    <form id="installForm" class="stack-form">
+      <p class="app-hint">已选 <strong>${getSelectedDeviceIds().length}</strong> 台设备。上传一个 .apk，将覆盖安装到所选设备（同包名自动覆盖）。</p>
+      <label class="file-upload-label">
+        <input type="file" id="apkFileInput" accept=".apk">
+      </label>
+      <div class="app-status" id="installStatus"></div>
+      <div class="modal-actions"><button class="btn-primary" type="submit" id="installSubmitBtn" disabled><svg class="ico ico-sm"><use href="#i-download"/></svg>安装到所选设备</button></div>
+    </form>`);
+  uploadedApkId=null;
+  const fileInput=$('apkFileInput');const statusEl=$('installStatus');const submitBtn=$('installSubmitBtn');
+  if(fileInput)fileInput.addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;submitBtn.disabled=true;statusEl.textContent='正在上传并解析包名…';
+    try{const fd=new FormData();fd.append('file',f);const res=await fetch(apiBase+'/api/admin/apk/upload',{method:'POST',headers:token?{Authorization:`Bearer ${token}`}:{},body:fd});const data=await res.json();if(!res.ok)throw new Error(data?.error||`HTTP ${res.status}`);uploadedApkId=data.id;statusEl.innerHTML=`<span class="ok">已上传：${escapeHTML(data.fileName)}（包名 ${escapeHTML(data.packageName)}）</span>`;submitBtn.disabled=false}catch(err){statusEl.innerHTML=`<span class="err">上传失败：${escapeHTML(err.message)}</span>`}})
+}
+function openUninstallModal(){
+  if(!getSelectedDeviceIds().length){toast('请先在设备清单勾选要卸载的设备');return}
+  openModal('卸载应用',`
+    <form id="uninstallForm" class="stack-form">
+      <p class="app-hint">已选 <strong>${getSelectedDeviceIds().length}</strong> 台设备。输入要卸载的应用包名。</p>
+      <label>应用包名<input type="text" id="uninstallPkgInput" placeholder="如 com.example.app" required></label>
+      <div class="app-status" id="uninstallStatus"></div>
+      <div class="modal-actions"><button class="btn-danger" type="submit"><svg class="ico ico-sm"><use href="#i-trash"/></svg>从所选设备卸载</button></div>
+    </form>`)
+}
+document.addEventListener('submit',async e=>{
+  if(e.target.id==='installForm'){
+    e.preventDefault();const statusEl=$('installStatus');
+    if(!uploadedApkId){toast('请先选择并上传一个 APK');return}
+    const ids=getSelectedDeviceIds();statusEl.textContent=`正在向 ${ids.length} 台设备安装…`;
+    try{const data=await api('/api/admin/apk/install',{method:'POST',body:JSON.stringify({apkId:uploadedApkId,deviceIds:ids})});renderResults(statusEl,data.results||[])}catch(err){statusEl.innerHTML=`<span class="err">安装请求失败：${escapeHTML(err.message)}</span>`}
+  }else if(e.target.id==='uninstallForm'){
+    e.preventDefault();const statusEl=$('uninstallStatus');const pkg=$('uninstallPkgInput').value.trim();
+    if(!pkg){toast('请输入包名');return}
+    const ids=getSelectedDeviceIds();statusEl.textContent=`正在从 ${ids.length} 台设备卸载 ${escapeHTML(pkg)} …`;
+    try{const data=await api('/api/admin/apk/uninstall',{method:'POST',body:JSON.stringify({packageName:pkg,deviceIds:ids})});renderResults(statusEl,data.results||[])}catch(err){statusEl.innerHTML=`<span class="err">卸载请求失败：${escapeHTML(err.message)}</span>`}
+  }
+})
+// renderResults 把逐台结果显示到指定状态容器。
+function renderResults(el,results){const nameMap={};for(const d of devices)nameMap[d.id]=deviceDisplayName(d);
+  const ok=results.filter(r=>r.ok).length,fail=results.length-ok;
+  const lines=results.map(r=>{const nm=nameMap[r.deviceId]||r.deviceId;return r.ok?`<span class="ok">✓ ${escapeHTML(nm)} 成功</span>`:`<span class="err">✕ ${escapeHTML(nm)}：${escapeHTML(r.error||'失败')}</span>`});
+  el.innerHTML=`<span class="${fail?'err':'ok'}">完成：成功 ${ok} 台，失败 ${fail} 台</span>\n${lines.join('\n')}`}
+
 if(token)showApp();
 
 </script>
@@ -944,6 +1332,10 @@ if(token)showApp();
     }
     // 回到页面顶部（独立页面切换后，回到顶部开始浏览）
     window.scrollTo(0, 0);
+    // 切换到「设备分组」页时刷新镜像组列表。
+    if (targetId === 'sec-device-groups' && typeof window.renderDeviceGroupsPage === 'function') {
+      window.renderDeviceGroupsPage();
+    }
   }
 
   for (const link of links) {
