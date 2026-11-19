@@ -27,6 +27,7 @@ type Router struct {
 	limiter *loginLimiter
 	tickets *fixedWindowLimiter
 	scrcpy  *scrcpy.ADB
+	apks    *apkStore
 }
 
 func New(s *logic.Service) *Router {
@@ -34,6 +35,7 @@ func New(s *logic.Service) *Router {
 		svc:     s,
 		limiter: newLoginLimiter(),
 		tickets: newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
+		apks:    newAPKStore(),
 	}
 }
 
@@ -99,10 +101,15 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 
 func bearer(req *http.Request) string {
 	h := req.Header.Get("Authorization")
-	if !strings.HasPrefix(h, "Bearer ") {
-		return ""
+	if strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 	}
-	return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+	// 下载等无法携带 Authorization 头的场景（如 <a href> 原生下载）允许
+	// 通过 query 参数 token 传递，避免用 fetch 缓冲大文件导致连接被中断。
+	if t := req.URL.Query().Get("token"); t != "" {
+		return strings.TrimSpace(t)
+	}
+	return ""
 }
 
 func (r *Router) auth(next http.Handler) http.Handler {
@@ -206,7 +213,7 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 	case "devices":
 		r.listDevices(w, req, u)
 	case "users":
-		r.createUser(w, req, u)
+		r.users(w, req, u)
 	case "groups":
 		r.groups(w, req, u)
 	case "groups/users":
@@ -214,7 +221,7 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 	case "groups/devices":
 		r.addDeviceGroup(w, req, u)
 	case "group-access":
-		r.setGroupAccess(w, req, u)
+		r.groupAccess(w, req, u)
 	case "scrcpy/pair":
 		r.handleScrcpyPair(w, req, u)
 	case "scrcpy/connect":
@@ -225,7 +232,41 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleScrcpyTcpip(w, req, u)
 	case "scrcpy/usb-devices":
 		r.handleScrcpyUsbDevices(w, req, u)
+	case "scrcpy/online-devices":
+		r.handleScrcpyOnlineDevices(w, req, u)
+	case "device/connect":
+		r.handleDeviceConnect(w, req, u)
+	case "device/disconnect":
+		r.handleDeviceDisconnect(w, req, u)
+	case "files/list":
+		r.handleFilesList(w, req, u)
+	case "files/download":
+		r.handleFilesDownload(w, req, u)
+	case "files/thumb":
+		r.handleFilesThumb(w, req, u)
+	case "apk/upload":
+		r.handleAPKUpload(w, req, u)
+	case "apk/list":
+		r.handleAPKList(w, req, u)
+	case "apk/install":
+		r.handleAPKInstall(w, req, u)
+	case "apk/uninstall":
+		r.handleAPKUninstall(w, req, u)
+	case "sync-groups":
+		r.handleSyncGroups(w, req, u)
 	default:
+		// 单资源删除路径：/api/admin/sync-groups/{id}、/api/admin/users/{id}、/api/admin/groups/{id}。
+		switch {
+		case strings.HasPrefix(path, "sync-groups/"):
+			r.handleSyncGroup(w, req, u)
+			return
+		case strings.HasPrefix(path, "users/"):
+			r.deleteUser(w, req, u, strings.TrimPrefix(path, "users/"))
+			return
+		case strings.HasPrefix(path, "groups/"):
+			r.deleteGroup(w, req, u, strings.TrimPrefix(path, "groups/"))
+			return
+		}
 		http.NotFound(w, req)
 	}
 }
@@ -282,13 +323,37 @@ func (r *Router) listDevices(w http.ResponseWriter, req *http.Request, u sqlite.
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (r *Router) createUser(w http.ResponseWriter, req *http.Request, u sqlite.User) {
-	if !requireMethod(w, req, http.MethodPost) {
-		return
-	}
+// users 处理 GET /api/admin/users（账号列表）与 POST（创建用户）。
+func (r *Router) users(w http.ResponseWriter, req *http.Request, u sqlite.User) {
 	if !requireAdmin(w, u) {
 		return
 	}
+	switch req.Method {
+	case http.MethodGet:
+		users, err := r.svc.ListUsers()
+		if err != nil {
+			failInternal(w, "list users", err)
+			return
+		}
+		// 不回传密码哈希，仅返回展示所需字段。
+		out := make([]map[string]string, 0, len(users))
+		for _, usr := range users {
+			out = append(out, map[string]string{
+				"id":        usr.ID,
+				"username":  usr.Username,
+				"role":      usr.Role,
+				"createdAt": usr.CreatedAt,
+			})
+		}
+		writeJSON(w, http.StatusOK, out)
+	case http.MethodPost:
+		r.createUser(w, req, u)
+	default:
+		requireMethod(w, req, http.MethodGet, http.MethodPost)
+	}
+}
+
+func (r *Router) createUser(w http.ResponseWriter, req *http.Request, u sqlite.User) {
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -304,6 +369,46 @@ func (r *Router) createUser(w http.ResponseWriter, req *http.Request, u sqlite.U
 	}
 	_ = r.svc.Store.Audit(u.ID, "create-user", "", id)
 	writeJSON(w, http.StatusCreated, map[string]string{"userId": id})
+}
+
+// deleteUser 删除普通用户（管理员不可删）。路径 /api/admin/users/{id}。
+func (r *Router) deleteUser(w http.ResponseWriter, req *http.Request, u sqlite.User, id string) {
+	if !requireMethod(w, req, http.MethodDelete) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	if err := r.svc.DeleteUser(id); err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			fail(w, http.StatusNotFound, "user not found")
+			return
+		}
+		failInput(w, "delete user", err)
+		return
+	}
+	_ = r.svc.Store.Audit(u.ID, "delete-user", "", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// deleteGroup 删除分组。路径 /api/admin/groups/{id}。
+func (r *Router) deleteGroup(w http.ResponseWriter, req *http.Request, u sqlite.User, id string) {
+	if !requireMethod(w, req, http.MethodDelete) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	if err := r.svc.DeleteGroup(id); err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			fail(w, http.StatusNotFound, "group not found")
+			return
+		}
+		failInput(w, "delete group", err)
+		return
+	}
+	_ = r.svc.Store.Audit(u.ID, "delete-group", "", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (r *Router) groups(w http.ResponseWriter, req *http.Request, u sqlite.User) {
@@ -396,6 +501,47 @@ func (r *Router) addDeviceGroup(w http.ResponseWriter, req *http.Request, u sqli
 		return
 	}
 	_ = r.svc.Store.Audit(u.ID, "group-device-add", body.DeviceID, body.GroupID)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// groupAccess 处理权限关系：GET 列表、POST 设置、DELETE 删除。
+func (r *Router) groupAccess(w http.ResponseWriter, req *http.Request, u sqlite.User) {
+	switch req.Method {
+	case http.MethodGet:
+		if !requireAdmin(w, u) {
+			return
+		}
+		list, err := r.svc.ListGroupAccess()
+		if err != nil {
+			failInternal(w, "list group access", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, list)
+	case http.MethodDelete:
+		if !requireAdmin(w, u) {
+			return
+		}
+		r.deleteGroupAccess(w, req, u)
+	case http.MethodPost:
+		r.setGroupAccess(w, req, u)
+	default:
+		requireMethod(w, req, http.MethodGet, http.MethodPost, http.MethodDelete)
+	}
+}
+
+// deleteGroupAccess 删除一条授权关系，参数经 query 传递（userGroupId/deviceGroupId）。
+func (r *Router) deleteGroupAccess(w http.ResponseWriter, req *http.Request, u sqlite.User) {
+	ug := req.URL.Query().Get("userGroupId")
+	dg := req.URL.Query().Get("deviceGroupId")
+	if err := r.svc.DeleteGroupAccess(ug, dg); err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			fail(w, http.StatusNotFound, "group access not found")
+			return
+		}
+		failInput(w, "delete group access", err)
+		return
+	}
+	_ = r.svc.Store.Audit(u.ID, "group-access-delete", "", ug+"->"+dg)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

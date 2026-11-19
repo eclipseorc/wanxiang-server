@@ -7,7 +7,6 @@ package adminapi
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,6 +25,12 @@ func friendlyAdbError(err error) string {
 		return "设备离线：请检查 USB 线是否插好、手机是否已解锁，或无线调试开关是否已开启。"
 	case strings.Contains(msg, "not found") || strings.Contains(msg, "no devices"):
 		return "未找到设备：请确认设备已通过 USB 连接并开启「USB 调试」。"
+	case strings.Contains(msg, "connect failed") || strings.Contains(msg, "connection reset") || strings.Contains(msg, "closed"):
+		return "连接不稳定：与设备的 ADB 连接中断，请稍后重试；若反复失败，请重新「连接设备」。"
+	case strings.Contains(msg, "protocol fault"):
+		// adb pair 失败时（IP 错误、端口错误、配对码错误、设备未响应）统一报
+		// protocol fault，无法进一步区分。给出覆盖最常见原因的友好提示。
+		return "配对失败：请核对设备 IP、配对端口和 6 位配对码是否与手机「无线调试」页一致；配对码为一次性且有时效，若已用过或超时请刷新后重试。"
 	default:
 		return msg
 	}
@@ -95,13 +100,16 @@ func (r *Router) handleScrcpyConnect(w http.ResponseWriter, req *http.Request, u
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
-	// 连接成功后自动切固定端口 5555，使设备监听稳定的 tcpip 端口，供后续
-	// 掉线自动重连使用。切换失败不阻断连接（仍可用动态端口控制），仅记录日志。
-	if err := r.scrcpy.Tcpip(req.Context(), fmt.Sprintf("%s:%d", body.Host, body.Port), 5555); err != nil {
-		log.Printf("scrcpy auto tcpip failed host=%s: %v", body.Host, err)
+	// 无线调试的连接端口是动态分配的，不能假设固定 5555，也绝不能执行
+	// adb tcpip 5555（会把无线调试设备打成 unauthorized、破坏授权）。连接成功后
+	// 解析该 IP 真实在线的端口回传给前端，前端据此拼 serial 并发起控制/持久化。
+	// 解析失败时退回用户填写端口，不阻断连接成功的结果。
+	realPort := body.Port
+	if p, err := r.scrcpy.ResolveOnlinePort(req.Context(), body.Host); err == nil {
+		realPort = p
 	}
 	_ = r.svc.Store.Audit(u.ID, "scrcpy-connect", "", body.Host)
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "port": realPort})
 }
 
 // handleScrcpyStatus 查询设备在 adb 中的真实在线状态（是否已完成配对+连接）。
@@ -194,4 +202,28 @@ func (r *Router) handleScrcpyTcpip(w http.ResponseWriter, req *http.Request, u s
 	}
 	_ = r.svc.Store.Audit(u.ID, "scrcpy-tcpip", "", body.Serial)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "port": body.Port})
+}
+
+// handleScrcpyOnlineDevices 返回 adb 中处于 device（已配对+连接，可立即用于
+// 观看/群控）状态的设备 serial 列表。serial 即无线设备的 ip:port。
+//
+// 供前端「一键镜像」判定哪些设备可被自动拉起屏幕控制，无需设备预先处于
+// 控屏状态（后端 /api/scrcpy/ws 的 prepare 会自动部署+启动 scrcpy-server）。
+func (r *Router) handleScrcpyOnlineDevices(w http.ResponseWriter, req *http.Request, u sqlite.User) {
+	if !requireMethod(w, req, http.MethodGet) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	if r.scrcpy == nil {
+		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
+		return
+	}
+	serials, err := r.scrcpy.OnlineDevices(req.Context())
+	if err != nil {
+		fail(w, http.StatusBadGateway, "query adb devices: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"serials": serials})
 }

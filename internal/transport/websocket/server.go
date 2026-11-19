@@ -402,10 +402,10 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 
 // snapshotDevice 在设备快照中附加 ADB 在线状态（内存态，由 ADBMonitor 维护），
 // 让前端区分「业务在线」「ADB 掉线」等状态。内嵌 sqlite.Device 保留其全部
-// JSON 字段与标签。
+// JSON 字段与标签；adbOnline 字段由内嵌的 Device.AdbOnline 承载，这里仅用
+// 内嵌结构体做类型别名，避免重复定义 JSON tag 冲突。
 type snapshotDevice struct {
 	sqlite.Device
-	ADBOnline bool `json:"adbOnline"`
 }
 
 // sendSnapshot 把当前管理员可见的设备列表一次性发给客户端，方便浏览器初始化状态。
@@ -424,14 +424,23 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 			continue
 		}
 		if allowed {
-			visible = append(visible, snapshotDevice{Device: device, ADBOnline: true})
+			// AdbOnline 默认取落库的 adb_online（持久化），避免进程重启后内存态
+			// 尚未扫描到就把「未授权/未连接」设备误判为 true（可操作）。
+			visible = append(visible, snapshotDevice{Device: device})
 		}
 	}
-	// 再在锁内补充 adbOnline 状态（内存态）。
+	// 再在锁内补充 adbOnline 状态（内存态，比落库更实时）与设备上报 IP。
 	h.hub.mu.RLock()
 	for i := range visible {
 		if v, ok := h.hub.adbOnline[visible[i].ID]; ok {
-			visible[i].ADBOnline = v
+			visible[i].AdbOnline = v
+		}
+		// 设备心跳上报的 IP 比落库的 adb_ip 更实时；落库为空时用上报值兜底，
+		// 让前端始终能拿到一个可拼 serial 的 IP。
+		if visible[i].AdbIP == "" {
+			if ip, ok := h.hub.deviceIPs[visible[i].ID]; ok {
+				visible[i].AdbIP = ip
+			}
 		}
 	}
 	h.hub.mu.RUnlock()

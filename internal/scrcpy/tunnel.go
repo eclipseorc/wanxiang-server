@@ -34,7 +34,7 @@ type ScrcpyConfig struct {
 func DefaultScrcpyConfig(baseDir string) ScrcpyConfig {
 	return ScrcpyConfig{
 		ServerLocalPath:  filepath.Join(baseDir, "tools", "scrcpy-server"),
-		ServerRemotePath: "/data/local/tmp/scrcpy-server",
+		ServerRemotePath: "/data/local/tmp/scrcpy-server.jar",
 		MaxSize:          1920,
 		BitRate:          8000000,
 		MaxFPS:           60,
@@ -43,13 +43,18 @@ func DefaultScrcpyConfig(baseDir string) ScrcpyConfig {
 
 // buildScrcpyCommand 拼出 adb shell 中启动 scrcpy-server 的完整命令。
 // tunnel_forward=true 让 scrcpy-server 在设备上创建 localabstract:scrcpy 等待连接。
+//
+// 类路径用 `-Djava.class.path=` JVM 参数而非 `CLASSPATH=` 环境变量：部分国产
+// ROM（华为 EMUI 9.x）的 app_process 会忽略 CLASSPATH 环境变量，导致
+// ClassNotFoundException（DexPathList 为空）而 Aborted。`-Djava.class.path=`
+// 在原生 Android 与 EMUI 上都能让 ART 正确加载 scrcpy-server.jar。
 func (c ScrcpyConfig) buildScrcpyCommand() string {
 	args := []string{
-		fmt.Sprintf("CLASSPATH=%s", c.ServerRemotePath),
 		"app_process",
+		fmt.Sprintf("-Djava.class.path=%s", c.ServerRemotePath),
 		"/",
 		"com.genymobile.scrcpy.Server",
-		"4.0",
+		"5.0.1",
 		"audio=false",
 		"tunnel_forward=true",
 		fmt.Sprintf("max_size=%d", c.MaxSize),
@@ -57,6 +62,13 @@ func (c ScrcpyConfig) buildScrcpyCommand() string {
 		fmt.Sprintf("max_fps=%d", c.MaxFPS),
 		"video_codec=h264",
 		"control=true",
+		// keep_active：每 ~4 秒调用 PowerManager.userActivity() 模拟用户活动，
+		// 让设备不因长时间无操作而息屏（息屏后 MediaProjection 停止推帧，远程画面
+		// 黑屏、0 fps）。与 stay_awake 不同，它不修改系统设置，且对纯无线（未插电）
+		// 设备同样有效。scrcpy 4.0 引入，5.0 沿用。
+		"keep_active=true",
+		// stay_awake 对插电设备做双保险，纯无线时无效（Android 系统行为）。
+		"stay_awake=true",
 		"send_device_meta=false",
 		"send_frame_meta=true",
 		"send_dummy_byte=false",

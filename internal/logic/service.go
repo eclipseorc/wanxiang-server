@@ -162,6 +162,52 @@ func (s *Service) CreateUser(username, password string) (string, error) {
 	return id, nil
 }
 
+// ListUsers 返回全部用户（含角色与创建时间），供账号管理列表展示。
+func (s *Service) ListUsers() ([]sqlite.User, error) {
+	return s.Store.ListUsers()
+}
+
+// DeleteUser 删除普通用户。管理员账号（role=admin）不可删除，避免系统失去
+// 唯一管理员或误删内置管理员；删除普通用户由外键级联清理其会话与分组关系。
+func (s *Service) DeleteUser(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return invalid("userId required")
+	}
+	u, err := s.Store.UserByID(id)
+	if err != nil {
+		return err
+	}
+	if u.Role == "admin" {
+		return invalid("管理员账号不可删除")
+	}
+	return s.Store.DeleteUser(id)
+}
+
+// DeleteGroup 删除分组；级联清理其用户/设备归属与授权关系。
+func (s *Service) DeleteGroup(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return invalid("groupId required")
+	}
+	return s.Store.DeleteGroup(id)
+}
+
+// ListGroupAccess 返回全部授权关系（含组名），供权限管理列表展示。
+func (s *Service) ListGroupAccess() ([]sqlite.GroupAccess, error) {
+	return s.Store.ListGroupAccess()
+}
+
+// DeleteGroupAccess 删除一条「用户组 → 设备组」授权关系。
+func (s *Service) DeleteGroupAccess(userGroupID, deviceGroupID string) error {
+	userGroupID = strings.TrimSpace(userGroupID)
+	deviceGroupID = strings.TrimSpace(deviceGroupID)
+	if userGroupID == "" || deviceGroupID == "" {
+		return invalid("userGroupId and deviceGroupId required")
+	}
+	return s.Store.DeleteGroupAccess(userGroupID, deviceGroupID)
+}
+
 // RegisterDevice 登记一台设备：设备 ID 由 App 本地生成并上报，型号可选。
 // 首次上报即入库，重复上报只更新型号，不做任何设备令牌下发。
 func (s *Service) RegisterDevice(deviceID, model string) error {

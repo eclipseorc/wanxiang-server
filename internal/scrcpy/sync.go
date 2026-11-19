@@ -27,9 +27,9 @@ import (
 // 它与现有观看会话的 video/control 连接是同一份，不额外建连。
 type deviceSession struct {
 	serial  string
-	control net.Conn   // 控制通道，用于写入控制事件
-	width   uint32     // 设备真实分辨率宽
-	height  uint32     // 设备真实分辨率高
+	control net.Conn // 控制通道，用于写入控制事件
+	width   uint32   // 设备真实分辨率宽
+	height  uint32   // 设备真实分辨率高
 }
 
 // syncGroup 是一个群控组：一个主控 + 若干从机。
@@ -356,8 +356,11 @@ func (s *Server) syncCreate(groupID string, serials []string, master string) map
 	g := &syncGroup{id: groupID, members: make(map[string]*deviceSession)}
 	for _, serial := range serials {
 		// 一台设备同一时刻只能在一个群控组里，避免控制通道被并发写乱。
-		if _, in := s.inGroup[serial]; in {
-			return syncError("device already in a group: " + serial)
+		// 若该 serial 残留在旧组（上次工作台关闭时 sync-destroy 未送达、页面刷新
+		// 等），自动把旧组解散，避免「一键镜像」因僵尸组而永久失败。
+		if oldGID, in := s.inGroup[serial]; in && oldGID != groupID {
+			s.dissolveGroupLocked(oldGID)
+			log.Printf("scrcpy sync auto-dissolved stale group id=%s (device %s re-joined %s)", oldGID, serial, groupID)
 		}
 		ds, ok := s.sessions[serial]
 		if !ok {
@@ -409,10 +412,21 @@ func (s *Server) syncDestroy(groupID string) map[string]any {
 	if !ok {
 		return syncError("group not found")
 	}
+	s.dissolveGroupLocked(groupID)
+	_ = g
+	log.Printf("scrcpy sync group destroyed id=%s", groupID)
+	return map[string]any{"type": "sync-destroyed", "groupId": groupID}
+}
+
+// dissolveGroupLocked 在已持有 s.mu 的前提下解散一个群控组，清理其成员的
+// inGroup 映射。由 syncDestroy 与 syncCreate（自动清理僵尸组）复用。
+func (s *Server) dissolveGroupLocked(groupID string) {
+	g, ok := s.groups[groupID]
+	if !ok {
+		return
+	}
 	for serial := range g.members {
 		delete(s.inGroup, serial)
 	}
 	delete(s.groups, groupID)
-	log.Printf("scrcpy sync group destroyed id=%s", groupID)
-	return map[string]any{"type": "sync-destroyed", "groupId": groupID}
 }

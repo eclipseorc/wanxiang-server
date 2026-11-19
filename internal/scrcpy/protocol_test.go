@@ -221,3 +221,28 @@ func TestParseCodecHeader(t *testing.T) {
 		t.Fatal("expected error for unsupported codec")
 	}
 }
+
+// isSessionPacket 应正确区分 v5 的 session packet（首字节最高位=1）与 media packet。
+func TestIsSessionPacket(t *testing.T) {
+	if !isSessionPacket([]byte{0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+		t.Fatal("session packet with MSB set should be recognized")
+	}
+	if isSessionPacket([]byte{0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+		t.Fatal("media packet with MSB clear should not be session packet")
+	}
+}
+
+// parseSessionPacket 应解析出 v5 session packet 里的视频分辨率。
+func TestParseSessionPacket(t *testing.T) {
+	pkt := make([]byte, sessionPacketSize)
+	pkt[0] = 0x80 // session packet flag
+	binary.BigEndian.PutUint32(pkt[4:8], 720)
+	binary.BigEndian.PutUint32(pkt[8:12], 1612)
+	w, h, err := parseSessionPacket(pkt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w != 720 || h != 1612 {
+		t.Fatalf("got %dx%d, want 720x1612", w, h)
+	}
+}

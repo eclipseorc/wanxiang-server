@@ -162,12 +162,10 @@ func TestSecurityHeadersAndMethodChecks(t *testing.T) {
 	}
 
 	token := loginAdmin(t, h)
+	// users 端点支持 GET（账号列表）与 POST（创建用户），GET 应返回 200。
 	rec = request(t, h, http.MethodGet, "/api/admin/users", "", token)
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("GET users: got %d, want 405", rec.Code)
-	}
-	if rec.Header().Get("Allow") != http.MethodPost {
-		t.Errorf("Allow = %q, want POST", rec.Header().Get("Allow"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET users: got %d, want 200", rec.Code)
 	}
 
 	noToken := request(t, h, http.MethodGet, "/api/admin/devices", "", "")

@@ -13,11 +13,15 @@ package scrcpy
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -54,7 +58,56 @@ func (s *Server) ServeMux() http.Handler {
 	mux.HandleFunc("GET /api/scrcpy/ws", s.handleWS)
 	mux.HandleFunc("GET /api/scrcpy/sync", s.handleSyncWS)
 	mux.HandleFunc("GET /api/scrcpy/devices", s.handleDevices)
+	mux.HandleFunc("GET /api/scrcpy/debug", s.handleDebug)
 	return mux
+}
+
+// handleDebug 返回当前观看/群控的内部状态（live、sessions、groups、inGroup），
+// 用于诊断「群控组黑屏 / 设备被占用 / 僵尸组残留」等问题。仅调试用。
+func (s *Server) handleDebug(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	live := make([]string, 0, len(s.live))
+	for serial := range s.live {
+		live = append(live, serial)
+	}
+
+	type sessionInfo struct {
+		Serial string `json:"serial"`
+		Width  uint32 `json:"width"`
+		Height uint32 `json:"height"`
+	}
+	sessions := make([]sessionInfo, 0, len(s.sessions))
+	for serial, ds := range s.sessions {
+		sessions = append(sessions, sessionInfo{Serial: serial, Width: ds.width, Height: ds.height})
+	}
+
+	type groupInfo struct {
+		ID      string   `json:"id"`
+		Master  string   `json:"master"`
+		Members []string `json:"members"`
+	}
+	groups := make([]groupInfo, 0, len(s.groups))
+	for gid, g := range s.groups {
+		members := make([]string, 0, len(g.members))
+		for serial := range g.members {
+			members = append(members, serial)
+		}
+		groups = append(groups, groupInfo{ID: gid, Master: g.master, Members: members})
+	}
+
+	inGroup := make(map[string]string, len(s.inGroup))
+	for serial, gid := range s.inGroup {
+		inGroup[serial] = gid
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"live":     live,
+		"sessions": sessions,
+		"groups":   groups,
+		"inGroup":  inGroup,
+	})
 }
 
 // tryAcquire 标记 serial 进入观看状态；已在观看时返回 false。
@@ -83,6 +136,25 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 会话级编码参数覆盖：群控等多路场景可传较低帧率/码率以降低资源占用。
+	// 未传的字段沿用默认配置（单台控制的高清流畅参数）。
+	cfg := s.cfg
+	if v := r.URL.Query().Get("maxSize"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MaxSize = n
+		}
+	}
+	if v := r.URL.Query().Get("bitrate"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.BitRate = n
+		}
+	}
+	if v := r.URL.Query().Get("fps"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MaxFPS = n
+		}
+	}
+
 	// 先升级 WS，再做准备流程，这样 prepare/acquire 的错误能通过 WS 的
 	// error 消息下发给前端（而非退化为一个无法带错误信息的 HTTP 响应），
 	// 前端据此能展示真实原因，而不是笼统的「会话已结束」。
@@ -101,7 +173,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	defer s.release(serial)
 
 	// 完成准备流程（部署 + 启动 + forward）。
-	port, err := s.prepare(r.Context(), serial)
+	port, err := s.prepare(r.Context(), serial, cfg)
 	if err != nil {
 		_ = conn.WriteJSON(map[string]string{"type": "error", "message": err.Error()})
 		return
@@ -120,15 +192,26 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 
 	// 视频：TCP -> WebSocket（读 codec 头 + 帧，转发给浏览器）。
 	// resolution 通道把 codec 头里的真实分辨率传回，用于登记群控会话。
+	// 缓冲为 1，pumpVideo 无论成功读到分辨率还是失败退出都会发一个信号，
+	// 保证主 goroutine 不会因 pumpVideo 提前 return 而永久卡死（锁泄漏）。
 	resolution := make(chan [2]uint32, 1)
 	go s.pumpVideo(tun.video, conn, resolution)
 
 	// 等待 codec 头解析出分辨率后登记会话，供群控组引用。
+	// 增加超时兜底：视频头在 8s 内没读到（网络抖动/僵尸 forward/scrcpy-server
+	// 启动失败）就中止会话，defer 的 release 会释放观看锁，避免锁泄漏。
 	var width, height uint32
 	select {
 	case sz := <-resolution:
 		width, height = sz[0], sz[1]
 	case <-r.Context().Done():
+		return
+	case <-time.After(8 * time.Second):
+		_ = conn.WriteJSON(map[string]string{"type": "error", "message": "视频流建立超时"})
+		return
+	}
+	if width == 0 && height == 0 {
+		// pumpVideo 读到错误信号（读头失败），直接结束会话，释放观看锁。
 		return
 	}
 	s.registerSession(serial, tun.control, width, height)
@@ -139,8 +222,9 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 // prepare 部署并启动 scrcpy-server，建立 adb forward，返回本地端口。
-// 无线调试下 daemon 可能意外重启导致设备掉线，因此先确保 daemon 存活与设备在线。
-func (s *Server) prepare(ctx context.Context, serial string) (int, error) {
+// cfg 允许按会话覆盖编码参数（群控降配）。无线调试下 daemon 可能意外重启
+// 导致设备掉线，因此先确保 daemon 存活与设备在线。
+func (s *Server) prepare(ctx context.Context, serial string, cfg ScrcpyConfig) (int, error) {
 	if err := s.adb.EnsureServer(ctx); err != nil {
 		return 0, err
 	}
@@ -150,10 +234,10 @@ func (s *Server) prepare(ctx context.Context, serial string) (int, error) {
 		}
 	}
 
-	if err := s.cfg.deploy(ctx, s.adb, serial); err != nil {
+	if err := cfg.deploy(ctx, s.adb, serial); err != nil {
 		return 0, err
 	}
-	if err := s.cfg.start(ctx, s.adb, serial); err != nil {
+	if err := cfg.start(ctx, s.adb, serial); err != nil {
 		return 0, err
 	}
 
@@ -191,29 +275,36 @@ func (s *Server) cleanup(serial string, port int) {
 
 // pumpVideo 从视频通道读取 codec 头与帧，转发到 WebSocket。
 // resolution 通道（可空）在解析出 codec 头后回传真实分辨率，供群控登记用。
+//
+// 兼容 scrcpy-server v4 与 v5 两种视频流开头：
+//   - v4：codec id(4) + width(4) + height(4)（或含 flags 的 16 字节扩展头）
+//   - v5：codec id(4) + session packet(12 字节，最高位=1，含 width/height)
+//
+// 两者靠「codec id 之后的第一个 u32 最高位」区分：v5 session packet 最高位为 1，
+// v4 的 width 是普通整数（< 2^31）。运行中 v5 还可能在旋转后插入 session packet，
+// 需在帧循环里识别并跳过。
 func (s *Server) pumpVideo(video interface{ Read([]byte) (int, error) }, conn *websocket.Conn, resolution chan<- [2]uint32) {
-	header := make([]byte, codecHeaderSizeExtended)
-	n, err := readFull(video, header[:codecHeaderSize])
+	codec, width, height, err := s.readVideoHeader(video)
 	if err != nil {
-		return
-	}
-	if n == codecHeaderSize {
-		if _, err := readFull(video, header[codecHeaderSize:codecHeaderSizeExtended]); err != nil {
-			return
+		// 读头失败（网络抖动 / 僵尸 forward / scrcpy-server 启动失败）时，
+		// 必须发一个「错误信号」唤醒主 goroutine，否则它会卡死在 select 上，
+		// 导致观看锁永久泄漏（后续同 serial 永远报 device already being controlled）。
+		log.Printf("scrcpy read video header failed: %v", err)
+		if resolution != nil {
+			select {
+			case resolution <- [2]uint32{0, 0}:
+			default:
+			}
 		}
-		n = codecHeaderSizeExtended
-	}
-	codecHeader, err := parseCodecHeader(header[:n])
-	if err != nil {
 		return
 	}
 	_ = conn.WriteJSON(map[string]any{
-		"type": "codec", "codec": string(codecHeader.Codec),
-		"width": codecHeader.Width, "height": codecHeader.Height,
+		"type": "codec", "codec": string(codec),
+		"width": width, "height": height,
 	})
 	if resolution != nil {
 		select {
-		case resolution <- [2]uint32{codecHeader.Width, codecHeader.Height}:
+		case resolution <- [2]uint32{width, height}:
 		default:
 		}
 	}
@@ -223,6 +314,18 @@ func (s *Server) pumpVideo(video interface{ Read([]byte) (int, error) }, conn *w
 	for {
 		if _, err := readFull(video, metaBuf); err != nil {
 			return
+		}
+		// v5：旋转后可能在帧流中插入 session packet，识别并跳过（不转发）。
+		if isSessionPacket(metaBuf) {
+			if w, h, err := parseSessionPacket(metaBuf); err == nil {
+				width, height = w, h
+				// 分辨率变化时通知前端（可选，当前前端用 codec 头分辨率）。
+				_ = conn.WriteJSON(map[string]any{
+					"type": "codec", "codec": string(codec),
+					"width": width, "height": height,
+				})
+			}
+			continue
 		}
 		meta, err := parseFrameMeta(metaBuf)
 		if err != nil {
@@ -240,6 +343,40 @@ func (s *Server) pumpVideo(video interface{ Read([]byte) (int, error) }, conn *w
 			return
 		}
 	}
+}
+
+// readVideoHeader 读取并解析视频流开头的 codec id 与分辨率，兼容 v4/v5。
+// 返回 codec、width、height。v5 的分辨率来自 session packet，v4 来自 codec 头。
+func (s *Server) readVideoHeader(video interface{ Read([]byte) (int, error) }) (Codec, uint32, uint32, error) {
+	codecID := make([]byte, codecIDSize)
+	if _, err := readFull(video, codecID); err != nil {
+		return "", 0, 0, err
+	}
+	codecName := string(codecID)
+	switch codecName {
+	case "h264", "h265":
+	default:
+		return "", 0, 0, fmt.Errorf("unsupported codec %q", codecName)
+	}
+	codec := Codec(codecName)
+
+	// 读接下来的 12 字节，判断是 v5 session packet 还是 v4 width/height。
+	buf := make([]byte, 12)
+	if _, err := readFull(video, buf); err != nil {
+		return "", 0, 0, err
+	}
+	if isSessionPacket(buf) {
+		// v5：session packet，宽高在其后 8 字节。
+		width, height, err := parseSessionPacket(buf)
+		return codec, width, height, err
+	}
+	// v4：buf 的前 8 字节是 width/height。
+	width := binary.BigEndian.Uint32(buf[0:4])
+	height := binary.BigEndian.Uint32(buf[4:8])
+	if plausibleSize(width) && plausibleSize(height) {
+		return codec, width, height, nil
+	}
+	return "", 0, 0, fmt.Errorf("unrecognized video header layout (width=%d height=%d)", width, height)
 }
 
 // pumpControl 从 WebSocket 读取控制事件，编码后写入控制通道。

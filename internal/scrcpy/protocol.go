@@ -87,9 +87,9 @@ func encodeTouch(a TouchAction) ([]byte, error) {
 		binary.BigEndian.PutUint32(buf[24:28], 1)      // action_button = PRIMARY
 		binary.BigEndian.PutUint32(buf[28:32], 1)      // buttons = PRIMARY
 	case actionUp:
-		binary.BigEndian.PutUint16(buf[22:24], 0)      // pressure 归零
-		binary.BigEndian.PutUint32(buf[24:28], 1)      // action_button = 释放的是 PRIMARY
-		binary.BigEndian.PutUint32(buf[28:32], 0)      // buttons = 无按下
+		binary.BigEndian.PutUint16(buf[22:24], 0) // pressure 归零
+		binary.BigEndian.PutUint32(buf[24:28], 1) // action_button = 释放的是 PRIMARY
+		binary.BigEndian.PutUint32(buf[28:32], 0) // buttons = 无按下
 	default: // move
 		binary.BigEndian.PutUint16(buf[22:24], 0xFFFF) // 移动保持压力
 		binary.BigEndian.PutUint32(buf[24:28], 0)      // action_button = 无按钮变化
@@ -186,6 +186,12 @@ func encodeBackOrScreenOn() []byte {
 // frameMetaSize 是 scrcpy 视频帧头（FrameMeta）的字节数：8 字节 pts + 4 字节长度。
 const frameMetaSize = 12
 
+// codecIDSize 是 scrcpy v5 视频流开头纯 codec id 的字节数（u32）。
+const codecIDSize = 4
+
+// sessionPacketSize 是 scrcpy v5 session packet 的字节数：4 字节 flag + 4 字节宽 + 4 字节高。
+const sessionPacketSize = 12
+
 // codecHeaderSize 是 codec 头的最小字节数：4 字节 codec 标识 + 4 字节宽度 + 4 字节高度。
 const codecHeaderSize = 12
 
@@ -208,6 +214,23 @@ func parseFrameMeta(data []byte) (FrameMeta, error) {
 		PTS:  binary.BigEndian.Uint64(data[0:8]),
 		Size: binary.BigEndian.Uint32(data[8:12]),
 	}, nil
+}
+
+// isSessionPacket 判断一个 12 字节帧头是否是 scrcpy v5 的 session packet。
+// session packet 与 media packet 靠第一个字节的最高位区分：session 为 1。
+func isSessionPacket(meta []byte) bool {
+	return len(meta) >= 1 && meta[0]&0x80 != 0
+}
+
+// parseSessionPacket 从 12 字节 session packet 中解析视频分辨率。
+// 布局：u32(flag, 最高位=1, 最低位=client resized) + u32(width) + u32(height)。
+func parseSessionPacket(data []byte) (width, height uint32, err error) {
+	if len(data) < sessionPacketSize {
+		return 0, 0, fmt.Errorf("session packet truncated: need %d bytes, got %d", sessionPacketSize, len(data))
+	}
+	width = binary.BigEndian.Uint32(data[4:8])
+	height = binary.BigEndian.Uint32(data[8:12])
+	return width, height, nil
 }
 
 // Codec 表示视频流的编码格式。

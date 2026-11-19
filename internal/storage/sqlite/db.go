@@ -77,12 +77,14 @@ func InitSchema(db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','user')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 		`CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL)`,
-		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1, online INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0, battery INTEGER NOT NULL DEFAULT 0, rtt_ms INTEGER NOT NULL DEFAULT 0, status_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 1, online INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0, battery INTEGER NOT NULL DEFAULT 0, rtt_ms INTEGER NOT NULL DEFAULT 0, status_json TEXT NOT NULL DEFAULT '{}', adb_ip TEXT NOT NULL DEFAULT '', adb_port INTEGER NOT NULL DEFAULT 0, adb_online INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS groups(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS group_users(group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(group_id,user_id))`,
 		`CREATE TABLE IF NOT EXISTS device_groups(group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, PRIMARY KEY(group_id,device_id))`,
 		`CREATE TABLE IF NOT EXISTS group_access(user_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, device_group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE, can_view INTEGER NOT NULL DEFAULT 0, can_manage INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_group_id,device_group_id))`,
 		`CREATE TABLE IF NOT EXISTS ws_tickets(ticket_hash TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS sync_groups(id TEXT PRIMARY KEY, name TEXT NOT NULL, master_id TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS sync_group_members(sync_group_id TEXT NOT NULL REFERENCES sync_groups(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, sort_order INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(sync_group_id,device_id))`,
 		`CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT, action TEXT NOT NULL, device_id TEXT, detail TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_online ON devices(online)`,
@@ -99,7 +101,37 @@ func InitSchema(db *sql.DB) error {
 	if err := migrateDevicesTable(db); err != nil {
 		return err
 	}
+
+	// 增量迁移：为旧库补齐 adb_ip / adb_online 两列（adb 连接状态持久化）。
+	// 用 additive ALTER TABLE ADD COLUMN，检测列不存在才加，幂等。
+	if err := addColumnIfMissing(db, "devices", "adb_ip", `TEXT NOT NULL DEFAULT ''`); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing(db, "devices", "adb_online", `INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+	// 增量迁移：为旧库补齐 adb_port 列（无线调试连接端口，拼真实 serial 用）。
+	// 无线调试端口是动态分配的，不能假设固定 5555，因此单独存一列。
+	if err := addColumnIfMissing(db, "devices", "adb_port", `INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
 	return nil
+}
+
+// addColumnIfMissing 检测表是否已有指定列，缺失时用 ALTER TABLE ADD COLUMN 补齐。
+// SQLite 不支持 IF NOT EXISTS 加列，需先查 pragma_table_info。
+func addColumnIfMissing(db *sql.DB, table, column, def string) error {
+	var count int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?`, table, column,
+	).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := db.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, table, column, def))
+	return err
 }
 
 // migrateDevicesTable 把旧版 devices 表迁移到无 token_hash 的形态：

@@ -20,6 +20,17 @@ type User struct {
 	Username     string
 	PasswordHash string
 	Role         string
+	CreatedAt    string
+}
+
+// GroupAccess 是一条「用户组 → 设备组」的授权关系，用于权限管理列表展示。
+type GroupAccess struct {
+	UserGroupID     string `json:"userGroupId"`
+	UserGroupName   string `json:"userGroupName"`
+	DeviceGroupID   string `json:"deviceGroupId"`
+	DeviceGroupName string `json:"deviceGroupName"`
+	CanView         bool   `json:"canView"`
+	CanManage       bool   `json:"canManage"`
 }
 
 type Device struct {
@@ -33,11 +44,31 @@ type Device struct {
 	Battery  int      `json:"battery"`
 	RTTMS    int64    `json:"rttMs"`
 	GroupIDs []string `json:"groupIds"`
+	// AdbIP 是设备最近一次连接成功的局域网 IP，用于拼出 adb serial（ip:port）。
+	// 空串表示尚未连接过 adb。
+	AdbIP string `json:"adbIp"`
+	// AdbPort 是设备最近一次连接成功的无线调试连接端口，与 AdbIP 一起拼出
+	// 完整 adb serial（ip:port）。无线调试端口是动态分配的，不能假设固定 5555。
+	// 0 表示端口未知（尚未连接或旧数据未回填）。
+	AdbPort int `json:"adbPort"`
+	// AdbOnline 是设备最近一次 adb 连接状态（落库持久化）。连接成功 true，
+	// 断开/未授权/未连接 false。用于在 ADBMonitor 尚未扫描到内存态时，
+	// 给前端一个可靠的兜底判断，避免「未授权」设备被误判为可操作。
+	AdbOnline bool `json:"adbOnline"`
 }
 
 type Group struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// SyncGroup 是持久化的「固定镜像组」：预存主控与成员设备，一键镜像时复用。
+// 成员用 device.id 绑定（而非 adb serial），IP 变化不影响组的复用。
+type SyncGroup struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	MasterID  string   `json:"masterId"`
+	DeviceIDs []string `json:"deviceIds"`
 }
 
 type Ticket struct {
@@ -161,6 +192,34 @@ func (s *Store) DeviceEnabled(id string) (bool, error) {
 	return enabled == 1, err
 }
 
+// DeviceByID 返回单台设备记录（含 adb_ip），用于按 ID 取设备的连接信息。
+func (s *Store) DeviceByID(id string) (Device, error) {
+	var device Device
+	var enabled, online, adbOnline int
+	var groupIDs sql.NullString
+	err := s.DB.QueryRow(
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,
+		        group_concat(DISTINCT dg.group_id)
+		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
+		 WHERE d.id=? GROUP BY d.id`,
+		id,
+	).Scan(
+		&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
+		&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &groupIDs,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return device, ErrNotFound
+	}
+	device.Enabled = enabled == 1
+	device.Online = online == 1
+	device.AdbOnline = adbOnline == 1
+	device.GroupIDs = []string{}
+	if groupIDs.Valid && groupIDs.String != "" {
+		device.GroupIDs = strings.Split(groupIDs.String, ",")
+	}
+	return device, err
+}
+
 func (s *Store) UpdateDeviceState(id string, battery int, rtt int64, status string) error {
 	_, err := s.DB.Exec(
 		`UPDATE devices SET online=1,last_seen=?,battery=?,rtt_ms=?,status_json=? WHERE id=?`,
@@ -180,9 +239,22 @@ func (s *Store) SetOnline(id string, online bool) error {
 	return err
 }
 
+// SetDeviceAdb 记录设备最近一次 adb 连接的 IP、端口（拼 serial 用）与在线状态。
+// 连接成功时传 ip/port 与 online=true；断开时 ip/port 保留（供自动重连）、online=false。
+func (s *Store) SetDeviceAdb(id, ip string, port int, online bool) error {
+	value := 0
+	if online {
+		value = 1
+	}
+	_, err := s.DB.Exec(
+		`UPDATE devices SET adb_ip=?,adb_port=?,adb_online=? WHERE id=?`, ip, port, value, id,
+	)
+	return err
+}
+
 func (s *Store) ListDevices() ([]Device, error) {
 	rows, err := s.DB.Query(
-		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 GROUP BY d.id ORDER BY d.name,d.id`,
@@ -195,16 +267,17 @@ func (s *Store) ListDevices() ([]Device, error) {
 	devices := make([]Device, 0)
 	for rows.Next() {
 		var device Device
-		var enabled, online int
+		var enabled, online, adbOnline int
 		var groupIDs sql.NullString
 		if err := rows.Scan(
 			&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
-			&device.Battery, &device.RTTMS, &device.Status, &groupIDs,
+			&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &groupIDs,
 		); err != nil {
 			return nil, err
 		}
 		device.Enabled = enabled == 1
 		device.Online = online == 1
+		device.AdbOnline = adbOnline == 1
 		device.GroupIDs = []string{}
 		if groupIDs.Valid && groupIDs.String != "" {
 			device.GroupIDs = strings.Split(groupIDs.String, ",")
@@ -239,6 +312,107 @@ func (s *Store) ListGroups() ([]Group, error) {
 	return groups, rows.Err()
 }
 
+// DeleteGroup 删除分组；group_users / device_groups / group_access 由外键
+// ON DELETE CASCADE 一并清理。返回 ErrNotFound 表示分组不存在。
+func (s *Store) DeleteGroup(id string) error {
+	result, err := s.DB.Exec(`DELETE FROM groups WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListUsers 返回全部用户（含角色与创建时间），按用户名排序。
+func (s *Store) ListUsers() ([]User, error) {
+	rows, err := s.DB.Query(
+		`SELECT id,username,password_hash,role,created_at FROM users ORDER BY username,id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// DeleteUser 删除用户；其会话与分组关系由外键级联清理。返回 ErrNotFound 表示不存在。
+func (s *Store) DeleteUser(id string) error {
+	result, err := s.DB.Exec(`DELETE FROM users WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListGroupAccess 返回全部「用户组 → 设备组」授权关系，join 组名供展示。
+func (s *Store) ListGroupAccess() ([]GroupAccess, error) {
+	rows, err := s.DB.Query(
+		`SELECT ga.user_group_id, COALESCE(ug.name,''), ga.device_group_id, COALESCE(dg.name,''), ga.can_view, ga.can_manage
+		 FROM group_access ga
+		 LEFT JOIN groups ug ON ug.id=ga.user_group_id
+		 LEFT JOIN groups dg ON dg.id=ga.device_group_id
+		 ORDER BY ug.name,dg.name`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]GroupAccess, 0)
+	for rows.Next() {
+		var a GroupAccess
+		var canView, canManage int
+		if err := rows.Scan(&a.UserGroupID, &a.UserGroupName, &a.DeviceGroupID, &a.DeviceGroupName, &canView, &canManage); err != nil {
+			return nil, err
+		}
+		a.CanView = canView == 1
+		a.CanManage = canManage == 1
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+// DeleteGroupAccess 删除一条授权关系（按用户组+设备组主键）。返回 ErrNotFound 表示不存在。
+func (s *Store) DeleteGroupAccess(userGroupID, deviceGroupID string) error {
+	result, err := s.DB.Exec(
+		`DELETE FROM group_access WHERE user_group_id=? AND device_group_id=?`,
+		userGroupID, deviceGroupID,
+	)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) AddUserGroup(userID, groupID string) error {
 	_, err := s.DB.Exec(
 		`INSERT OR IGNORE INTO group_users(group_id,user_id) VALUES(?,?)`, groupID, userID,
@@ -251,6 +425,154 @@ func (s *Store) AddDeviceGroup(deviceID, groupID string) error {
 		`INSERT OR IGNORE INTO device_groups(group_id,device_id) VALUES(?,?)`, groupID, deviceID,
 	)
 	return err
+}
+
+// ListSyncGroups 返回全部固定镜像组及其成员（按 sort_order 排序）。
+func (s *Store) ListSyncGroups() ([]SyncGroup, error) {
+	rows, err := s.DB.Query(
+		`SELECT g.id,g.name,g.master_id,m.device_id
+		 FROM sync_groups g
+		 LEFT JOIN sync_group_members m ON m.sync_group_id=g.id
+		 ORDER BY g.name,g.id,m.sort_order,m.device_id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groups := make([]SyncGroup, 0)
+	byID := make(map[string]*SyncGroup)
+	order := make([]string, 0)
+	for rows.Next() {
+		var id, name, masterID string
+		var deviceID sql.NullString
+		if err := rows.Scan(&id, &name, &masterID, &deviceID); err != nil {
+			return nil, err
+		}
+		g, ok := byID[id]
+		if !ok {
+			g = &SyncGroup{ID: id, Name: name, MasterID: masterID, DeviceIDs: []string{}}
+			byID[id] = g
+			order = append(order, id)
+		}
+		if deviceID.Valid && deviceID.String != "" {
+			g.DeviceIDs = append(g.DeviceIDs, deviceID.String)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, id := range order {
+		groups = append(groups, *byID[id])
+	}
+	return groups, nil
+}
+
+// SyncGroupByID 返回单个固定镜像组及其成员。
+func (s *Store) SyncGroupByID(id string) (SyncGroup, error) {
+	var g SyncGroup
+	g.DeviceIDs = []string{}
+	var masterID string
+	err := s.DB.QueryRow(`SELECT id,name,master_id FROM sync_groups WHERE id=?`, id).
+		Scan(&g.ID, &g.Name, &masterID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return g, ErrNotFound
+	}
+	if err != nil {
+		return g, err
+	}
+	g.MasterID = masterID
+
+	rows, err := s.DB.Query(
+		`SELECT device_id FROM sync_group_members WHERE sync_group_id=? ORDER BY sort_order,device_id`, id,
+	)
+	if err != nil {
+		return g, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var deviceID string
+		if err := rows.Scan(&deviceID); err != nil {
+			return g, err
+		}
+		g.DeviceIDs = append(g.DeviceIDs, deviceID)
+	}
+	return g, rows.Err()
+}
+
+// CreateSyncGroup 创建固定镜像组：先写主表，再批量写成员。
+// masterID 必须落在 memberDeviceIDs 内（由调用方保证，这里仅做空值兜底）。
+func (s *Store) CreateSyncGroup(id, name, masterID string, memberDeviceIDs []string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now().Unix()
+	if _, err := tx.Exec(
+		`INSERT INTO sync_groups(id,name,master_id,created_at,updated_at) VALUES(?,?,?,?,?)`,
+		id, name, masterID, now, now,
+	); err != nil {
+		return err
+	}
+	for i, deviceID := range memberDeviceIDs {
+		if _, err := tx.Exec(
+			`INSERT INTO sync_group_members(sync_group_id,device_id,sort_order) VALUES(?,?,?)`,
+			id, deviceID, i,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// UpdateSyncGroup 更新固定镜像组的名称、主控与成员（整组覆盖）。
+// 若 masterID 为空，则回退为成员列表第一个。
+func (s *Store) UpdateSyncGroup(id, name, masterID string, memberDeviceIDs []string) error {
+	if masterID == "" && len(memberDeviceIDs) > 0 {
+		masterID = memberDeviceIDs[0]
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(
+		`UPDATE sync_groups SET name=?,master_id=?,updated_at=? WHERE id=?`,
+		name, masterID, time.Now().Unix(), id,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM sync_group_members WHERE sync_group_id=?`, id); err != nil {
+		return err
+	}
+	for i, deviceID := range memberDeviceIDs {
+		if _, err := tx.Exec(
+			`INSERT INTO sync_group_members(sync_group_id,device_id,sort_order) VALUES(?,?,?)`,
+			id, deviceID, i,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// DeleteSyncGroup 删除固定镜像组；成员由外键 ON DELETE CASCADE 一并清理。
+func (s *Store) DeleteSyncGroup(id string) error {
+	result, err := s.DB.Exec(`DELETE FROM sync_groups WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) SetGroupAccess(userGroup, deviceGroup string, canView, canManage bool) error {

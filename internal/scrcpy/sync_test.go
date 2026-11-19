@@ -179,20 +179,27 @@ func TestSyncCreateGroupLifecycle(t *testing.T) {
 		t.Fatalf("inGroup[b] = %q, want g1", s.inGroup["b"])
 	}
 
-	// 一台设备不能同时在两个组：a 已在 g1，再建含 a 的 g3 应失败。
-	if resp := s.syncCreate("g3", []string{"a"}, "a"); resp["type"] != "sync-error" {
-		t.Fatalf("syncCreate g3 should fail, got %v", resp)
-	}
-
-	// 解散 g1 后，a/b 应从 inGroup 移除。
-	if resp := s.syncDestroy("g1"); resp["type"] != "sync-destroyed" {
-		t.Fatalf("syncDestroy g1 resp = %v", resp)
+	// 一台设备不能同时在两个组：a 已在 g1，再建含 a 的 g3 会自动解散旧组 g1
+	// （清理僵尸组），然后成功建 g3，避免「一键镜像」因残留组永久失败。
+	if resp := s.syncCreate("g3", []string{"a"}, "a"); resp["type"] != "sync-created" {
+		t.Fatalf("syncCreate g3 should auto-dissolve stale g1 and succeed, got %v", resp)
 	}
 	if s.groups["g1"] != nil {
-		t.Fatal("g1 should be destroyed")
+		t.Fatal("g1 should be auto-dissolved")
 	}
 	if _, ok := s.inGroup["b"]; ok {
-		t.Fatal("b should be removed from inGroup after destroy")
+		t.Fatal("b should be removed from inGroup after g1 auto-dissolve")
+	}
+
+	// 解散 g3 后，a 应从 inGroup 移除。
+	if resp := s.syncDestroy("g3"); resp["type"] != "sync-destroyed" {
+		t.Fatalf("syncDestroy g3 resp = %v", resp)
+	}
+	if s.groups["g3"] != nil {
+		t.Fatal("g3 should be destroyed")
+	}
+	if _, ok := s.inGroup["a"]; ok {
+		t.Fatal("a should be removed from inGroup after destroy")
 	}
 
 	// 缺省主控：解散后重建，不指定 master，应取第一个成员 a。

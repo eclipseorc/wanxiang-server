@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,11 @@ import (
 
 // defaultAdbTimeout 是单条 adb 命令的默认超时。adb pair / connect 在弱网下可能较慢。
 const defaultAdbTimeout = 15 * time.Second
+
+// adbTransferTimeout 是 adb pull/push 等文件传输类命令的超时。文件传输耗时与
+// 文件大小线性相关（实测 48MB APK 经 Wi-Fi 拉取约 18 秒），必须比默认超时宽松得多，
+// 否则大文件会在传输中途被 context 杀掉，表现为「下载失败」。
+const adbTransferTimeout = 10 * time.Minute
 
 // ADB 封装了 adb 二进制的路径与命令执行。
 type ADB struct {
@@ -58,10 +64,16 @@ func resolveAdbPath(baseDir string) (string, error) {
 
 // run 执行一条 adb 命令并返回标准输出。args 不含 adb 本身。
 func (a *ADB) run(ctx context.Context, args ...string) (string, error) {
+	return a.runWithTimeout(ctx, defaultAdbTimeout, args...)
+}
+
+// runWithTimeout 执行一条 adb 命令，允许调用方指定超时。文件传输（pull/push）
+// 等耗时操作应传入更宽松的超时，避免大文件被默认超时中断。
+func (a *ADB) runWithTimeout(ctx context.Context, timeout time.Duration, args ...string) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	runCtx, cancel := context.WithTimeout(ctx, defaultAdbTimeout)
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(runCtx, a.path, args...)
@@ -121,6 +133,35 @@ func (a *ADB) IsDeviceOnline(ctx context.Context, serial string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// ResolveOnlinePort 返回指定 IP 当前在 adb 中处于 device 状态的连接端口。
+//
+// 无线调试的连接端口是动态分配的，connect 成功后 adb devices 里会出现
+// 形如 "192.168.1.100:35583" 的 serial。本方法按 IP 前缀匹配，提取该 IP
+// 真实在线的端口，供落库（拼真实 serial 用）。找不到（设备离线或端口未知）
+// 时返回错误，调用方不应将其当作可用的固定端口。
+func (a *ADB) ResolveOnlinePort(ctx context.Context, host string) (int, error) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return 0, fmt.Errorf("resolve port: empty host")
+	}
+	out, err := a.run(ctx, "devices")
+	if err != nil {
+		return 0, err
+	}
+	for _, serial := range parseOnlineSerials(out) {
+		ip, portStr, ok := strings.Cut(serial, ":")
+		if !ok || ip != host {
+			continue
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 {
+			continue
+		}
+		return port, nil
+	}
+	return 0, fmt.Errorf("host %s not online in adb devices", host)
 }
 
 // OnlineDevices 返回 adb 中处于 device（在线可操作）状态的设备 serial 列表。
@@ -221,18 +262,16 @@ func parseMdnsServices(out string) []string {
 }
 
 // Pair 执行无线调试配对。pairPort 是设备「无线调试」页显示的配对端口，
-// code 是 6 位配对码。设备已配对过时返回 nil（幂等），避免重复配对报错。
+// code 是 6 位配对码。
+//
+// 重要：adb pair 只以退出码 0 表示配对成功。配对失败（IP 错误、端口错误、
+// 配对码错误、设备未响应）时，adb 会以退出码 1 返回，且 stderr 统一是
+// "protocol fault (couldn't read status message)"——这个错误同时也会出现在
+// 「对已配对设备重复配对」的场景，因此无法据此区分「已配对」与「真失败」。
+// 所以这里不做任何文本兜底，只有退出码 0 才算成功，其余一律返回错误，
+// 避免把失败误报为「配对成功」。
 func (a *ADB) Pair(ctx context.Context, host string, pairPort int, code string) error {
 	_, err := a.run(ctx, "pair", fmt.Sprintf("%s:%d", host, pairPort), code)
-	if err == nil {
-		return nil
-	}
-	// 已配对/已连接时 adb 会报错，属正常幂等场景，不视为失败。
-	if strings.Contains(err.Error(), "already paired") ||
-		strings.Contains(err.Error(), "already connected") ||
-		strings.Contains(err.Error(), "protocol fault") {
-		return nil
-	}
 	return err
 }
 
@@ -323,8 +362,179 @@ func (a *ADB) RemoveForward(ctx context.Context, serial string, localPort int) e
 
 // Push 把本地文件推送到设备指定路径。
 func (a *ADB) Push(ctx context.Context, serial, localPath, remotePath string) error {
-	_, err := a.run(ctx, "-s", serial, "push", localPath, remotePath)
+	_, err := a.runWithTimeout(ctx, adbTransferTimeout, "-s", serial, "push", localPath, remotePath)
 	return err
+}
+
+// Pull 把设备上的文件或目录拉取到本地指定路径。
+func (a *ADB) Pull(ctx context.Context, serial, remotePath, localPath string) error {
+	_, err := a.runWithTimeout(ctx, adbTransferTimeout, "-s", serial, "pull", remotePath, localPath)
+	return err
+}
+
+// Install 把本地 APK 安装到指定设备。localAPK 是服务器上的 APK 文件路径。
+//
+// 使用 `adb install -r -g`：-r 覆盖安装（同版本或降级也能装），-g 自动授予
+// 运行时权限（避免装完后因缺权限导致应用不可用，符合批量部署场景）。
+// 安装耗时与 APK 大小线性相关（几十 MB 经 Wi-Fi 需十几秒），用 adbTransferTimeout。
+func (a *ADB) Install(ctx context.Context, serial, localAPK string) error {
+	_, err := a.runWithTimeout(ctx, adbTransferTimeout, "-s", serial, "install", "-r", "-g", localAPK)
+	return err
+}
+
+// Uninstall 从指定设备卸载应用。packageName 是应用包名（如 com.example.app），
+// 非 APK 文件名。卸载为一次性 shell 操作，用默认超时即可。
+func (a *ADB) Uninstall(ctx context.Context, serial, packageName string) error {
+	_, err := a.run(ctx, "-s", serial, "uninstall", packageName)
+	return err
+}
+
+// PullStream 通过 `adb exec-out cat` 把设备文件的内容流式写入 w，边拉边写。
+//
+// 与 Pull（先把整个文件拉取到本地落盘、再一次性读取）不同，exec-out 从第一条
+// 字节起就持续产出，直接把内容交给调用方（HTTP 响应体）。这解决大文件下载时
+// 「响应头已发、但 body 迟迟不出现」导致浏览器判定连接异常而中断的问题。
+//
+// 代价：若拉取中途设备断连，错误发生时数据可能已部分写入 w，无法撤回；调用方
+// 已下发的 Content-Length 与最终字节数可能不一致，浏览器会得到截断文件。这是
+// 流式传输的固有取舍，比「先落盘再一次性读」更契合实时下载场景。
+func (a *ADB) PullStream(ctx context.Context, serial, remotePath string, w io.Writer) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	runCtx, cancel := context.WithTimeout(ctx, adbTransferTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, a.path, "-s", serial, "exec-out", "cat", shellQuote(remotePath))
+	var stderr bytes.Buffer
+	cmd.Stdout = w
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("adb exec-out cat %s: %s", remotePath, msg)
+	}
+	return nil
+}
+
+// DeviceFile 是设备上一个文件/目录的最小信息，供文件浏览界面展示。
+type DeviceFile struct {
+	Name    string // 文件或目录名（不含路径）
+	IsDir   bool   // 是否目录
+	Size    int64  // 字节数；目录为 0
+	IsImage bool   // 是否常见图片类型（供前端决定是否请求缩略图）
+}
+
+// ListFiles 列出设备上指定目录的内容。
+//
+// 实现用 `adb shell ls -la <path>` 并解析输出。相比 `ls -l`，`-a` 会带上
+// 隐藏文件，但这里刻意跳过 `.` 与 `..` 两个特殊项；解析依赖 -l 的固定列，
+// 文件名中的空格会导致字段数变化，故从第 8 列开始按「权限列固定 10 字符」
+// 拆分，剩余部分视为文件名（可含空格）。
+func (a *ADB) ListFiles(ctx context.Context, serial, path string) ([]DeviceFile, error) {
+	out, err := a.Shell(ctx, serial, "ls -la "+shellQuote(path))
+	if err != nil {
+		return nil, err
+	}
+	return parseLsOutput(out), nil
+}
+
+// shellQuote 给 adb shell 里的路径参数加单引号，避免空格/特殊字符被拆词。
+// 路径中若本身含单引号则退回不转义（极罕见，宁可报错也不注入）。
+func shellQuote(s string) string {
+	if strings.Contains(s, "'") {
+		return s
+	}
+	return "'" + s + "'"
+}
+
+// parseLsOutput 解析 `ls -la` 的输出为文件列表。
+//
+// 每一行形如（toybox 默认日期为 YYYY-MM-DD）：
+//
+//	drwxr-xr-x 2 root root  4096 2024-01-01 12:00 Camera
+//	-rw-r--r-- 1 root root 2413 2024-01-01 12:00 IMG_001.jpg
+//
+// 首列首字符 'd' 表示目录；'-' 表示普通文件。第 5 列（索引 4）是大小，
+// 目录/符号链接的大小列无意义，只对普通文件取 size。文件名从日期/时间字段
+// 之后开始拼接（含空格的文件名也能完整保留）。
+//
+// 日期字段数因 ls 实现而异：toybox 用 `YYYY-MM-DD HH:MM`（2 个字段），
+// GNU/coreutils 老格式用 `MMM DD HH:MM`（3 个字段）。因此先看第 6 个字段
+// 是否为 `YYYY-MM-DD` 形式来判定文件名起始索引，避免硬编码列数。
+func parseLsOutput(out string) []DeviceFile {
+	lines := strings.Split(out, "\n")
+	var files []DeviceFile
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "total ") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			continue // 无法确定文件名的行跳过
+		}
+		mode := fields[0]
+		if len(mode) == 0 {
+			continue
+		}
+		isDir := mode[0] == 'd'
+		// 文件名起始索引：默认 7（YYYY-MM-DD 日期占 2 字段：date + time），
+		// 若第 6 字段不是 YYYY-MM-DD，则日期占 3 字段，名称从 8 开始。
+		nameIdx := 7
+		if !isYYYYMMDD(fields[5]) {
+			nameIdx = 8
+		}
+		if nameIdx >= len(fields) {
+			continue
+		}
+		name := strings.Join(fields[nameIdx:], " ")
+		if name == "." || name == ".." {
+			continue
+		}
+		var size int64
+		if !isDir {
+			// 第 5 列（索引 4）是大小，解析失败时保留 0。
+			if n, err := strconv.ParseInt(fields[4], 10, 64); err == nil {
+				size = n
+			}
+		}
+		files = append(files, DeviceFile{
+			Name:    name,
+			IsDir:   isDir,
+			Size:    size,
+			IsImage: isImageName(name),
+		})
+	}
+	return files
+}
+
+// isYYYYMMDD 判断字段是否为 YYYY-MM-DD 形式的日期，用于区分 ls 的日期列宽。
+func isYYYYMMDD(s string) bool {
+	if len(s) != 10 || s[4] != '-' || s[7] != '-' {
+		return false
+	}
+	for i, c := range s {
+		if i == 4 || i == 7 {
+			continue
+		}
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// isImageName 根据扩展名判断是否为常见图片类型，供缩略图功能使用。
+func isImageName(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp":
+		return true
+	}
+	return false
 }
 
 // Shell 在设备上执行 shell 命令并返回输出。

@@ -21,13 +21,17 @@ import (
 // 因为 adb devices 每次调用都有进程开销；30 秒足以在设备掉线后及时提醒。
 const adbStatusScanInterval = 30 * time.Second
 
-// adbReconnectPort 是设备切到 TCP 监听后的固定端口（传统 adb tcpip 默认值）。
-// 阶段 2 里对「业务在线但 adb 离线」的设备，先尝试 connect 该固定端口自动恢复。
+// adbReconnectPort 是传统模式（USB 切 tcpip）设备的固定监听端口，仅作为
+// 无线调试设备无落库端口时的兜底重连端口。无线调试设备不能依赖此端口，
+// 应优先用落库的真实端口（adb_port）重连。
 const adbReconnectPort = 5555
 
 // adbReconnectMinInterval 是同一设备两次自动重连尝试之间的最小间隔，避免
 // 设备确实已重启（5555 未监听）时每 30 秒就重复 connect 一次造成无谓开销。
-const adbReconnectMinInterval = 2 * time.Minute
+// 取 45 秒：设备重启后 Shizuku 自启重开无线调试 + mDNS 广播约需 1~2 分钟，
+// 45 秒限频能让 mDNS 一旦发现新端口就能在下一个扫描周期（30 秒）内重连成功，
+// 又不会在设备离线空窗期过于频繁地空 connect。
+const adbReconnectMinInterval = 45 * time.Second
 
 // ADBMonitor 周期扫描 adb，向「业务在线但 adb 离线」的设备下发 adb-status。
 type ADBMonitor struct {
@@ -143,29 +147,37 @@ func (m *ADBMonitor) scanOnce() {
 	}
 }
 
-// tryRecover 尝试自动恢复一台 adb 离线设备。先连固定端口 5555（阶段 2），
-// 失败再用 mDNS 发现的动态端口连接并切回 5555（阶段 3）。成功返回 true。
+// tryRecover 尝试自动恢复一台 adb 离线设备。优先用落库的真实端口重连
+// （设备端口未变时最快），失败再用 mDNS 发现的当前动态端口连接。无线调试
+// 端口是动态分配的，这里绝不再执行 adb tcpip 5555（会把无线调试设备打成
+// unauthorized、破坏授权）。成功返回 true。
 func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// 1) 固定端口 5555（设备还活着但连接断了时，5555 仍在监听）。
-	if err := m.adb.Connect(ctx, ip, adbReconnectPort); err == nil {
+	// 1) 落库的真实端口（无线调试连接时记录的真实端口，端口未变时直接可用）。
+	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil && dev.AdbIP != "" && dev.AdbPort > 0 {
+		if m.adb.Connect(ctx, dev.AdbIP, dev.AdbPort) == nil {
+			log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, dev.AdbIP, dev.AdbPort)
+			m.publishState(deviceID, ip, true)
+			return true
+		}
+	}
+
+	// 2) 传统模式兜底：固定 5555（设备是 USB 切 tcpip 的传统模式时监听 5555）。
+	if m.adb.Connect(ctx, ip, adbReconnectPort) == nil {
 		log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, ip, adbReconnectPort)
 		m.publishState(deviceID, ip, true)
 		return true
 	}
 
-	// 2) mDNS 发现的动态端口（设备重启后端口变了）。
+	// 3) mDNS 发现的动态端口（设备重启后端口变了）。连上后保持原端口，
+	//    不再切回 5555（无线调试设备切 5555 会破坏授权）。
 	if addr, ok := mdnsByIP[ip]; ok {
 		host, portStr, ok := strings.Cut(addr, ":")
 		if ok {
 			if port, err := strconv.Atoi(portStr); err == nil {
 				if err := m.adb.Connect(ctx, host, port); err == nil {
-					// 连上动态端口后，切回固定 5555，供后续掉线自动重连。
-					if terr := m.adb.Tcpip(ctx, addr, adbReconnectPort); terr != nil {
-						log.Printf("adb-status tcpip after mdns failed device_id=%s addr=%s: %v", deviceID, addr, terr)
-					}
 					log.Printf("adb-status mdns reconnect ok device_id=%s addr=%s", deviceID, addr)
 					m.publishState(deviceID, ip, true)
 					return true
@@ -212,9 +224,9 @@ func serialIPSet(serials []string) map[string]bool {
 }
 
 // publishState 统一收口「ADB 状态变化」时的三件事：
-//   1. 更新 lastAdbState（避免重复通知）；
-//   2. 更新 hub.adbOnline（供管理端快照与广播读取）；
-//   3. 下发 adb-status 给设备 + 广播 device-adb-state 给管理端。
+//  1. 更新 lastAdbState（避免重复通知）；
+//  2. 更新 hub.adbOnline（供管理端快照与广播读取）；
+//  3. 下发 adb-status 给设备 + 广播 device-adb-state 给管理端。
 func (m *ADBMonitor) publishState(deviceID, ip string, connected bool) {
 	m.lastAdbState[deviceID] = connected
 

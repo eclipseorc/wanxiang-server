@@ -33,12 +33,12 @@ func TestTryAcquireDifferentSerials(t *testing.T) {
 // scrcpy 启动命令应包含关键参数。
 func TestBuildScrcpyCommand(t *testing.T) {
 	cfg := ScrcpyConfig{
-		ServerRemotePath: "/data/local/tmp/scrcpy-server",
+		ServerRemotePath: "/data/local/tmp/scrcpy-server.jar",
 		MaxSize:          1024, BitRate: 2000000, MaxFPS: 30,
 	}
 	cmd := cfg.buildScrcpyCommand()
 	for _, want := range []string{
-		"CLASSPATH=/data/local/tmp/scrcpy-server",
+		"-Djava.class.path=/data/local/tmp/scrcpy-server.jar",
 		"com.genymobile.scrcpy.Server",
 		"tunnel_forward=true",
 		"max_size=1024",
