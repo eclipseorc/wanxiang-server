@@ -16,6 +16,9 @@
 *.out
 coverage.*
 
+# Runtime logs produced by scripts/run.sh and scripts/run.ps1
+/logs/
+
 # OS and local editor output
 .DS_Store
 Thumbs.db
