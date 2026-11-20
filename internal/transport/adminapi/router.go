@@ -26,22 +26,32 @@ type Router struct {
 	svc     *logic.Service
 	limiter *loginLimiter
 	tickets *fixedWindowLimiter
-	scrcpy  *scrcpy.ADB
+	// scrcpy 仅用于文件/APK 等「会话操作」（ListFiles/Pull/Push/Install/Shell 等），
+	// 这些是控屏/文件传输会话，与「连接管理」无关，继续由 scrcpy.ADB 直接提供。
+	scrcpy *scrcpy.ADB
+	// adbConn 是「连接管理」（配对/连接/断开/tcpip/在线状态查询等）的统一入口，
+	// 收敛到 logic.AdbConnector，使 admin-server 与 websocket-server 共享同一份实现。
+	adbConn *logic.AdbConnector
 	apks    *apkStore
+	// mdmTokens 是 MDM 远程安装时「设备端下载 APK」的一次性凭证存储。
+	mdmTokens *mdmApkTokenStore
 }
 
 func New(s *logic.Service) *Router {
 	return &Router{
-		svc:     s,
-		limiter: newLoginLimiter(),
-		tickets: newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
-		apks:    newAPKStore(),
+		svc:       s,
+		limiter:   newLoginLimiter(),
+		tickets:   newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
+		apks:      newAPKStore(),
+		mdmTokens: newMdmApkTokenStore(),
 	}
 }
 
-// WithScrcpy 注入 adb 封装，启用远程控制的配对/连接接口。
+// WithScrcpy 注入 adb 封装，启用远程控制的配对/连接接口与会话操作。
+// 同一 adb 实例同时构造连接管理入口（AdbConnector）与会话操作句柄（scrcpy）。
 func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
 	r.scrcpy = adb
+	r.adbConn = logic.NewAdbConnector(r.svc, adb)
 	return r
 }
 
@@ -49,6 +59,9 @@ func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", r.health)
 	mux.HandleFunc("POST /api/admin/login", r.login)
+	// 设备端 APK 下载：不带 session，凭一次性 token 鉴权（token 由 MDM 安装
+	// 指令随下发内容携带给设备端）。
+	mux.HandleFunc("GET /api/admin/mdm/apk-download", r.handleMdmApkDownload)
 	mux.Handle("/api/admin/", r.auth(http.HandlerFunc(r.admin)))
 	return SecurityHeaders(mux)
 }
@@ -254,6 +267,14 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleAPKUninstall(w, req, u)
 	case "sync-groups":
 		r.handleSyncGroups(w, req, u)
+	case "dpc/qrcode":
+		r.handleDpcQrcode(w, req, u)
+	case "mdm/policies":
+		r.handleMdmPolicies(w, req, u)
+	case "mdm/install":
+		r.handleMdmInstall(w, req, u)
+	case "mdm/uninstall":
+		r.handleMdmUninstall(w, req, u)
 	default:
 		// 单资源删除路径：/api/admin/sync-groups/{id}、/api/admin/users/{id}、/api/admin/groups/{id}。
 		switch {
@@ -265,6 +286,9 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 			return
 		case strings.HasPrefix(path, "groups/"):
 			r.deleteGroup(w, req, u, strings.TrimPrefix(path, "groups/"))
+			return
+		case strings.HasPrefix(path, "mdm/policies/"):
+			r.handleMdmPolicyDelete(w, req, u, strings.TrimPrefix(path, "mdm/policies/"))
 			return
 		}
 		http.NotFound(w, req)

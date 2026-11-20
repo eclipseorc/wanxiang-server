@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/eclipseorc/wanxiang-server/internal/envfile"
+	"github.com/eclipseorc/wanxiang-server/internal/logic"
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
 	wsserver "github.com/eclipseorc/wanxiang-server/internal/transport/websocket"
@@ -48,11 +49,19 @@ func RunWebsocket() error {
 
 	hub := wsserver.NewHub(store)
 
-	// 装配 adb 状态扫描器：周期检测「业务在线但 adb 离线」的设备并下发 adb-status。
-	// adb 找不到时扫描器会静默停用（远程控制本就不可用），不影响转发服务。
+	// 装配 adb 能力：既是「业务在线但 adb 离线」状态扫描器，也是 MDM 路径下
+	// 设备「ADB 就绪」事件的 connect 执行器。两者共享同一个 logic.AdbConnector
+	// （连接管理唯一入口），复用同一 adb 实例与共享 SQLite。
+	// adb 找不到时静默停用（远程控制本就不可用），不影响转发服务。
 	if adb, err := scrcpy.NewADB("."); err == nil {
-		monitor := wsserver.NewADBMonitor(hub, adb)
+		connector := logic.NewAdbConnector(logic.New(store), adb)
+
+		monitor := wsserver.NewADBMonitor(hub, connector)
 		monitor.Start(context.Background())
+
+		// 注入 adb-ready 处理器：复用同一 connector，把设备本地自配对完成后的
+		// connect 动作交给 logic 层统一执行。
+		hub.WithAdbConnector(connector)
 	} else {
 		log.Printf("adb-status monitor disabled: %v", err)
 	}

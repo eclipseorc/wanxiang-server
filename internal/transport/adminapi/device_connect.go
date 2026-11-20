@@ -33,7 +33,7 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -60,21 +60,21 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 	}
 
 	ctx := req.Context()
-	if err := r.scrcpy.EnsureServer(ctx); err != nil {
+	if err := r.adbConn.EnsureServer(ctx); err != nil {
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
 
 	// 首次配对：提供了配对端口与配对码才走 pair。已配对设备直接连接。
 	if body.PairPort > 0 && body.Code != "" {
-		if err := r.scrcpy.Pair(ctx, body.Host, body.PairPort, body.Code); err != nil {
+		if err := r.adbConn.Pair(ctx, body.Host, body.PairPort, body.Code); err != nil {
 			fail(w, http.StatusBadRequest, friendlyAdbError(err))
 			return
 		}
 	}
 
 	// 连接（内部已轮询等待 device 状态）。
-	if err := r.scrcpy.Connect(ctx, body.Host, body.Port); err != nil {
+	if err := r.adbConn.Connect(ctx, body.Host, body.Port); err != nil {
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
@@ -82,7 +82,7 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 	// 连接成功后解析该 IP 真实在线的端口（无线调试端口动态分配，不能假设 5555）。
 	// 解析失败（设备刚从 offline/unauthorized 转回、端口尚未就绪等）时，退回
 	// 用户填写的端口作为兜底，避免因一次解析失败就判连接失败。
-	realPort, err := r.scrcpy.ResolveOnlinePort(ctx, body.Host)
+	realPort, err := r.adbConn.ResolveOnlinePort(ctx, body.Host)
 	if err != nil {
 		realPort = body.Port
 		_ = r.svc.Store.Audit(u.ID, "device-connect-resolve-port-failed", body.DeviceID, body.Host+": "+err.Error())
@@ -110,7 +110,7 @@ func (r *Router) handleDeviceDisconnect(w http.ResponseWriter, req *http.Request
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -134,7 +134,7 @@ func (r *Router) handleDeviceDisconnect(w http.ResponseWriter, req *http.Request
 			port = 5555 // 旧数据无端口，兜底 5555
 		}
 		serial := fmt.Sprintf("%s:%d", device.AdbIP, port)
-		if derr := r.scrcpy.Disconnect(req.Context(), serial); derr != nil {
+		if derr := r.adbConn.Disconnect(req.Context(), serial); derr != nil {
 			_ = r.svc.Store.Audit(u.ID, "device-disconnect-failed", body.DeviceID, serial+": "+derr.Error())
 		}
 	}

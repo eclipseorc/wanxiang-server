@@ -44,7 +44,7 @@ func (r *Router) handleScrcpyPair(w http.ResponseWriter, req *http.Request, u sq
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -63,7 +63,7 @@ func (r *Router) handleScrcpyPair(w http.ResponseWriter, req *http.Request, u sq
 		fail(w, http.StatusBadRequest, "host, pairPort and code are required")
 		return
 	}
-	if err := r.scrcpy.Pair(req.Context(), body.Host, body.PairPort, body.Code); err != nil {
+	if err := r.adbConn.Pair(req.Context(), body.Host, body.PairPort, body.Code); err != nil {
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
@@ -79,7 +79,7 @@ func (r *Router) handleScrcpyConnect(w http.ResponseWriter, req *http.Request, u
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -96,7 +96,7 @@ func (r *Router) handleScrcpyConnect(w http.ResponseWriter, req *http.Request, u
 		fail(w, http.StatusBadRequest, "host and port are required")
 		return
 	}
-	if err := r.scrcpy.Connect(req.Context(), body.Host, body.Port); err != nil {
+	if err := r.adbConn.Connect(req.Context(), body.Host, body.Port); err != nil {
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
@@ -105,7 +105,7 @@ func (r *Router) handleScrcpyConnect(w http.ResponseWriter, req *http.Request, u
 	// 解析该 IP 真实在线的端口回传给前端，前端据此拼 serial 并发起控制/持久化。
 	// 解析失败时退回用户填写端口，不阻断连接成功的结果。
 	realPort := body.Port
-	if p, err := r.scrcpy.ResolveOnlinePort(req.Context(), body.Host); err == nil {
+	if p, err := r.adbConn.ResolveOnlinePort(req.Context(), body.Host); err == nil {
 		realPort = p
 	}
 	_ = r.svc.Store.Audit(u.ID, "scrcpy-connect", "", body.Host)
@@ -121,7 +121,7 @@ func (r *Router) handleScrcpyStatus(w http.ResponseWriter, req *http.Request, u 
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -137,7 +137,7 @@ func (r *Router) handleScrcpyStatus(w http.ResponseWriter, req *http.Request, u 
 		return
 	}
 	serial := fmt.Sprintf("%s:%d", host, port)
-	online, err := r.scrcpy.IsDeviceOnline(req.Context(), serial)
+	online, err := r.adbConn.IsDeviceOnline(req.Context(), serial)
 	if err != nil {
 		fail(w, http.StatusInternalServerError, "status failed: "+err.Error())
 		return
@@ -154,11 +154,11 @@ func (r *Router) handleScrcpyUsbDevices(w http.ResponseWriter, req *http.Request
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
-	serials, err := r.scrcpy.UsbSerials(req.Context())
+	serials, err := r.adbConn.UsbSerials(req.Context())
 	if err != nil {
 		fail(w, http.StatusInternalServerError, "list usb devices failed: "+err.Error())
 		return
@@ -176,7 +176,7 @@ func (r *Router) handleScrcpyTcpip(w http.ResponseWriter, req *http.Request, u s
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
@@ -196,7 +196,7 @@ func (r *Router) handleScrcpyTcpip(w http.ResponseWriter, req *http.Request, u s
 	if body.Port <= 0 {
 		body.Port = 5555 // 传统 adb tcpip 默认端口
 	}
-	if err := r.scrcpy.Tcpip(req.Context(), body.Serial, body.Port); err != nil {
+	if err := r.adbConn.Tcpip(req.Context(), body.Serial, body.Port); err != nil {
 		fail(w, http.StatusBadRequest, friendlyAdbError(err))
 		return
 	}
@@ -216,11 +216,11 @@ func (r *Router) handleScrcpyOnlineDevices(w http.ResponseWriter, req *http.Requ
 	if !requireAdmin(w, u) {
 		return
 	}
-	if r.scrcpy == nil {
+	if r.adbConn == nil {
 		fail(w, http.StatusServiceUnavailable, "scrcpy not configured")
 		return
 	}
-	serials, err := r.scrcpy.OnlineDevices(req.Context())
+	serials, err := r.adbConn.OnlineDevices(req.Context())
 	if err != nil {
 		fail(w, http.StatusBadGateway, "query adb devices: "+err.Error())
 		return

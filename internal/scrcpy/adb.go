@@ -135,6 +135,35 @@ func (a *ADB) IsDeviceOnline(ctx context.Context, serial string) (bool, error) {
 	return false, nil
 }
 
+// IsPaired 判断指定 serial 是否已出现在 adb 的设备列表中（即已配对/已授权）。
+//
+// 与 IsDeviceOnline 的区别：IsDeviceOnline 只认「device」（在线可操作）状态；
+// 本方法把「unauthorized」（已配对但尚未在设备上点「允许」）也视为「已配对」，
+// 因为那说明服务端的 adb key 已经推到设备、只差一次授权确认，符合「先查已配对
+// 再 connect」的语义。返回 (出现, 是否 device 在线, 是否 unauthorized, error)。
+func (a *ADB) IsPaired(ctx context.Context, serial string) (present bool, online bool, unauthorized bool, err error) {
+	out, err := a.run(ctx, "devices")
+	if err != nil {
+		return false, false, false, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != serial {
+			continue
+		}
+		switch fields[1] {
+		case "device":
+			return true, true, false, nil
+		case "unauthorized":
+			return true, false, true, nil
+		default:
+			// offline 等其它状态：已出现但不可用，也视为「已配对出现过」。
+			return true, false, false, nil
+		}
+	}
+	return false, false, false, nil
+}
+
 // ResolveOnlinePort 返回指定 IP 当前在 adb 中处于 device 状态的连接端口。
 //
 // 无线调试的连接端口是动态分配的，connect 成功后 adb devices 里会出现

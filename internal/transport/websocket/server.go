@@ -3,11 +3,13 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -97,6 +99,12 @@ type Hub struct {
 	store *sqlite.Store
 	mu    sync.RWMutex
 
+	// connector 处理设备端上行 adb-ready 事件：设备在本地完成「无线调试自配对 +
+	// 固化 5555」后通知服务端，由 connector 执行 adb connect。该能力由装配层注入
+	// （logic.AdbConnector），未注入时收到 adb-ready 只记录日志、不执行 connect。
+	// 这里用最小接口，避免 websocket 包直接依赖 logic 层的具体类型。
+	connector AdbReadyConnector
+
 	// devices 表示当前在线的设备连接，以 deviceID 为键。
 	devices map[string]*client
 	// deviceIPs 记录设备最近一次心跳上报的本机 IP，用于「业务在线但 ADB 离线」
@@ -112,6 +120,13 @@ type Hub struct {
 	admins map[*client]sqlite.User
 }
 
+// AdbReadyConnector 是处理设备「ADB 就绪」事件的最小接口。由装配层注入
+// logic.AdbConnector 的实现，把「adb connect」的执行逻辑收敛到 logic 层，
+// 避免 websocket 包直接依赖具体实现。返回 connected 表示设备是否已进入 adb 在线。
+type AdbReadyConnector interface {
+	ConnectAfterReady(ctx context.Context, deviceID, ip string, port int) (connected bool, err error)
+}
+
 // NewHub 创建一个新的 WebSocket 中枢，并在内存中保留设备/管理员连接映射。
 func NewHub(store *sqlite.Store) *Hub {
 	return &Hub{
@@ -121,6 +136,13 @@ func NewHub(store *sqlite.Store) *Hub {
 		adbOnline: make(map[string]bool),
 		admins:    make(map[*client]sqlite.User),
 	}
+}
+
+// WithAdbConnector 注入 adb-ready 事件的处理器（logic.AdbConnector）。
+// 不注入时 adb-ready 消息会被忽略（仅记日志），不影响转发服务运行。
+func (h *Hub) WithAdbConnector(c AdbReadyConnector) *Hub {
+	h.connector = c
+	return h
 }
 
 // Handler 负责把 HTTP 请求升级成 WebSocket 连接，并把来自设备/管理员的消息交给对应处理函数。
@@ -379,6 +401,12 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 			h.hub.deviceIPs[c.id] = ip
 			h.hub.mu.Unlock()
 		}
+		// 设备上报 MDM 纳管状态（Device Owner 与否），落库供管理端分流。
+		if mdm, ok := message["mdmEnabled"].(bool); ok {
+			if err := h.hub.store.SetDeviceMdmEnabled(c.id, mdm); err != nil {
+				log.Printf("device mdm state update failed device_id=%s: %v", c.id, err)
+			}
+		}
 		if err := h.hub.store.UpdateDeviceState(c.id, battery, rtt, status); err != nil {
 			log.Printf("device heartbeat state update failed device_id=%s: %v", c.id, err)
 		}
@@ -386,6 +414,20 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		h.hub.broadcastDevice(c.id, "device-state", map[string]any{
 			"battery": battery, "rttMs": rtt, "status": status, "lastSeen": time.Now().Unix(),
 		})
+	case "adb-ready":
+		h.handleAdbReady(c, message)
+	case "mdm-pull-policy":
+		// 设备端（连接建立后）主动拉取当前全局 MDM 策略。
+		h.sendMdmPolicies(c)
+	case "mdm-command-result":
+		// 设备端执行完 MDM 安装/卸载后回传结果，转发给所有管理端。
+		payload := map[string]any{"deviceId": c.id}
+		for _, key := range []string{"action", "packageName", "ok", "error"} {
+			if v, ok := message[key]; ok {
+				payload[key] = boundedPayload(v)
+			}
+		}
+		h.hub.broadcastDevice(c.id, "mdm-command-result", payload)
 	case "status":
 		h.hub.broadcastDevice(c.id, "device-state", boundedPayload(message["data"]))
 	case "command-result":
@@ -398,6 +440,46 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		}
 		h.hub.broadcastDevice(c.id, "command-result", payload)
 	}
+}
+
+// handleAdbReady 处理设备端上行的「ADB 就绪」事件：设备在本地完成「无线调试
+// 自配对 + 固化 5555」后通知服务端，服务端据此执行 adb connect IP:5555，把设备
+// 拉进 adb 连接列表（MDM 全自动路径）。connect 逻辑由注入的 connector 执行；
+// 未注入或执行失败时只记日志、不阻塞连接，也不会回退到其它路径。
+func (h *Handler) handleAdbReady(c *client, message map[string]any) {
+	ip, _ := message["lan_ip"].(string)
+	port := intValue(message["adb_port"])
+	if port <= 0 {
+		port = 5555
+	}
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "empty lan_ip"})
+		return
+	}
+
+	if h.hub.connector == nil {
+		log.Printf("adb-ready received but connector not configured device_id=%s ip=%s", c.id, ip)
+		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "connector not configured"})
+		return
+	}
+
+	connected, err := h.hub.connector.ConnectAfterReady(context.Background(), c.id, ip, port)
+	if err != nil {
+		log.Printf("adb-ready connect failed device_id=%s ip=%s: %v", c.id, ip, err)
+		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "connect failed"})
+		return
+	}
+
+	if connected {
+		log.Printf("adb-ready connected device_id=%s ip=%s:%d", c.id, ip, port)
+		// 更新内存态 adbOnline，供管理端快照与广播立即反映 adb 上线。
+		h.hub.mu.Lock()
+		h.hub.adbOnline[c.id] = true
+		h.hub.mu.Unlock()
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": true, "ip": ip})
+	}
+	_ = c.send(map[string]any{"type": "adb-ready-ack", "connected": strconv.FormatBool(connected)})
 }
 
 // snapshotDevice 在设备快照中附加 ADB 在线状态（内存态，由 ADBMonitor 维护），
@@ -454,8 +536,113 @@ func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]an
 		h.handleCommand(c, message)
 	case "device-control":
 		h.handleDeviceControl(c, user, message)
+	case "mdm-policy-push":
+		h.handleMdmPolicyPush(c, user, message)
+	case "mdm-device-command":
+		h.handleMdmDeviceCommand(c, user, message)
 	case "ping":
 		_ = c.send(map[string]any{"type": "pong", "sentAt": message["sentAt"]})
+	}
+}
+
+// handleMdmDeviceCommand 处理管理端对单台 MDM 设备下发的安装/卸载指令：
+// 把指令转发给指定 deviceId 的设备连接，由设备端 PackageInstaller 静默执行。
+// 仅管理员可用；设备必须在线（存在连接）才能送达。
+func (h *Handler) handleMdmDeviceCommand(c *client, user sqlite.User, message map[string]any) {
+	if user.Role != "admin" {
+		_ = c.send(map[string]string{"type": "error", "message": "admin only"})
+		return
+	}
+	deviceID, _ := message["deviceId"].(string)
+	action, _ := message["action"].(string)
+	if deviceID == "" || (action != "install" && action != "uninstall") {
+		_ = c.send(map[string]string{"type": "error", "message": "invalid mdm device command"})
+		return
+	}
+
+	h.hub.mu.RLock()
+	device := h.hub.devices[deviceID]
+	h.hub.mu.RUnlock()
+	if device == nil {
+		_ = c.send(map[string]any{
+			"type": "mdm-command-result", "deviceId": deviceID,
+			"ok": false, "error": "device offline",
+		})
+		return
+	}
+
+	// 转发给设备端，附上管理端回传所需的信息。
+	payload := map[string]any{"type": "mdm-device-command", "action": action}
+	for _, key := range []string{"packageName", "apkId", "token", "downloadUrl"} {
+		if v, ok := message[key]; ok {
+			payload[key] = v
+		}
+	}
+	if err := device.send(payload); err != nil {
+		_ = c.send(map[string]any{
+			"type": "mdm-command-result", "deviceId": deviceID,
+			"ok": false, "error": "send failed",
+		})
+		return
+	}
+	_ = c.send(map[string]any{
+		"type": "mdm-command-result", "deviceId": deviceID,
+		"ok": true, "sent": true,
+	})
+	_ = h.hub.store.Audit(user.ID, "mdm-device-"+action, deviceID, "")
+}
+
+// handleMdmPolicyPush 处理管理端下发的「策略已变更」通知：读库后把最新策略
+// 推送给所有在线的 Device Owner 设备。仅管理员可触发；普通用户无权改策略。
+func (h *Handler) handleMdmPolicyPush(c *client, user sqlite.User, message map[string]any) {
+	if user.Role != "admin" {
+		_ = c.send(map[string]string{"type": "error", "message": "admin only"})
+		return
+	}
+	h.pushMdmPolicies()
+	_ = c.send(map[string]any{"type": "mdm-policy-pushed"})
+}
+
+// sendMdmPolicies 把当前全局 MDM 策略打包下发给单台设备（设备端主动拉取）。
+func (h *Handler) sendMdmPolicies(c *client) {
+	policies, err := h.hub.store.ListMdmPolicies()
+	if err != nil {
+		log.Printf("load mdm policies for device failed device_id=%s: %v", c.id, err)
+		_ = c.send(map[string]any{"type": "mdm-policy", "policies": map[string]string{}})
+		return
+	}
+	out := make(map[string]string, len(policies))
+	for _, p := range policies {
+		out[p.Key] = p.Value
+	}
+	_ = c.send(map[string]any{"type": "mdm-policy", "policies": out})
+}
+
+// pushMdmPolicies 把当前全局 MDM 策略推送给所有在线的 Device Owner 设备。
+// 读取一次策略、广播给所有 MDM 设备，避免逐设备查库。
+func (h *Handler) pushMdmPolicies() {
+	policies, err := h.hub.store.ListMdmPolicies()
+	if err != nil {
+		log.Printf("load mdm policies for push failed: %v", err)
+		return
+	}
+	out := make(map[string]string, len(policies))
+	for _, p := range policies {
+		out[p.Key] = p.Value
+	}
+
+	h.hub.mu.RLock()
+	targets := make([]*client, 0)
+	for id, device := range h.hub.devices {
+		mdm, err := h.hub.store.DeviceByID(id)
+		if err == nil && mdm.MdmEnabled {
+			targets = append(targets, device)
+		}
+	}
+	h.hub.mu.RUnlock()
+
+	for _, device := range targets {
+		_ = device.send(map[string]any{"type": "mdm-policy", "policies": out})
 	}
 }
 

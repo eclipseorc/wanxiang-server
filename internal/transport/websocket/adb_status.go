@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
+	"github.com/eclipseorc/wanxiang-server/internal/logic"
 )
 
 // adbStatusScanInterval 是扫描 adb 在线状态的周期。周期不宜过短，
@@ -36,7 +36,10 @@ const adbReconnectMinInterval = 45 * time.Second
 // ADBMonitor 周期扫描 adb，向「业务在线但 adb 离线」的设备下发 adb-status。
 type ADBMonitor struct {
 	hub *Hub
-	adb *scrcpy.ADB
+	// connector 是「连接管理」的统一入口（logic.AdbConnector），承载在线设备
+	// 探测（OnlineDevices/MdnsServices）与自动重连（Connect），与 admin-server
+	// 共享同一份实现，避免 adb 写操作散落在多个 transport。
+	connector *logic.AdbConnector
 
 	// lastAdbState 记录每个 deviceId 上一次的 adb 连接状态，只在状态变化时
 	// 下发通知，避免每 30 秒重复轰炸设备。
@@ -45,12 +48,12 @@ type ADBMonitor struct {
 	lastReconnect map[string]time.Time
 }
 
-// NewADBMonitor 创建扫描器。adb 为 nil 时（找不到 adb 二进制）会静默停用，
+// NewADBMonitor 创建扫描器。connector 为 nil 时（未配置 adb）会静默停用，
 // 避免进程因 adb 缺失而崩溃；日志会提示远程控制相关能力不可用。
-func NewADBMonitor(hub *Hub, adb *scrcpy.ADB) *ADBMonitor {
+func NewADBMonitor(hub *Hub, connector *logic.AdbConnector) *ADBMonitor {
 	return &ADBMonitor{
 		hub:           hub,
-		adb:           adb,
+		connector:     connector,
 		lastAdbState:  make(map[string]bool),
 		lastReconnect: make(map[string]time.Time),
 	}
@@ -58,7 +61,7 @@ func NewADBMonitor(hub *Hub, adb *scrcpy.ADB) *ADBMonitor {
 
 // Start 启动后台扫描循环，直到 ctx 取消。
 func (m *ADBMonitor) Start(ctx context.Context) {
-	if m.adb == nil {
+	if m.connector == nil {
 		log.Printf("adb-status monitor disabled: adb not available")
 		return
 	}
@@ -86,7 +89,7 @@ func (m *ADBMonitor) scanOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	onlineSerials, err := m.adb.OnlineDevices(ctx)
+	onlineSerials, err := m.connector.OnlineDevices(ctx)
 	if err != nil {
 		log.Printf("adb-status scan failed: %v", err)
 		return
@@ -95,7 +98,7 @@ func (m *ADBMonitor) scanOnce() {
 	// mDNS 发现（设备重启后 IP/端口都变时用）。失败不阻断主流程，只降级为
 	// 仅靠固定端口重连 + 人工通知。
 	mdnsByIP := map[string]string{}
-	if services, err := m.adb.MdnsServices(ctx); err == nil {
+	if services, err := m.connector.MdnsServices(ctx); err == nil {
 		mdnsByIP = mdnsAddrByIP(services)
 	} else {
 		log.Printf("adb-status mdns scan failed: %v", err)
@@ -157,7 +160,7 @@ func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string)
 
 	// 1) 落库的真实端口（无线调试连接时记录的真实端口，端口未变时直接可用）。
 	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil && dev.AdbIP != "" && dev.AdbPort > 0 {
-		if m.adb.Connect(ctx, dev.AdbIP, dev.AdbPort) == nil {
+		if m.connector.Connect(ctx, dev.AdbIP, dev.AdbPort) == nil {
 			log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, dev.AdbIP, dev.AdbPort)
 			m.publishState(deviceID, ip, true)
 			return true
@@ -165,7 +168,7 @@ func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string)
 	}
 
 	// 2) 传统模式兜底：固定 5555（设备是 USB 切 tcpip 的传统模式时监听 5555）。
-	if m.adb.Connect(ctx, ip, adbReconnectPort) == nil {
+	if m.connector.Connect(ctx, ip, adbReconnectPort) == nil {
 		log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, ip, adbReconnectPort)
 		m.publishState(deviceID, ip, true)
 		return true
@@ -177,7 +180,7 @@ func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string)
 		host, portStr, ok := strings.Cut(addr, ":")
 		if ok {
 			if port, err := strconv.Atoi(portStr); err == nil {
-				if err := m.adb.Connect(ctx, host, port); err == nil {
+				if err := m.connector.Connect(ctx, host, port); err == nil {
 					log.Printf("adb-status mdns reconnect ok device_id=%s addr=%s", deviceID, addr)
 					m.publishState(deviceID, ip, true)
 					return true
