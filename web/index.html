@@ -77,6 +77,53 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .stack-form label{display:flex;flex-direction:column;gap:7px}
 .stack-form button{margin-top:3px}
 
+/* ===== DPC 纳管二维码 ===== */
+.dpc-grid{display:grid;grid-template-columns:340px 1fr;gap:32px;padding:26px;align-items:start}
+.dpc-form{display:flex;flex-direction:column;gap:15px}
+.dpc-form label{display:flex;flex-direction:column;gap:7px}
+.dpc-actions{margin-top:6px}
+.dpc-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;border:1px dashed var(--line-2);border-radius:var(--r-lg);background:#fafbfe;min-height:280px;justify-content:center}
+.dpc-qr{width:240px;height:240px;display:grid;place-items:center;background:#fff;border-radius:12px;border:1px solid var(--line);text-align:center;padding:14px}
+.dpc-qr img,.dpc-qr canvas,.dpc-qr svg{width:100%;height:100%;object-fit:contain}
+.dpc-qr-hint{max-width:300px;text-align:center;font-size:12.5px;line-height:1.7}
+@media (max-width:860px){.dpc-grid{grid-template-columns:1fr}}
+
+/* ===== 应用管理：七个 MDM 功能标签页 ===== */
+.mdm-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px;border-bottom:1px solid var(--line)}
+.mdm-tab{background:transparent;color:var(--muted);border:0;border-radius:0;padding:11px 16px;font-size:14px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;box-shadow:none;letter-spacing:0}
+.mdm-tab:hover:not(.active){background:transparent;color:var(--ink-2);transform:none;box-shadow:none}
+.mdm-tab.active{background:transparent;color:var(--brand);border-bottom-color:var(--brand);font-weight:600;box-shadow:none}
+.mdm-panel{display:none}
+.mdm-panel.active{display:block;animation:pageIn .2s ease}
+.mdm-mode-row{display:flex;gap:8px;align-items:center;margin-bottom:16px}
+.mdm-mode-chip{background:var(--surface);border:1px solid var(--line-2);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;box-shadow:none}
+.mdm-mode-chip:hover:not(.active){transform:none;box-shadow:none;border-color:var(--brand);color:var(--ink-2)}
+.mdm-mode-chip.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);font-weight:600}
+.mdm-add-row{display:flex;gap:10px;margin-bottom:14px}
+.mdm-add-row input{flex:1}
+.mdm-tip{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 14px}
+
+/* ===== 设备权限设置：分组卡片 + 开关/单选/输入列表 ===== */
+.perm-group{display:grid;gap:16px;margin-bottom:20px}
+.perm-card{background:var(--card-bg,var(--surface));border:1px solid var(--line-2);border-radius:var(--r-md,16px);padding:20px 22px}
+.perm-card h3{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--ink)}
+.perm-card .perm-sub{font-size:12.5px;color:var(--muted);margin:0 0 16px}
+.perm-item{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:15px 0;border-top:1px solid var(--line)}
+.perm-item:first-of-type{border-top:0;padding-top:0}
+.perm-item .perm-label{flex:1;min-width:0}
+.perm-item .perm-name{font-size:14px;font-weight:500;color:var(--ink);display:flex;align-items:center;gap:8px}
+.perm-item .perm-name .badge{font-size:11px;font-weight:500;color:var(--muted);background:var(--surface-soft);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+.perm-item .perm-desc{font-size:12.5px;color:var(--muted);line-height:1.65;margin-top:4px}
+.perm-item .perm-ctrl{flex:none;display:flex;align-items:center;padding-top:2px}
+.perm-radio-group{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.perm-radio{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:13.5px;color:var(--ink-2);font-weight:400}
+.perm-radio input{accent-color:var(--brand);width:15px;height:15px;margin:0}
+.perm-input{width:100%;max-width:420px}
+.perm-save-row{display:flex;justify-content:flex-end;margin-top:4px}
+.perm-placeholder{opacity:.62}
+.perm-placeholder .perm-name{color:var(--muted)}
+.perm-placeholder .perm-ctrl{font-size:12px;color:var(--muted);background:var(--surface-soft);border:1px dashed var(--line);border-radius:8px;padding:4px 10px}
+
 /* ===== 登录视图 ===== */
 .login-view{min-height:100vh;display:flex;background:#fff}
 .login-brand{position:relative;overflow:hidden;flex:1.08;min-width:0;background:radial-gradient(1000px 620px at 12% 12%,#253a78 0%,transparent 62%),linear-gradient(155deg,#0a1120 0%,#111e3c 55%,#0b1730 100%);color:#fff;padding:52px 60px;display:flex;flex-direction:column;justify-content:flex-start}
@@ -596,6 +643,7 @@ table .col-select{width:34px;text-align:center;padding:0}
   .toast{left:16px;right:16px;bottom:16px;max-width:none}
 }
 </style>
+<script src="/qrcode.js"></script>
 </head>
 <body>
 <!-- 图标定义：内联 symbol，避免任何外部资源依赖 -->
@@ -630,6 +678,12 @@ table .col-select{width:34px;text-align:center;padding:0}
   <symbol id="i-package" viewBox="0 0 24 24"><path d="M12 2.5 20 7v10l-8 4.5L4 17V7z"/><path d="M4 7l8 4.5L20 7M12 11.5v10"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M4 20h16"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+  <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="3" width="7" height="7" rx="1.5"/><rect x="13" y="3" width="7" height="7" rx="1.5"/><rect x="4" y="14" width="7" height="7" rx="1.5"/><rect x="13" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-location" viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-call" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-shield-key" viewBox="0 0 24 24"><path d="M12 2.5 20 6v6c0 5-3.4 8.4-8 9.5-4.6-1.1-8-4.5-8-9.5V6z"/><circle cx="12" cy="10" r="2"/><path d="M12 12v3"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 21V4A1.5 1.5 0 0 1 5.5 2.5z"/><path d="M14 2.5V7h4M8 12h8M8 16h8M8 8h3"/></symbol>
 </svg>
 
 <!-- ===== 登录视图 ===== -->
@@ -688,6 +742,13 @@ table .col-select{width:34px;text-align:center;padding:0}
       <a class="nav-link" data-target="sec-accounts" href="#sec-accounts"><svg class="ico"><use href="#i-users"/></svg><span class="nav-label">账号管理</span></a>
       <a class="nav-link" data-target="sec-groups" href="#sec-groups"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">角色管理</span></a>
       <a class="nav-link" data-target="sec-perms" href="#sec-perms"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">权限管理</span></a>
+      <div class="nav-group-title">设备管理</div>
+      <a class="nav-link" data-target="sec-mdm-phones" href="#sec-mdm-phones"><svg class="ico"><use href="#i-phone"/></svg><span class="nav-label">手机管理</span></a>
+      <a class="nav-link" data-target="sec-mdm-apps" href="#sec-mdm-apps"><svg class="ico"><use href="#i-app"/></svg><span class="nav-label">应用管理</span></a>
+      <a class="nav-link" data-target="sec-mdm-location" href="#sec-mdm-location"><svg class="ico"><use href="#i-location"/></svg><span class="nav-label">定位管理</span></a>
+      <a class="nav-link" data-target="sec-mdm-calls" href="#sec-mdm-calls"><svg class="ico"><use href="#i-call"/></svg><span class="nav-label">有效通话设置</span></a>
+      <a class="nav-link" data-target="sec-mdm-perms" href="#sec-mdm-perms"><svg class="ico"><use href="#i-shield-key"/></svg><span class="nav-label">设备权限设置</span></a>
+      <a class="nav-link" data-target="sec-mdm-agreement" href="#sec-mdm-agreement"><svg class="ico"><use href="#i-doc"/></svg><span class="nav-label">领用协议</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-status"><span class="live-dot"></span><span>系统运行中</span></div>
@@ -828,6 +889,374 @@ table .col-select{width:34px;text-align:center;padding:0}
             <tbody id="permRows"><tr><td colspan="5" class="table-empty">加载中…</td></tr></tbody>
           </table></div>
         </div>
+      </section>
+
+      <!-- 页面：手机管理（含 DPC 纳管二维码生成） -->
+      <section id="sec-mdm-phones" class="section page" data-title="手机管理" data-crumb="手机管理">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>手机管理</h2><p>生成 DPC 纳管二维码，扫码后设备自动注册为 Device Owner 并接入管控</p></div></div>
+        <div class="card">
+          <div class="card-head"><div><h3>DPC 纳管二维码</h3><p>填写设备开机向导所需的 WiFi 与租户信息，生成 provisioning 二维码</p></div></div>
+          <div class="dpc-grid">
+            <form id="dpcForm" class="dpc-form" autocomplete="off">
+              <label>WiFi 名称（SSID）<input id="dpcSsid" placeholder="如 office-wifi"></label>
+              <label>WiFi 密码<input id="dpcPwd" type="password" placeholder="留空表示开放网络"></label>
+              <label>WiFi 安全类型
+                <select id="dpcSec">
+                  <option value="WPA" selected>WPA</option>
+                  <option value="WEP">WEP</option>
+                  <option value="NONE">无（开放网络）</option>
+                </select>
+              </label>
+              <label>租户凭证（tenant_token）<input id="dpcToken" placeholder="设备初始注册凭证"></label>
+              <div class="dpc-actions">
+                <button type="submit" class="primary" id="dpcGenBtn">生成二维码</button>
+              </div>
+            </form>
+            <div class="dpc-qr-wrap">
+              <div id="dpcQr" class="dpc-qr"><span class="muted">填写左侧信息后点击「生成二维码」</span></div>
+              <p id="dpcQrHint" class="dpc-qr-hint muted">二维码内容为 Android Device Owner provisioning JSON，供设备开机向导扫码纳管。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 页面：应用管理（七个 MDM 功能标签页） -->
+      <section id="sec-mdm-apps" class="section page" data-title="应用管理" data-crumb="应用管理">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>应用管理</h2><p>集中管理应用安装限制、远程安装/卸载与设备应用策略</p></div></div>
+
+        <div class="mdm-tabs" id="mdmTabs">
+          <button class="mdm-tab active" data-tab="install-policy">应用安装限制</button>
+          <button class="mdm-tab" data-tab="remote-install">远程安装应用</button>
+          <button class="mdm-tab" data-tab="remote-uninstall">远程卸载应用</button>
+          <button class="mdm-tab" data-tab="uninstall-blocked">防卸载应用</button>
+          <button class="mdm-tab" data-tab="run-blacklist">应用运行黑名单</button>
+          <button class="mdm-tab" data-tab="keep-alive">常驻应用</button>
+          <button class="mdm-tab" data-tab="auto-start">开机自启应用</button>
+        </div>
+
+        <!-- 1. 应用安装限制 -->
+        <div class="mdm-panel active" id="mdmPanel-install-policy">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>应用名单类型</h3><p>白名单：全局禁装，仅白名单内应用可下发安装；黑名单：挂起名单内应用</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <div class="mdm-mode-row">
+                <button class="mdm-mode-chip active" id="installModeBlack" data-mode="blacklist">黑名单</button>
+                <button class="mdm-mode-chip" id="installModeWhite" data-mode="whitelist">白名单</button>
+              </div>
+              <div class="mdm-add-row">
+                <input type="text" id="installPolicyPkg" placeholder="输入应用包名，如 com.tencent.mm">
+                <button class="btn-primary" id="installPolicyAddBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加应用</button>
+              </div>
+              <div class="scroll"><table>
+                <thead><tr><th>包名</th><th style="width:120px">操作</th></tr></thead>
+                <tbody id="installPolicyRows"><tr><td colspan="2" class="table-empty">暂无应用</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 远程安装应用 -->
+        <div class="mdm-panel" id="mdmPanel-remote-install">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>远程安装</h3><p>上传 APK 后按设备纳管状态分流：非 MDM 走 adb，MDM 走设备端静默安装</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <p class="mdm-tip">已选设备：<strong id="remoteInstallCount">0</strong> 台。上传一个 .apk，将覆盖安装到所选设备。</p>
+              <div class="mdm-add-row">
+                <label class="file-upload-label" style="flex:1;margin:0"><input type="file" id="mdmInstallFile" accept=".apk"></label>
+                <button class="btn-primary" id="mdmInstallSubmitBtn" disabled><svg class="ico ico-sm"><use href="#i-download"/></svg>安装到所选设备</button>
+              </div>
+              <div class="app-status" id="mdmInstallStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 远程卸载应用 -->
+        <div class="mdm-panel" id="mdmPanel-remote-uninstall">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>远程卸载</h3><p>输入包名，按设备纳管状态分流卸载</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <p class="mdm-tip">已选设备：<strong id="remoteUninstallCount">0</strong> 台。输入要卸载的应用包名。</p>
+              <div class="mdm-add-row">
+                <input type="text" id="mdmUninstallPkg" placeholder="如 com.example.app">
+                <button class="btn-danger" id="mdmUninstallSubmitBtn"><svg class="ico ico-sm"><use href="#i-trash"/></svg>从所选设备卸载</button>
+              </div>
+              <div class="app-status" id="mdmUninstallStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 防卸载应用 -->
+        <div class="mdm-panel" id="mdmPanel-uninstall-blocked">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>防卸载应用</h3><p>名单内的应用禁止被卸载（Device Owner 策略，需设备已纳管）</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <div class="mdm-add-row">
+                <input type="text" id="uninstallBlockedPkg" placeholder="输入应用包名">
+                <button class="btn-primary" id="uninstallBlockedAddBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加应用</button>
+              </div>
+              <div class="scroll"><table>
+                <thead><tr><th>包名</th><th style="width:120px">操作</th></tr></thead>
+                <tbody id="uninstallBlockedRows"><tr><td colspan="2" class="table-empty">暂无应用</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 应用运行黑名单 -->
+        <div class="mdm-panel" id="mdmPanel-run-blacklist">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>应用运行黑名单</h3><p>名单内的应用被挂起（图标置灰、不可运行）</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <div class="mdm-add-row">
+                <input type="text" id="runBlacklistPkg" placeholder="输入应用包名">
+                <button class="btn-primary" id="runBlacklistAddBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加应用</button>
+              </div>
+              <div class="scroll"><table>
+                <thead><tr><th>包名</th><th style="width:120px">操作</th></tr></thead>
+                <tbody id="runBlacklistRows"><tr><td colspan="2" class="table-empty">暂无应用</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 常驻应用 -->
+        <div class="mdm-panel" id="mdmPanel-keep-alive">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>常驻应用</h3><p>名单内的应用保留 APK 常驻、不因无用户使用被移除</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <div class="mdm-add-row">
+                <input type="text" id="keepAlivePkg" placeholder="输入应用包名">
+                <button class="btn-primary" id="keepAliveAddBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加应用</button>
+              </div>
+              <div class="scroll"><table>
+                <thead><tr><th>包名</th><th style="width:120px">操作</th></tr></thead>
+                <tbody id="keepAliveRows"><tr><td colspan="2" class="table-empty">暂无应用</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. 开机自启应用 -->
+        <div class="mdm-panel" id="mdmPanel-auto-start">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>开机自启应用</h3><p>名单内的应用在设备开机后自动拉起</p></div>
+            </div>
+            <div style="padding:20px 26px">
+              <div class="mdm-add-row">
+                <input type="text" id="autoStartPkg" placeholder="输入应用包名">
+                <button class="btn-primary" id="autoStartAddBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加应用</button>
+              </div>
+              <div class="scroll"><table>
+                <thead><tr><th>包名</th><th style="width:120px">操作</th></tr></thead>
+                <tbody id="autoStartRows"><tr><td colspan="2" class="table-empty">暂无应用</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 页面：定位管理（占位） -->
+      <section id="sec-mdm-location" class="section page" data-title="定位管理" data-crumb="定位管理">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>定位管理</h2><p>查看与追踪设备实时位置</p></div></div>
+        <div class="card"><div class="card-head"><div><h3>设备位置</h3><p>功能规划中，敬请期待</p></div></div></div>
+      </section>
+
+      <!-- 页面：有效通话设置（占位） -->
+      <section id="sec-mdm-calls" class="section page" data-title="有效通话设置" data-crumb="有效通话设置">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>有效通话设置</h2><p>配置设备通话相关策略</p></div></div>
+        <div class="card"><div class="card-head"><div><h3>通话策略</h3><p>功能规划中，敬请期待</p></div></div></div>
+      </section>
+
+      <!-- 页面：设备权限设置 -->
+      <section id="sec-mdm-perms" class="section page" data-title="设备权限设置" data-crumb="设备权限设置">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>设备权限设置</h2><p>配置设备的系统权限与限制策略，保存后下发到所有已纳管（Device Owner）设备</p></div></div>
+
+        <div class="perm-group">
+          <!-- 分组一：网络与连接 -->
+          <div class="perm-card">
+            <h3>网络与连接</h3>
+            <p class="perm-sub">限制设备对网络、热点、蓝牙等连接能力的使用</p>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止启用 WiFi</div>
+                <div class="perm-desc">开启后，员工的手机设备将禁止启用 WiFi</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.wifi"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止启用热点</div>
+                <div class="perm-desc">开启后，员工的手机设备将禁止启用热点</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.hotspot"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止启用蓝牙</div>
+                <div class="perm-desc">开启后，员工的手机设备将无法自行启用蓝牙</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.bluetooth"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止开启 VPN</div>
+                <div class="perm-desc">开启后，员工的手机设备将强制屏蔽 VPN 功能，无法开启 VPN 服务</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.vpn"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止开启飞行模式</div>
+                <div class="perm-desc">开启后，员工的手机设备将禁止开启飞行模式</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.airplaneMode"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">移动网络限制</div>
+                <div class="perm-desc">禁止开启移动网络后，员工的手机设备将强制关闭移动网络开关，员工无法自行开启；禁止关闭移动网络后，员工的手机设备将强制开启移动网络开关，员工无法自行关闭</div>
+              </div>
+              <div class="perm-ctrl">
+                <div class="perm-radio-group">
+                  <label class="perm-radio"><input type="radio" name="perm-mobile-network" value="none" data-perm="mobileNetwork"><span>不限制</span></label>
+                  <label class="perm-radio"><input type="radio" name="perm-mobile-network" value="disableOn" data-perm="mobileNetwork"><span>禁止开启移动网络</span></label>
+                  <label class="perm-radio"><input type="radio" name="perm-mobile-network" value="disableOff" data-perm="mobileNetwork"><span>禁止关闭移动网络</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">WIFI 白名单设置</div>
+                <div class="perm-desc">添加允许设备连接的 WiFi（SSID），未配置则不限制</div>
+                <div class="mdm-add-row" style="margin-top:10px;margin-bottom:0">
+                  <input type="text" id="wifiWhitelistInput" class="perm-input" placeholder="请输入 WiFi 名称（SSID）">
+                  <button class="btn" id="wifiWhitelistAddBtn" style="flex:none">＋ 添加白名单</button>
+                </div>
+                <div class="mdm-tip" id="wifiWhitelistList" style="margin-top:10px"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 分组二：系统与硬件 -->
+          <div class="perm-card">
+            <h3>系统与硬件</h3>
+            <p class="perm-sub">限制设备对系统能力与硬件组件的使用</p>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止开启 USB 调试 / 开发者模式</div>
+                <div class="perm-desc">开启后，员工的手机设备无法自行启用开发者模式并强制关闭 USB 调试功能</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.usbDebug"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止使用 USB 传输文件</div>
+                <div class="perm-desc">开启后，员工的手机设备将无法自行使用 USB 传输文件</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.usbFileTransfer"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止启用摄像头</div>
+                <div class="perm-desc">开启后，员工的手机设备将禁止启用摄像头</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="cameraDisabled"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止截屏权限</div>
+                <div class="perm-desc">开启后，员工的手机设备将无法自行截屏</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.screenCapture"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">禁止恢复出厂设置</div>
+                <div class="perm-desc">开启后，员工的手机设备将无法自行恢复出厂设置</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="restrictions.factoryReset"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">是否开启屏幕常亮</div>
+                <div class="perm-desc">开启后，员工的手机设备屏幕将保持常亮状态</div>
+              </div>
+              <div class="perm-ctrl"><label class="switch"><input type="checkbox" data-perm="screenAlwaysOn"><span class="switch-track"></span></label></div>
+            </div>
+
+            <div class="perm-item">
+              <div class="perm-label">
+                <div class="perm-name">设置锁屏显示的单位名称</div>
+                <div class="perm-desc">显示在锁屏界面的组织/单位名称</div>
+              </div>
+              <div class="perm-ctrl"><input type="text" id="orgNameInput" class="perm-input" placeholder="请输入显示的单位名称" data-perm="orgName"></div>
+            </div>
+          </div>
+
+          <!-- 分组三：通话（暂不支持项占位） -->
+          <div class="perm-card">
+            <h3>通话与隐私</h3>
+            <p class="perm-sub">通话行为与隐私相关策略</p>
+
+            <div class="perm-item perm-placeholder">
+              <div class="perm-label">
+                <div class="perm-name">手机号脱敏 <span class="badge">暂不支持</span></div>
+                <div class="perm-desc">开启后，通话记录手机号中间四位将隐藏（Android MDM 无可靠标准 API）</div>
+              </div>
+              <div class="perm-ctrl">暂不支持</div>
+            </div>
+
+            <div class="perm-item perm-placeholder">
+              <div class="perm-label">
+                <div class="perm-name">是否支持三方通话 <span class="badge">暂不支持</span></div>
+                <div class="perm-desc">开启后，员工的手机设备在双方通话时允许接听第三方来电（Android MDM 无可靠标准 API）</div>
+              </div>
+              <div class="perm-ctrl">暂不支持</div>
+            </div>
+
+            <div class="perm-item perm-placeholder">
+              <div class="perm-label">
+                <div class="perm-name">是否支持通话自动录音 <span class="badge">暂不支持</span></div>
+                <div class="perm-desc">开启后，员工的手机设备在电话接通时自动录音，录音文件可在录音机应用中查看（受系统版本/地区限制，无可靠标准 API）</div>
+              </div>
+              <div class="perm-ctrl">暂不支持</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="perm-save-row"><button class="btn primary" id="devicePermsSaveBtn">保存</button></div>
+      </section>
+
+      <!-- 页面：领用协议（占位） -->
+      <section id="sec-mdm-agreement" class="section page" data-title="领用协议" data-crumb="领用协议">
+        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>领用协议</h2><p>配置设备领用时的协议与须知</p></div></div>
+        <div class="card"><div class="card-head"><div><h3>协议内容</h3><p>功能规划中，敬请期待</p></div></div></div>
       </section>
     </main>
   </div>
@@ -981,7 +1410,7 @@ const $=id=>document.getElementById(id);let token=sessionStorage.getItem('adminT
 const apiBase=location.origin;const wsBase=localStorage.getItem('wsBase')||`${location.protocol==='https:'?'wss:':'ws:'}//${location.hostname}:9003`;
 function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',3600)}
 async function api(path,options={}){const headers=new Headers(options.headers||{});if(token)headers.set('Authorization',`Bearer ${token}`);if(options.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');const res=await fetch(apiBase+path,{...options,headers});let data=null;const text=await res.text();if(text){try{data=JSON.parse(text)}catch{data={error:text}}}if(!res.ok)throw new Error(data?.error||`HTTP ${res.status}`);return data}
-function showApp(){const yes=!!token;$('loginCard').classList.toggle('hidden',yes);$('app').classList.toggle('hidden',!yes);$('logoutBtn').classList.toggle('hidden',!yes);if(yes){loadAll();connectRealtime()}}
+function showApp(){const yes=!!token;$('loginCard').classList.toggle('hidden',yes);$('app').classList.toggle('hidden',!yes);$('logoutBtn').classList.toggle('hidden',!yes);if(yes){loadAll();connectRealtime();if(typeof loadMdmPolicies==='function')loadMdmPolicies()}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{const data=await api('/api/admin/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});token=data.token;user=data;sessionStorage.setItem('adminToken',token);showApp();toast('登录成功')}catch(err){toast(err.message)}});
 $('logoutBtn').onclick=async()=>{try{await api('/api/admin/logout',{method:'POST'})}catch{};token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()};
 $('refreshBtn').onclick=loadAll;$('connectBtn').onclick=connectRealtime;
@@ -1049,7 +1478,7 @@ function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGrid
 function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
 async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
-async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
+async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip}renderDevices()}else loadAll();return}if(m.type==='mdm-command-result'){const nm=(m.deviceId&&devices.find(x=>x.id===m.deviceId))?deviceDisplayName(devices.find(x=>x.id===m.deviceId)):m.deviceId;const act=m.data?.action==='install'?'安装':(m.data?.action==='uninstall'?'卸载':'操作');if(m.data&&m.data.ok===false){toast(`${nm} ${act}失败：${m.data.error||'未知错误'}`)}else if(m.data&&m.data.ok===true){toast(`${nm} ${act}成功`)}return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
 async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定停用并断开此设备？':'确定重新启用此设备？'))return;if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪，无法下发控制指令');return}sendWS({type:'device-control',deviceId:id,action:action})}
 
 /* ===== 资源管理：账号 / 分组 / 权限 三个列表页 ===== */
@@ -1208,6 +1637,333 @@ function renderResults(el,results){const nameMap={};for(const d of devices)nameM
   el.innerHTML=`<span class="${fail?'err':'ok'}">完成：成功 ${ok} 台，失败 ${fail} 台</span>\n${lines.join('\n')}`}
 
 if(token)showApp();
+
+/* ===== DPC 纳管二维码生成 ===== */
+function renderDpcQr(payload){
+  const box=$('dpcQr'); if(!box) return;
+  if(typeof window.qrcode!=='function'){ box.innerHTML='<span class="err">二维码库未加载</span>'; return; }
+  const text=JSON.stringify(payload);
+  const qr=window.qrcode(0,'M'); // typeNumber 0 = 自动选择最小版本
+  qr.addData(text); qr.make();
+  box.innerHTML=qr.createSvgTag({scalable:true});
+}
+const dpcForm=$('dpcForm');
+if(dpcForm){
+  dpcForm.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=$('dpcGenBtn'); if(btn)btn.disabled=true;
+    try{
+      const body={
+        wifiSsid:$('dpcSsid').value.trim(),
+        wifiPassword:$('dpcPwd').value,
+        wifiSecurityType:$('dpcSec').value,
+        tenantToken:$('dpcToken').value.trim(),
+      };
+      if(!body.wifiSsid){ toast('请填写 WiFi 名称'); return; }
+      const data=await api('/api/admin/dpc/qrcode',{method:'POST',body:JSON.stringify(body)});
+      renderDpcQr(data.payload);
+      toast('二维码已生成');
+    }catch(err){ toast(err.message); }
+    finally{ if(btn)btn.disabled=false; }
+  });
+}
+
+/* ===== 应用管理：七个 MDM 功能标签页 ===== */
+(function(){
+  const POLICY_KEYS={
+    installPolicy:'install_policy',
+    uninstallBlocked:'uninstall_blocked',
+    runBlacklist:'run_blacklist',
+    keepAlive:'keep_alive',
+    autoStart:'auto_start',
+    devicePerms:'device_perms'
+  };
+  // 内存态策略缓存：key -> {mode?, packages:[]}
+  const policyCache={};
+  function getPkgs(key){const p=policyCache[key];return p?(p.packages||[]):[]}
+  function getMode(key){const p=policyCache[key];return p?(p.mode||'blacklist'):'blacklist'}
+
+  // —— 标签页切换 ——
+  const tabBtns=[...document.querySelectorAll('#mdmTabs .mdm-tab')];
+  const panels={};document.querySelectorAll('.mdm-panel').forEach(p=>panels[p.id.replace('mdmPanel-','')]=p);
+  tabBtns.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const key=btn.dataset.tab;
+      Object.entries(panels).forEach(([k,p])=>p.classList.toggle('active',k===key));
+    });
+  });
+
+  // —— 拉取策略 ——
+  async function loadMdmPolicies(){
+    try{
+      const data=await api('/api/admin/mdm/policies');
+      const map={};
+      (data.policies||[]).forEach(p=>{try{map[p.key]=JSON.parse(p.value||'{}')}catch(_){map[p.key]={}}});
+      ['installPolicy','uninstallBlocked','runBlacklist','keepAlive','autoStart'].forEach(k=>{policyCache[k]=map[POLICY_KEYS[k]]||{packages:[]}});
+      renderAllPolicyLists();
+      renderDevicePerms(map[POLICY_KEYS.devicePerms]||{});
+    }catch(err){ /* 策略加载失败不阻断页面，仅在操作时提示 */ }
+  }
+  window.loadMdmPolicies=loadMdmPolicies;
+
+  // —— 保存某条策略（覆盖写）——
+  async function savePolicy(key,value){
+    await api('/api/admin/mdm/policies',{method:'POST',body:JSON.stringify({key,value:JSON.stringify(value)})});
+    // 触发服务端向所有在线 MDM 设备推送。
+    try{sendWS({type:'mdm-policy-push'})}catch(_){}
+  }
+
+  // —— 名单表格渲染 ——
+  function renderPkgTable(tbodyId,pkgs,onDelete){
+    const body=document.getElementById(tbodyId);if(!body)return;
+    body.replaceChildren();
+    if(!pkgs.length){body.innerHTML='<tr><td colspan="2" class="table-empty">暂无应用</td></tr>';return}
+    pkgs.forEach(pkg=>{
+      const tr=document.createElement('tr');
+      const name=document.createElement('td');name.textContent=pkg;name.className='name-cell';
+      const op=document.createElement('td');
+      const del=document.createElement('button');del.textContent='删除';del.className='danger';del.style.padding='5px 12px';del.style.fontSize='12.5px';
+      del.onclick=()=>onDelete(pkg);
+      op.append(del);
+      tr.append(name,op);body.append(tr);
+    });
+  }
+  function renderAllPolicyLists(){
+    renderPkgTable('installPolicyRows',getPkgs('installPolicy'),pkg=>removePkg('installPolicy',pkg));
+    renderPkgTable('uninstallBlockedRows',getPkgs('uninstallBlocked'),pkg=>removePkg('uninstallBlocked',pkg));
+    renderPkgTable('runBlacklistRows',getPkgs('runBlacklist'),pkg=>removePkg('runBlacklist',pkg));
+    renderPkgTable('keepAliveRows',getPkgs('keepAlive'),pkg=>removePkg('keepAlive',pkg));
+    renderPkgTable('autoStartRows',getPkgs('autoStart'),pkg=>removePkg('autoStart',pkg));
+    // 安装限制的黑白名单模式切换
+    const mode=getMode('installPolicy');
+    const blackBtn=document.getElementById('installModeBlack'),whiteBtn=document.getElementById('installModeWhite');
+    if(blackBtn&&whiteBtn){blackBtn.classList.toggle('active',mode==='blacklist');whiteBtn.classList.toggle('active',mode==='whitelist')}
+  }
+
+  // —— 添加/删除包名 ——
+  async function addPkg(cacheKey,inputId){
+    const input=document.getElementById(inputId);if(!input)return;
+    const pkg=input.value.trim();
+    if(!pkg){toast('请输入包名');return}
+    const list=getPkgs(cacheKey);
+    if(list.includes(pkg)){toast('该包名已存在');return}
+    list.push(pkg);
+    const value={packages:list};
+    if(cacheKey==='installPolicy')value.mode=getMode('installPolicy');
+    try{
+      await savePolicy(POLICY_KEYS[cacheKey],value);
+      input.value='';renderAllPolicyLists();toast('已添加并下发');
+    }catch(err){toast('保存失败：'+err.message);list.pop();renderAllPolicyLists()}
+  }
+  async function removePkg(cacheKey,pkg){
+    if(!confirm(`确定从名单移除 ${pkg}？`))return;
+    let list=getPkgs(cacheKey).filter(x=>x!==pkg);
+    const value={packages:list};
+    if(cacheKey==='installPolicy')value.mode=getMode('installPolicy');
+    try{
+      await savePolicy(POLICY_KEYS[cacheKey],value);
+      renderAllPolicyLists();toast('已移除并下发');
+    }catch(err){toast('保存失败：'+err.message)}
+  }
+  async function setInstallMode(mode){
+    const value={mode,packages:getPkgs('installPolicy')};
+    try{
+      await savePolicy(POLICY_KEYS.installPolicy,value);
+      renderAllPolicyLists();toast(mode==='whitelist'?'已切换为白名单':'已切换为黑名单');
+    }catch(err){toast('保存失败：'+err.message)}
+  }
+
+  // —— 绑定按钮 ——
+  function bindIf(id,fn){const el=document.getElementById(id);if(el)el.addEventListener('click',fn)}
+  bindIf('installPolicyAddBtn',()=>addPkg('installPolicy','installPolicyPkg'));
+  bindIf('uninstallBlockedAddBtn',()=>addPkg('uninstallBlocked','uninstallBlockedPkg'));
+  bindIf('runBlacklistAddBtn',()=>addPkg('runBlacklist','runBlacklistPkg'));
+  bindIf('keepAliveAddBtn',()=>addPkg('keepAlive','keepAlivePkg'));
+  bindIf('autoStartAddBtn',()=>addPkg('autoStart','autoStartPkg'));
+  bindIf('installModeBlack',()=>setInstallMode('blacklist'));
+  bindIf('installModeWhite',()=>setInstallMode('whitelist'));
+
+  // —— 远程安装（分流）——
+  let mdmUploadedApkId=null;
+  const mdmInstallFile=document.getElementById('mdmInstallFile');
+  const mdmInstallSubmit=document.getElementById('mdmInstallSubmitBtn');
+  const mdmInstallStatus=document.getElementById('mdmInstallStatus');
+  function refreshSelectedCount(){
+    const n=getSelectedDeviceIds().length;
+    const c1=document.getElementById('remoteInstallCount'),c2=document.getElementById('remoteUninstallCount');
+    if(c1)c1.textContent=n;if(c2)c2.textContent=n;
+  }
+  if(mdmInstallFile)mdmInstallFile.addEventListener('change',async e=>{
+    const f=e.target.files[0];if(!f)return;
+    mdmInstallSubmit.disabled=true;mdmInstallStatus.textContent='正在上传并解析包名…';
+    try{
+      const fd=new FormData();fd.append('file',f);
+      const res=await fetch(apiBase+'/api/admin/apk/upload',{method:'POST',headers:token?{Authorization:`Bearer ${token}`}:{},body:fd});
+      const data=await res.json();if(!res.ok)throw new Error(data?.error||`HTTP ${res.status}`);
+      mdmUploadedApkId=data.id;
+      mdmInstallStatus.innerHTML=`<span class="ok">已上传：${escapeHTML(data.fileName)}（包名 ${escapeHTML(data.packageName)}）</span>`;
+      mdmInstallSubmit.disabled=false;
+    }catch(err){mdmInstallStatus.innerHTML=`<span class="err">上传失败：${escapeHTML(err.message)}</span>`}
+  });
+  if(mdmInstallSubmit)mdmInstallSubmit.addEventListener('click',async()=>{
+    if(!mdmUploadedApkId){toast('请先选择并上传一个 APK');return}
+    const ids=getSelectedDeviceIds();
+    if(!ids.length){toast('请先在设备清单勾选要安装的设备');return}
+    mdmInstallStatus.textContent=`正在向 ${ids.length} 台设备安装（自动分流）…`;
+    try{
+      const data=await api('/api/admin/mdm/install',{method:'POST',body:JSON.stringify({apkId:mdmUploadedApkId,deviceIds:ids})});
+      // adb 路径结果直接展示
+      let html='';
+      if(data.adbResults&&data.adbResults.length){
+        const nameMap={};devices.forEach(d=>nameMap[d.id]=deviceDisplayName(d));
+        data.adbResults.forEach(r=>{const nm=nameMap[r.deviceId]||r.deviceId;html+=r.ok?`<span class="ok">✓ ${escapeHTML(nm)}（adb）成功</span>`:`<span class="err">✕ ${escapeHTML(nm)}（adb）：${escapeHTML(r.error||'失败')}</span>`});
+      }
+      // MDM 路径：经 WS 下发安装指令
+      if(data.mdmDevices&&data.mdmDevices.length){
+        const nameMap={};devices.forEach(d=>nameMap[d.id]=deviceDisplayName(d));
+        for(const md of data.mdmDevices){
+          if(ws&&ws.readyState===WebSocket.OPEN){
+            sendWS({type:'mdm-device-command',action:'install',deviceId:md.deviceId,packageName:md.packageName,downloadUrl:md.downloadUrl});
+            html+=`<span class="ok">→ ${escapeHTML(nameMap[md.deviceId]||md.deviceId)}（MDM）指令已下发，静默安装中…</span>`;
+          }else{
+            html+=`<span class="err">✕ ${escapeHTML(nameMap[md.deviceId]||md.deviceId)}（MDM）：实时连接未就绪</span>`;
+          }
+        }
+      }
+      if(!html)html='<span class="ok">无目标设备</span>';
+      mdmInstallStatus.innerHTML=html;
+    }catch(err){mdmInstallStatus.innerHTML=`<span class="err">安装请求失败：${escapeHTML(err.message)}</span>`}
+  });
+
+  // —— 远程卸载（分流）——
+  const mdmUninstallSubmit=document.getElementById('mdmUninstallSubmitBtn');
+  const mdmUninstallStatus=document.getElementById('mdmUninstallStatus');
+  if(mdmUninstallSubmit)mdmUninstallSubmit.addEventListener('click',async()=>{
+    const pkg=document.getElementById('mdmUninstallPkg').value.trim();
+    if(!pkg){toast('请输入包名');return}
+    const ids=getSelectedDeviceIds();
+    if(!ids.length){toast('请先在设备清单勾选要卸载的设备');return}
+    mdmUninstallStatus.textContent=`正在从 ${ids.length} 台设备卸载 ${escapeHTML(pkg)} …`;
+    try{
+      const data=await api('/api/admin/mdm/uninstall',{method:'POST',body:JSON.stringify({packageName:pkg,deviceIds:ids})});
+      let html='';
+      if(data.adbResults&&data.adbResults.length){
+        const nameMap={};devices.forEach(d=>nameMap[d.id]=deviceDisplayName(d));
+        data.adbResults.forEach(r=>{const nm=nameMap[r.deviceId]||r.deviceId;html+=r.ok?`<span class="ok">✓ ${escapeHTML(nm)}（adb）成功</span>`:`<span class="err">✕ ${escapeHTML(nm)}（adb）：${escapeHTML(r.error||'失败')}</span>`});
+      }
+      if(data.mdmDevices&&data.mdmDevices.length){
+        const nameMap={};devices.forEach(d=>nameMap[d.id]=deviceDisplayName(d));
+        for(const md of data.mdmDevices){
+          if(ws&&ws.readyState===WebSocket.OPEN){
+            sendWS({type:'mdm-device-command',action:'uninstall',deviceId:md.deviceId,packageName:md.packageName});
+            html+=`<span class="ok">→ ${escapeHTML(nameMap[md.deviceId]||md.deviceId)}（MDM）指令已下发，静默卸载中…</span>`;
+          }else{
+            html+=`<span class="err">✕ ${escapeHTML(nameMap[md.deviceId]||md.deviceId)}（MDM）：实时连接未就绪</span>`;
+          }
+        }
+      }
+      if(!html)html='<span class="ok">无目标设备</span>';
+      mdmUninstallStatus.innerHTML=html;
+    }catch(err){mdmUninstallStatus.innerHTML=`<span class="err">卸载请求失败：${escapeHTML(err.message)}</span>`}
+  });
+
+  // 每次设备列表变化时刷新「已选设备」计数。
+  const origRenderDevices=window.renderDevices;
+  if(typeof renderDevices==='function'){
+    window.renderDevices=function(){origRenderDevices();refreshSelectedCount()};
+  }
+
+  // 页面加载时刷新计数；策略由 showApp 登录后拉取。
+  refreshSelectedCount();
+
+  /* ===== 设备权限设置（sec-mdm-perms，独立页面，非应用管理标签页） ===== */
+  const PERM_DEFAULTS={
+    restrictions:{vpn:false,usbDebug:false,screenCapture:false,factoryReset:false,airplaneMode:false,wifi:false,hotspot:false,bluetooth:false,usbFileTransfer:false},
+    cameraDisabled:false,
+    mobileNetwork:'none',
+    screenAlwaysOn:false,
+    orgName:'',
+    wifiWhitelist:[]
+  };
+
+  // 渲染：把策略值回填到表单控件。
+  function renderDevicePerms(raw){
+    const p=Object.assign({},PERM_DEFAULTS,raw);
+    p.restrictions=Object.assign({},PERM_DEFAULTS.restrictions,raw.restrictions||{});
+    document.querySelectorAll('#sec-mdm-perms [data-perm]').forEach(el=>{
+      const key=el.dataset.perm; // 形如 restrictions.wifi / mobileNetwork / orgName
+      const val=getNested(p,key);
+      if(el.type==='checkbox'){el.checked=!!val}
+      else if(el.type==='radio'){el.checked=(el.value===val)}
+      else {el.value=(val==null?'':val)} // 文本框
+    });
+    renderWifiWhitelist(p.wifiWhitelist||[]);
+  }
+  function getNested(obj,path){
+    return path.split('.').reduce((o,k)=>o==null?undefined:o[k],obj);
+  }
+  function setNested(obj,path,val){
+    const keys=path.split('.');let cur=obj;
+    for(let i=0;i<keys.length-1;i++){const k=keys[i];if(typeof cur[k]!=='object'||cur[k]===null)cur[k]={};cur=cur[k]}
+    cur[keys[keys.length-1]]=val;
+  }
+
+  // 收集当前表单为策略对象。
+  function collectPerms(){
+    const p=JSON.parse(JSON.stringify(PERM_DEFAULTS));
+    document.querySelectorAll('#sec-mdm-perms [data-perm]').forEach(el=>{
+      const key=el.dataset.perm;
+      if(el.type==='checkbox'){setNested(p,key,el.checked)}
+      else if(el.type==='radio'){if(el.checked)setNested(p,key,el.value)}
+      else {setNested(p,key,el.value.trim())}
+    });
+    return p;
+  }
+
+  // WIFI 白名单展示与增删。
+  function renderWifiWhitelist(list){
+    const box=document.getElementById('wifiWhitelistList');if(!box)return;
+    box.replaceChildren();
+    if(!list.length){box.textContent='暂无白名单';return}
+    list.forEach(ssid=>{
+      const chip=document.createElement('span');
+      chip.style.cssText='display:inline-flex;align-items:center;gap:8px;background:var(--surface-soft);border:1px solid var(--line);border-radius:8px;padding:5px 10px;margin:0 6px 6px 0;font-size:12.5px;color:var(--ink-2)';
+      const name=document.createElement('span');name.textContent=ssid;
+      const del=document.createElement('button');del.textContent='×';del.style.cssText='border:0;background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;padding:0 2px';
+      del.onclick=async()=>{
+        const cur=collectPerms();cur.wifiWhitelist=cur.wifiWhitelist.filter(x=>x!==ssid);
+        try{await savePolicy(POLICY_KEYS.devicePerms,cur);renderWifiWhitelist(cur.wifiWhitelist);toast('已移除白名单')}catch(err){toast('保存失败：'+err.message)}
+      };
+      chip.append(name,del);box.append(chip);
+    });
+  }
+
+  // 添加 WIFI 白名单。
+  const wifiAddBtn=document.getElementById('wifiWhitelistAddBtn');
+  const wifiInput=document.getElementById('wifiWhitelistInput');
+  if(wifiAddBtn)wifiAddBtn.addEventListener('click',async()=>{
+    const ssid=(wifiInput?wifiInput.value:'').trim();
+    if(!ssid){toast('请输入 WiFi 名称');return}
+    const cur=collectPerms();
+    if(!cur.wifiWhitelist.includes(ssid))cur.wifiWhitelist.push(ssid);
+    else{toast('该白名单已存在');return}
+    try{await savePolicy(POLICY_KEYS.devicePerms,cur);if(wifiInput)wifiInput.value='';renderWifiWhitelist(cur.wifiWhitelist);toast('已添加并下发')}catch(err){toast('保存失败：'+err.message)}
+  });
+
+  // 保存整组权限。
+  const saveBtn=document.getElementById('devicePermsSaveBtn');
+  if(saveBtn)saveBtn.addEventListener('click',async()=>{
+    const btn=saveBtn;btn.disabled=true;btn.textContent='保存中…';
+    try{
+      const cur=collectPerms();
+      await savePolicy(POLICY_KEYS.devicePerms,cur);
+      toast('已保存并下发到所有纳管设备');
+    }catch(err){toast('保存失败：'+err.message)}
+    finally{btn.disabled=false;btn.textContent='保存'}
+  });
+})();
 
 </script>
 <script>
