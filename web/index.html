@@ -115,6 +115,23 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .auto-step-params .param-cell label{font-size:11.5px;color:var(--muted)}
 .auto-step-params input{font-size:13px;padding:7px 10px}
 
+/* ===== 自动化：画布式编排器（LogicFlow） ===== */
+.auto-view-toggle{display:flex;gap:6px;margin-bottom:12px}
+.auto-view-toggle button{flex:1;padding:7px 0;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);border-radius:8px;cursor:pointer}
+.auto-view-toggle button.active{background:var(--brand-soft,var(--surface-soft));color:var(--brand);border-color:var(--brand);font-weight:600}
+.auto-canvas-wrap{display:none;flex-direction:column;gap:10px}
+.auto-canvas-wrap.active{display:flex}
+.auto-canvas-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.auto-canvas-toolbar .palette-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:8px;cursor:pointer;transition:all .15s}
+.auto-canvas-toolbar .palette-btn:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft,var(--surface-soft))}
+.auto-canvas-toolbar .palette-btn svg{width:14px;height:14px}
+.auto-canvas{position:relative;width:100%;height:420px;border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:var(--canvas-bg,#fafafa)}
+.auto-canvas .lf-graph{background:transparent}
+.auto-canvas .lf-node{fill:var(--card-bg,var(--surface))}
+.auto-canvas .lf-node .lf-node-content{color:var(--ink)}
+.auto-canvas-hint{font-size:12px;color:var(--muted);line-height:1.6}
+.auto-canvas-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;pointer-events:none}
+
 /* ===== 设备权限设置：分组卡片 + 开关/单选/输入列表 ===== */
 .perm-group{display:grid;gap:16px;margin-bottom:20px}
 .perm-card{background:var(--card-bg,var(--surface));border:1px solid var(--line-2);border-radius:var(--r-md,16px);padding:20px 22px}
@@ -655,7 +672,9 @@ table .col-select{width:34px;text-align:center;padding:0}
   .toast{left:16px;right:16px;bottom:16px;max-width:none}
 }
 </style>
+<link rel="stylesheet" href="/lib/logicflow.css">
 <script src="/qrcode.js"></script>
+<script src="/lib/logicflow.js"></script>
 </head>
 <body>
 <!-- 图标定义：内联 symbol，避免任何外部资源依赖 -->
@@ -1326,20 +1345,36 @@ table .col-select{width:34px;text-align:center;padding:0}
 
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
                 <label style="font-size:13px;font-weight:500">动作步骤</label>
-                <select id="autoAddAction" style="max-width:200px;margin:0">
-                  <option value="tap">点击 (tap)</option>
-                  <option value="swipe">滑动 (swipe)</option>
-                  <option value="inputText">输入文字 (inputText)</option>
-                  <option value="launchApp">打开应用 (launchApp)</option>
-                  <option value="installApk">安装应用 (installApk)</option>
-                  <option value="screenshot">截图 (screenshot)</option>
-                  <option value="wait">等待 (wait)</option>
-                  <option value="ocrFind">OCR 定位 (ocrFind)</option>
-                </select>
-                <button class="secondary" id="autoAddStepBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加步骤</button>
+                <div class="auto-view-toggle" style="margin:0;width:180px">
+                  <button type="button" class="active" id="autoViewFormBtn">表单</button>
+                  <button type="button" id="autoViewCanvasBtn">画布</button>
+                </div>
               </div>
 
-              <div id="autoStepList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+              <!-- 表单式步骤列表 -->
+              <div id="autoFormView">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                  <select id="autoAddAction" style="max-width:200px;margin:0">
+                    <option value="tap">点击 (tap)</option>
+                    <option value="swipe">滑动 (swipe)</option>
+                    <option value="inputText">输入文字 (inputText)</option>
+                    <option value="launchApp">打开应用 (launchApp)</option>
+                    <option value="installApk">安装应用 (installApk)</option>
+                    <option value="screenshot">截图 (screenshot)</option>
+                    <option value="wait">等待 (wait)</option>
+                    <option value="ocrFind">OCR 定位 (ocrFind)</option>
+                  </select>
+                  <button class="secondary" id="autoAddStepBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加步骤</button>
+                </div>
+                <div id="autoStepList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+              </div>
+
+              <!-- 画布式编排器 -->
+              <div id="autoCanvasView" style="display:none">
+                <div class="auto-canvas-toolbar" id="autoCanvasToolbar"></div>
+                <div class="auto-canvas" id="autoCanvas"></div>
+                <p class="auto-canvas-hint">点击上方动作按钮添加步骤节点；拖拽节点调整执行顺序；节点之间箭头表示执行顺序。步骤参数请切换到「表单」视图填写。</p>
+              </div>
 
               <div class="perm-save-row">
                 <button class="btn primary" id="autoSaveFlowBtn">保存流程</button>
@@ -2107,6 +2142,8 @@ if(dpcForm){
     $('autoFlowDesc').value = flow ? flow.description : '';
     editingSteps = flow ? JSON.parse(JSON.stringify(flow.steps || [])) : [];
     renderStepList();
+    // 默认回到表单视图；画布视图在用户点击「画布」时才惰性初始化。
+    showFormView();
     $('autoEditor').classList.remove('hidden');
   }
   function closeEditor() { $('autoEditor').classList.add('hidden'); }
@@ -2133,7 +2170,7 @@ if(dpcForm){
       title.innerHTML = `<span class="auto-step-idx">${i+1}</span><span>${ACTION_LABELS[step.action] || step.action}</span>`;
       const del = document.createElement('button');
       del.className = 'auto-step-del'; del.textContent = '×'; del.title = '删除此步骤';
-      del.onclick = () => { editingSteps.splice(i,1); renderStepList(); };
+      del.onclick = () => { editingSteps.splice(i,1); renderStepList(); if (lf) syncCanvasFromSteps(); };
       head.append(title, del);
       div.append(head);
 
@@ -2171,6 +2208,155 @@ if(dpcForm){
     editingSteps.push({action, params});
     renderStepList();
   });
+
+  // ===== 画布式编排器（LogicFlow）=====
+  let lf = null;              // LogicFlow 实例
+  let canvasNodeIds = [];     // 与 editingSteps 顺序对应的节点 id 列表
+  const NODE_W = 180, NODE_H = 56, NODE_GAP = 24;
+
+  // 动作面板按钮：点击追加一个步骤节点。
+  function renderCanvasToolbar() {
+    const bar = $('autoCanvasToolbar');
+    bar.replaceChildren();
+    Object.keys(ACTION_PARAMS).forEach(action => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'palette-btn';
+      btn.innerHTML = `<svg class="ico ico-sm"><use href="#i-plus"/></svg>${ACTION_LABELS[action] || action}`;
+      btn.addEventListener('click', () => {
+        const params = {};
+        (ACTION_PARAMS[action] || []).forEach(p => { params[p.key] = ''; });
+        editingSteps.push({action, params});
+        syncCanvasFromSteps();
+        renderStepList();
+      });
+      bar.append(btn);
+    });
+  }
+
+  // 根据 editingSteps 重建画布（节点纵向排列 + 相邻连线）。
+  function syncCanvasFromSteps() {
+    if (!lf) return;
+    const data = lf.getGraphData();
+    // 清空现有节点与边。
+    (data.nodes || []).forEach(n => lf.deleteNode(n.id));
+    canvasNodeIds = [];
+
+    if (!editingSteps.length) { updateCanvasEmpty(); return; }
+
+    editingSteps.forEach((step, i) => {
+      const node = lf.addNode({
+        type: 'rect',
+        x: 90 + NODE_W / 2,
+        y: 40 + i * (NODE_H + NODE_GAP),
+        text: `${i + 1}. ${ACTION_LABELS[step.action] || step.action}`,
+        properties: { index: i },
+      });
+      canvasNodeIds.push(node.id);
+    });
+    // 相邻连线表达执行顺序。
+    for (let i = 0; i < canvasNodeIds.length - 1; i++) {
+      lf.addEdge({
+        type: 'polyline',
+        sourceNodeId: canvasNodeIds[i],
+        targetNodeId: canvasNodeIds[i + 1],
+      });
+    }
+    updateCanvasEmpty();
+  }
+
+  function updateCanvasEmpty() {
+    const existing = $('autoCanvasEmpty');
+    if (existing) existing.remove();
+    if (!editingSteps.length) {
+      const empty = document.createElement('div');
+      empty.id = 'autoCanvasEmpty';
+      empty.className = 'auto-canvas-empty';
+      empty.textContent = '从上方动作面板点击添加步骤节点';
+      $('autoCanvas').append(empty);
+    }
+  }
+
+  // 根据节点在画布上的 Y 坐标，把 editingSteps 重排（拖拽节点后同步顺序）。
+  function reorderStepsByY() {
+    if (!lf) return;
+    const data = lf.getGraphData();
+    const nodes = data.nodes || [];
+    const order = nodes
+      .map(n => ({ id: n.id, y: n.y }))
+      .sort((a, b) => a.y - b.y)
+      .map(o => o.id);
+    // 依据 canvasNodeIds 的顺序索引，重排 editingSteps。
+    const newSteps = order
+      .map(id => {
+        const idx = canvasNodeIds.indexOf(id);
+        return idx >= 0 ? editingSteps[idx] : null;
+      })
+      .filter(Boolean);
+    if (newSteps.length === editingSteps.length) {
+      editingSteps = newSteps;
+      // 重建画布，使节点编号与连线反映新顺序。
+      syncCanvasFromSteps();
+      renderStepList();
+    }
+  }
+
+  function initCanvas() {
+    if (lf) return;
+    if (typeof window.LogicFlow === 'undefined') {
+      // 库未加载时退回表单模式。
+      $('autoViewCanvasBtn').disabled = true;
+      return;
+    }
+    const LogicFlow = window.LogicFlow.default || window.LogicFlow;
+    lf = new LogicFlow({
+      container: $('autoCanvas'),
+      isSilentMode: false,
+      stopScrollGraph: false,
+      grid: true,
+      width: '100%',
+      height: 420,
+      themeMode: 'default',
+      style: {
+        rect: {
+          width: NODE_W,
+          height: NODE_H,
+          radius: 10,
+          fill: '#ffffff',
+          stroke: '#c7cede',
+          strokeWidth: 1,
+        },
+        nodeText: { fontSize: 13, color: '#0e1526' },
+        edge: { stroke: '#98a3ba', strokeWidth: 1.5 },
+      },
+    });
+    lf.on('node:drop', () => { reorderStepsByY(); });
+    lf.on('node:click', ({ data }) => {
+      // 点击节点可定位到对应步骤（在表单视图高亮）。
+      const idx = canvasNodeIds.indexOf(data.id);
+      if (idx >= 0) toast(`第 ${idx + 1} 步：${ACTION_LABELS[editingSteps[idx].action] || editingSteps[idx].action}`);
+    });
+    renderCanvasToolbar();
+    syncCanvasFromSteps();
+  }
+
+  function showCanvasView() {
+    initCanvas();
+    $('autoFormView').style.display = 'none';
+    $('autoCanvasView').style.display = 'block';
+    $('autoViewFormBtn').classList.remove('active');
+    $('autoViewCanvasBtn').classList.add('active');
+    if (lf) syncCanvasFromSteps();
+  }
+  function showFormView() {
+    $('autoCanvasView').style.display = 'none';
+    $('autoFormView').style.display = 'block';
+    $('autoViewCanvasBtn').classList.remove('active');
+    $('autoViewFormBtn').classList.add('active');
+    renderStepList();
+  }
+  $('autoViewFormBtn').addEventListener('click', showFormView);
+  $('autoViewCanvasBtn').addEventListener('click', showCanvasView);
 
   // --- 流程列表渲染 ---
   async function loadFlows() {

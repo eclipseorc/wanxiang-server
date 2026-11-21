@@ -145,13 +145,24 @@ type StepResult struct {
 
 ## 六、OCR 方案(「坐标 + OCR」定位的关键)
 
-- 选用 **RapidOCR / PaddleOCR** 本地部署,理由:离线可用、零成本、数据不出内网、
-  中文识别好。
-- 部署形态:独立 OCR 服务(HTTP),执行引擎通过 HTTP 调用;或内嵌 ONNX 运行时。
-- `ocrFind` 动作流程:截图 → 送 OCR → 返回匹配文字的中心坐标 → 后续步骤用该坐标点击。
+最终选定 **本地 Tesseract(经 gosseract 绑定)**,与已有 adb/scrcpy 属于同一量级的
+「系统依赖」,而非独立服务。理由:离线可用、零成本、数据不出内网、中文识别可用
+(需 `chi_sim.traineddata`)。
 
-一期建议先接一个本地 HTTP OCR 服务(RapidOCR Server),执行引擎通过 `ocrFind`
-动作调用它,返回 `{ text, x, y }`。
+- 实现:`internal/automation/ocr.go` 定义 `TesseractOCR`,用
+  `github.com/otiai10/gosseract/v2` 调 Tesseract C 库,`GetBoundingBoxes(RIL_WORD)`
+  拿到每个词的框,匹配目标文字后返回中心坐标。
+- **编译隔离(build tag)**:gosseract 是 cgo 库,需 CGO + tesseract 开发库。
+  为保持项目默认「纯 Go 一键 `go build`」,OCR 实现放在 `//go:build ocr` 标签下,
+  未启用时用 `ocr_stub.go` 的占位实现(返回「OCR 未启用」明确错误)。
+  - 默认:`go build ./...`(纯 Go,零 CGO,不依赖 tesseract)
+  - 启用:`CGO_ENABLED=1 go build -tags ocr`(需装 tesseract + 中文语言包)
+- **运行期开关**:通过环境变量 `AUTOMATION_OCR=1` 启用 OCR 客户端(即使已
+  用 `-tags ocr` 编译,未设该变量时 `buildOCR()` 仍返回 nil,`ocrFind` 报「未配置」)。
+  可选 `AUTOMATION_OCR_LANGS`(默认 `chi_sim+eng`)、`AUTOMATION_OCR_TESSDATA`
+  (语言包目录)。
+- `ocrFind` 动作流程:截图 → 送 Tesseract 识别 → 匹配目标文字 → 返回中心坐标,
+  供后续 `tap` 等步骤使用。
 
 ---
 
@@ -190,15 +201,24 @@ type StepResult struct {
 6. 任务列表 + 执行日志展示
 
 ### 二期(体验升级)
-1. 画布式拖拽编排器(节点 + 连线)
-2. 定时调度(cron)
-3. OCR 服务接入与 `ocrFind` 落地
-4. 并发上限 + 结果可视化
+1. ✅ 画布式拖拽编排器(节点 + 连线)—— 已完成,用滴滴开源 **LogicFlow**
+   (Apache-2.0,UMD 单文件,下载到 `web/lib/`,符合 CSP `'self'`)。画布是线性
+   `steps` 数组的可视化:节点=动作、连线=顺序,拖拽节点重排顺序,保存时仍导出
+   线性数组(后端零改动)。与一期「表单式编排」通过视图切换共存。
+2. ⬜ 定时调度(cron)
+3. ✅ OCR 服务接入与 `ocrFind` 落地 —— 已完成(见第六节,build tag + 环境变量双重开关)
+4. ⬜ 并发上限 + 结果可视化
+
+### 二期待办(剩余)
+1. 定时调度(cron)—— 流程支持按 cron 表达式定时自动触发
+2. 并发上限配置化 —— 当前执行引擎硬编码 8,改为环境变量/配置
+3. 任务详情前端从 alert 升级为面板展示
+4. 画布节点参数编辑 —— 当前参数编辑在「表单」视图完成,画布可加节点内联参数面板
 
 ---
 
 ## 十、待确认问题
 
-1. 一期是否先「表单式编排」过渡,二期再上画布拖拽?(当前按此排期)
-2. OCR 一期是否接入?还是先「坐标 + 人工标定」,OCR 二期再上?(当前按二期接入)
-3. 执行引擎放在 admin-server 进程内,还是独立 executor 进程?(当前按进程内)
+1. ✅ 一期是否先「表单式编排」过渡,二期再上画布拖拽?—— 已确认,一期表单式、二期画布
+2. ✅ OCR 一期是否接入?—— 已确认二期接入,且选定 Tesseract(gosseract)而非 RapidOCR
+3. ✅ 执行引擎放在 admin-server 进程内,还是独立 executor 进程?—— 已确认进程内

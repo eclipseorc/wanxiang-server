@@ -58,7 +58,7 @@ func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
 	r.adbConn = logic.NewAdbConnector(r.svc, adb)
 	r.automation = automation.NewExecutor(
 		r.svc.Store,
-		automation.NewEngine(adb, "./data/automation-shots", nil),
+		automation.NewEngine(adb, "./data/automation-shots", buildOCR()),
 		adb,
 	)
 	return r

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/eclipseorc/wanxiang-server/internal/automation"
@@ -289,6 +290,19 @@ func (r *Router) handleAutomationJob(w http.ResponseWriter, req *http.Request, u
 		"job":  job,
 		"logs": logs,
 	})
+}
+
+// buildOCR 按环境变量构造 OCR 客户端。OCR 属于可选能力:未显式启用时返回
+// nil,ocFind 动作会返回「OCR not configured」;启用时用本地 Tesseract。
+// 通过 AUTOMATION_OCR=1 启用;可选 AUTOMATION_OCR_LANGS(如 chi_sim+eng)、
+// AUTOMATION_OCR_TESSDATA(语言包目录)微调。
+func buildOCR() automation.OCRClient {
+	if os.Getenv("AUTOMATION_OCR") != "1" {
+		return nil
+	}
+	langs := os.Getenv("AUTOMATION_OCR_LANGS")
+	prefix := os.Getenv("AUTOMATION_OCR_TESSDATA")
+	return automation.NewTesseractOCR(langs, prefix)
 }
 
 // failNotFound 统一处理「不存在」错误:ErrNotFound 返回 404,其余内部错误。
