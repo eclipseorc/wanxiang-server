@@ -91,7 +91,20 @@ func InitSchema(db *sql.DB) error {
 		// keep_alive、auto_start），value 为 JSON 编码的策略内容。一张全局配置，
 		// 下发到所有 Device Owner 纳管设备。name/value 均为 TEXT，便于存包名列表。
 		`CREATE TABLE IF NOT EXISTS mdm_policies(key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)`,
+		// automation_flows 是自动化流程定义表：steps_json 为步骤数组（表单编排产物），
+		// 每个步骤形如 {action, params}。action 是动作原语名（tap/swipe/launchApp 等），
+		// params 是动作参数键值对。schedule 为可选 cron 表达式（空 = 手动触发）。
+		`CREATE TABLE IF NOT EXISTS automation_flows(id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', steps_json TEXT NOT NULL DEFAULT '[]', schedule TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+		// automation_jobs 是一次具体执行：device_ids 为逗号分隔的目标设备 ID 列表，
+		// status 取 pending/running/success/failed/partial，snapshot_json 记录触发时
+		// 的流程步骤快照（流程后续被编辑不影响历史任务可追溯）。
+		`CREATE TABLE IF NOT EXISTS automation_jobs(id TEXT PRIMARY KEY, flow_id TEXT NOT NULL REFERENCES automation_flows(id) ON DELETE CASCADE, device_ids TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', snapshot_json TEXT NOT NULL DEFAULT '[]', created_at INTEGER NOT NULL, started_at INTEGER NOT NULL DEFAULT 0, finished_at INTEGER NOT NULL DEFAULT 0)`,
+		// automation_step_logs 记录任务中每一步的执行结果，screenshot_path 为 screenshot
+		// 动作产物或失败现场截图路径（空 = 无）。
+		`CREATE TABLE IF NOT EXISTS automation_step_logs(id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES automation_jobs(id) ON DELETE CASCADE, device_id TEXT NOT NULL DEFAULT '', step_index INTEGER NOT NULL, action TEXT NOT NULL, params_json TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL DEFAULT 'success', error TEXT NOT NULL DEFAULT '', screenshot_path TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_automation_jobs_flow ON automation_jobs(flow_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_automation_step_logs_job ON automation_step_logs(job_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_devices_online ON devices(online)`,
 	}
 	for _, q := range stmts {

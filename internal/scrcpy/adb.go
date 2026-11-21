@@ -448,6 +448,36 @@ func (a *ADB) PullStream(ctx context.Context, serial, remotePath string, w io.Wr
 	return nil
 }
 
+// Screencap 通过 `adb exec-out screencap -p` 把设备当前屏幕截图（PNG）拉取到
+// 本地 localPath。与 Pull 不同，screencap 走 exec-out 直接输出 PNG 二进制，
+// 无需在设备上先落盘再拉取；产物文件大小通常几百 KB，用默认超时即可。
+func (a *ADB) Screencap(ctx context.Context, serial, localPath string) error {
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o750); err != nil {
+		return err
+	}
+	f, err := os.Create(localPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	runCtx, cancel := context.WithTimeout(ctx, defaultAdbTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, a.path, "-s", serial, "exec-out", "screencap", "-p")
+	var stderr bytes.Buffer
+	cmd.Stdout = f
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("adb screencap %s: %s", serial, msg)
+	}
+	return nil
+}
+
 // DeviceFile 是设备上一个文件/目录的最小信息，供文件浏览界面展示。
 type DeviceFile struct {
 	Name    string // 文件或目录名（不含路径）

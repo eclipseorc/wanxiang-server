@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eclipseorc/wanxiang-server/internal/automation"
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 	"github.com/eclipseorc/wanxiang-server/internal/storage/sqlite"
@@ -35,6 +36,8 @@ type Router struct {
 	apks    *apkStore
 	// mdmTokens 是 MDM 远程安装时「设备端下载 APK」的一次性凭证存储。
 	mdmTokens *mdmApkTokenStore
+	// automation 是自动化执行引擎(动作原语 + 流程执行),由 WithScrcpy 注入。
+	automation *automation.Executor
 }
 
 func New(s *logic.Service) *Router {
@@ -48,10 +51,16 @@ func New(s *logic.Service) *Router {
 }
 
 // WithScrcpy 注入 adb 封装，启用远程控制的配对/连接接口与会话操作。
-// 同一 adb 实例同时构造连接管理入口（AdbConnector）与会话操作句柄（scrcpy）。
+// 同一 adb 实例同时构造连接管理入口（AdbConnector）与会话操作句柄（scrcpy），
+// 并据此构造自动化执行引擎（复用 adb 能力，不额外建连接）。
 func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
 	r.scrcpy = adb
 	r.adbConn = logic.NewAdbConnector(r.svc, adb)
+	r.automation = automation.NewExecutor(
+		r.svc.Store,
+		automation.NewEngine(adb, "./data/automation-shots", nil),
+		adb,
+	)
 	return r
 }
 
@@ -275,6 +284,10 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleMdmInstall(w, req, u)
 	case "mdm/uninstall":
 		r.handleMdmUninstall(w, req, u)
+	case "automation/flows":
+		r.handleAutomationFlows(w, req, u)
+	case "automation/jobs":
+		r.handleAutomationJobs(w, req, u)
 	default:
 		// 单资源删除路径：/api/admin/sync-groups/{id}、/api/admin/users/{id}、/api/admin/groups/{id}。
 		switch {
@@ -289,6 +302,18 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 			return
 		case strings.HasPrefix(path, "mdm/policies/"):
 			r.handleMdmPolicyDelete(w, req, u, strings.TrimPrefix(path, "mdm/policies/"))
+			return
+		case strings.HasPrefix(path, "automation/flows/"):
+			rest := strings.TrimPrefix(path, "automation/flows/")
+			// /automation/flows/{id}/run 触发执行,否则按 {id} 做单资源操作。
+			if strings.HasSuffix(rest, "/run") {
+				r.handleAutomationRun(w, req, u, strings.TrimSuffix(rest, "/run"))
+				return
+			}
+			r.handleAutomationFlow(w, req, u, rest)
+			return
+		case strings.HasPrefix(path, "automation/jobs/"):
+			r.handleAutomationJob(w, req, u, strings.TrimPrefix(path, "automation/jobs/"))
 			return
 		}
 		http.NotFound(w, req)

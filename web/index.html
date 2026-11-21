@@ -103,6 +103,18 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .mdm-add-row input{flex:1}
 .mdm-tip{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 14px}
 
+/* ===== 自动化：步骤编排列表 ===== */
+.auto-step{background:var(--card-bg,var(--surface));border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.auto-step-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.auto-step-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink)}
+.auto-step-idx{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:6px;background:var(--brand-soft,var(--surface-soft));color:var(--brand);font-size:12px;font-weight:700}
+.auto-step-del{border:0;background:transparent;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.auto-step-del:hover{color:var(--danger,var(--red));background:var(--surface-soft)}
+.auto-step-params{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.auto-step-params .param-cell{display:flex;flex-direction:column;gap:4px}
+.auto-step-params .param-cell label{font-size:11.5px;color:var(--muted)}
+.auto-step-params input{font-size:13px;padding:7px 10px}
+
 /* ===== 设备权限设置：分组卡片 + 开关/单选/输入列表 ===== */
 .perm-group{display:grid;gap:16px;margin-bottom:20px}
 .perm-card{background:var(--card-bg,var(--surface));border:1px solid var(--line-2);border-radius:var(--r-md,16px);padding:20px 22px}
@@ -749,6 +761,7 @@ table .col-select{width:34px;text-align:center;padding:0}
       <a class="nav-link" data-target="sec-mdm-calls" href="#sec-mdm-calls"><svg class="ico"><use href="#i-call"/></svg><span class="nav-label">有效通话设置</span></a>
       <a class="nav-link" data-target="sec-mdm-perms" href="#sec-mdm-perms"><svg class="ico"><use href="#i-shield-key"/></svg><span class="nav-label">设备权限设置</span></a>
       <a class="nav-link" data-target="sec-mdm-agreement" href="#sec-mdm-agreement"><svg class="ico"><use href="#i-doc"/></svg><span class="nav-label">领用协议</span></a>
+      <a class="nav-link" data-target="sec-automation" href="#sec-automation"><svg class="ico"><use href="#i-bolt"/></svg><span class="nav-label">自动化</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="sidebar-status"><span class="live-dot"></span><span>系统运行中</span></div>
@@ -1257,6 +1270,99 @@ table .col-select{width:34px;text-align:center;padding:0}
       <section id="sec-mdm-agreement" class="section page" data-title="领用协议" data-crumb="领用协议">
         <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>领用协议</h2><p>配置设备领用时的协议与须知</p></div></div>
         <div class="card"><div class="card-head"><div><h3>协议内容</h3><p>功能规划中，敬请期待</p></div></div></div>
+      </section>
+
+      <!-- 页面：自动化 -->
+      <section id="sec-automation" class="section page" data-title="自动化" data-crumb="自动化">
+        <div class="section-head"><div><span class="eyebrow">06 / Automation</span><h2>自动化</h2><p>编排真机操作流程，批量执行点击、滑动、截图、安装等动作</p></div></div>
+
+        <div class="mdm-tabs" id="autoTabs">
+          <button class="mdm-tab active" data-tab="flows">流程编排</button>
+          <button class="mdm-tab" data-tab="jobs">执行记录</button>
+        </div>
+
+        <!-- 流程编排 -->
+        <div class="mdm-panel active" id="autoPanel-flows">
+          <div class="card">
+            <div class="card-head">
+              <div><h3>自动化流程</h3><p>用「动作步骤」编排对真机的自动化操作</p></div>
+              <div class="card-head-right"><button class="btn-primary" id="autoNewFlowBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>新建流程</button></div>
+            </div>
+            <div class="table-card">
+              <table>
+                <thead><tr><th>名称</th><th>步骤数</th><th>调度</th><th>更新时间</th><th style="width:220px">操作</th></tr></thead>
+                <tbody id="autoFlowRows"><tr><td colspan="5" class="muted">暂无流程，点击「新建流程」开始</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 执行记录 -->
+        <div class="mdm-panel" id="autoPanel-jobs">
+          <div class="card">
+            <div class="card-head"><div><h3>执行记录</h3><p>查看流程在各设备上的执行结果</p></div></div>
+            <div class="table-card">
+              <table>
+                <thead><tr><th>任务 ID</th><th>关联流程</th><th>设备数</th><th>状态</th><th>创建时间</th><th style="width:100px">操作</th></tr></thead>
+                <tbody id="autoJobRows"><tr><td colspan="6" class="muted">暂无执行记录</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 流程编辑抽屉 -->
+        <div class="scr-drawer hidden" id="autoEditor">
+          <div class="scr-drawer-backdrop" id="autoEditorBackdrop"></div>
+          <div class="scr-drawer-panel" style="max-width:720px">
+            <div class="scr-drawer-head">
+              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3 id="autoEditorTitle">新建流程</h3><span class="muted small">按顺序执行的动作步骤</span></div></div>
+              <button id="autoEditorCloseBtn" class="btn-ghost" title="关闭"><svg class="ico ico-sm"><use href="#i-arrow"/></svg>关闭</button>
+            </div>
+            <div class="scr-drawer-body">
+              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程名称</label>
+              <input id="autoFlowName" style="margin-bottom:14px" placeholder="例如：每日回归-打开App截图">
+              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程说明（可选）</label>
+              <input id="autoFlowDesc" style="margin-bottom:16px" placeholder="简要描述该流程的用途">
+
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <label style="font-size:13px;font-weight:500">动作步骤</label>
+                <select id="autoAddAction" style="max-width:200px;margin:0">
+                  <option value="tap">点击 (tap)</option>
+                  <option value="swipe">滑动 (swipe)</option>
+                  <option value="inputText">输入文字 (inputText)</option>
+                  <option value="launchApp">打开应用 (launchApp)</option>
+                  <option value="installApk">安装应用 (installApk)</option>
+                  <option value="screenshot">截图 (screenshot)</option>
+                  <option value="wait">等待 (wait)</option>
+                  <option value="ocrFind">OCR 定位 (ocrFind)</option>
+                </select>
+                <button class="secondary" id="autoAddStepBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加步骤</button>
+              </div>
+
+              <div id="autoStepList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+
+              <div class="perm-save-row">
+                <button class="btn primary" id="autoSaveFlowBtn">保存流程</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 运行流程抽屉 -->
+        <div class="scr-drawer hidden" id="autoRunDrawer">
+          <div class="scr-drawer-backdrop" id="autoRunBackdrop"></div>
+          <div class="scr-drawer-panel" style="max-width:520px">
+            <div class="scr-drawer-head">
+              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3>运行流程</h3><span class="muted small" id="autoRunFlowName">—</span></div></div>
+              <button id="autoRunCloseBtn" class="btn-ghost" title="关闭"><svg class="ico ico-sm"><use href="#i-arrow"/></svg>关闭</button>
+            </div>
+            <div class="scr-drawer-body">
+              <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:500">选择目标设备（可多选）</label>
+              <div id="autoRunDeviceList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;margin-bottom:16px"></div>
+              <div class="perm-save-row"><button class="btn primary" id="autoRunConfirmBtn">开始执行</button></div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -1967,6 +2073,262 @@ if(dpcForm){
 
 </script>
 <script>
+/* ===== 自动化引擎：流程编排 + 执行记录 ===== */
+(() => {
+  'use strict';
+  // 依赖第一个 script 里的 api()、toast()、devices 等全局变量。
+
+  // 动作原语的参数定义：key 为参数名，label 为中文提示。
+  const ACTION_PARAMS = {
+    tap: [{key:'x',label:'X 坐标'},{key:'y',label:'Y 坐标'}],
+    swipe: [{key:'x1',label:'起点 X'},{key:'y1',label:'起点 Y'},{key:'x2',label:'终点 X'},{key:'y2',label:'终点 Y'},{key:'duration',label:'时长(ms,可选)'}],
+    inputText: [{key:'text',label:'文字内容'}],
+    launchApp: [{key:'pkg',label:'应用包名'}],
+    installApk: [{key:'apkPath',label:'APK 本地路径(服务器)'}],
+    screenshot: [{key:'dir',label:'保存子目录(可选)'}],
+    wait: [{key:'ms',label:'等待毫秒'}],
+    ocrFind: [{key:'text',label:'目标文字'}],
+  };
+  const ACTION_LABELS = {
+    tap:'点击',swipe:'滑动',inputText:'输入文字',launchApp:'打开应用',
+    installApk:'安装应用',screenshot:'截图',wait:'等待',ocrFind:'OCR 定位'
+  };
+
+  let flows = [];
+  let editingFlow = null;   // 正在编辑的流程(id) 或 'new'
+  let editingSteps = [];    // 编辑器里的步骤数组
+  let runningFlow = null;   // 正在运行的流程
+
+  // --- 抽屉开关 ---
+  function openEditor(flow) {
+    editingFlow = flow;
+    $('autoEditorTitle').textContent = flow ? '编辑流程' : '新建流程';
+    $('autoFlowName').value = flow ? flow.name : '';
+    $('autoFlowDesc').value = flow ? flow.description : '';
+    editingSteps = flow ? JSON.parse(JSON.stringify(flow.steps || [])) : [];
+    renderStepList();
+    $('autoEditor').classList.remove('hidden');
+  }
+  function closeEditor() { $('autoEditor').classList.add('hidden'); }
+
+  function openRun(flow) {
+    runningFlow = flow;
+    $('autoRunFlowName').textContent = flow.name;
+    renderRunDevices();
+    $('autoRunDrawer').classList.remove('hidden');
+  }
+  function closeRun() { $('autoRunDrawer').classList.add('hidden'); }
+
+  // --- 步骤列表渲染 ---
+  function renderStepList() {
+    const box = $('autoStepList');
+    box.replaceChildren();
+    editingSteps.forEach((step, i) => {
+      const div = document.createElement('div');
+      div.className = 'auto-step';
+      const head = document.createElement('div');
+      head.className = 'auto-step-head';
+      const title = document.createElement('div');
+      title.className = 'auto-step-title';
+      title.innerHTML = `<span class="auto-step-idx">${i+1}</span><span>${ACTION_LABELS[step.action] || step.action}</span>`;
+      const del = document.createElement('button');
+      del.className = 'auto-step-del'; del.textContent = '×'; del.title = '删除此步骤';
+      del.onclick = () => { editingSteps.splice(i,1); renderStepList(); };
+      head.append(title, del);
+      div.append(head);
+
+      const params = document.createElement('div');
+      params.className = 'auto-step-params';
+      const defs = ACTION_PARAMS[step.action] || [];
+      defs.forEach(p => {
+        const cell = document.createElement('div');
+        cell.className = 'param-cell';
+        const label = document.createElement('label');
+        label.textContent = p.label;
+        const input = document.createElement('input');
+        input.value = step.params[p.key] || '';
+        input.placeholder = p.label;
+        input.addEventListener('change', () => { step.params[p.key] = input.value.trim(); });
+        cell.append(label, input);
+        params.append(cell);
+      });
+      if (defs.length) div.append(params);
+      box.append(div);
+    });
+    if (!editingSteps.length) {
+      const empty = document.createElement('div');
+      empty.className = 'muted'; empty.style.textAlign='center'; empty.style.padding='20px 0';
+      empty.textContent = '暂无步骤，从上方选择动作并「添加步骤」';
+      box.append(empty);
+    }
+  }
+
+  // --- 添加步骤 ---
+  $('autoAddStepBtn').addEventListener('click', () => {
+    const action = $('autoAddAction').value;
+    const params = {};
+    (ACTION_PARAMS[action] || []).forEach(p => { params[p.key] = ''; });
+    editingSteps.push({action, params});
+    renderStepList();
+  });
+
+  // --- 流程列表渲染 ---
+  async function loadFlows() {
+    try {
+      flows = await api('/api/admin/automation/flows');
+      renderFlowRows();
+    } catch (e) { toast('加载流程失败：' + e.message); }
+  }
+  function renderFlowRows() {
+    const body = $('autoFlowRows');
+    body.replaceChildren();
+    if (!flows.length) { body.innerHTML = '<tr><td colspan="5" class="muted">暂无流程，点击「新建流程」开始</td></tr>'; return; }
+    flows.forEach(f => {
+      const tr = document.createElement('tr');
+      const name = document.createElement('td'); name.textContent = f.name;
+      const cnt = document.createElement('td'); cnt.textContent = (f.steps||[]).length;
+      const sched = document.createElement('td'); sched.textContent = f.schedule || '手动触发';
+      const upd = document.createElement('td'); upd.textContent = f.updatedAt ? new Date(f.updatedAt*1000).toLocaleString() : '—';
+      const act = document.createElement('td');
+      const edit = document.createElement('button'); edit.textContent='编辑'; edit.className='secondary'; edit.style.marginRight='6px';
+      edit.onclick = () => openEditor(f);
+      const run = document.createElement('button'); run.textContent='运行'; run.className='primary'; run.style.marginRight='6px';
+      run.onclick = () => openRun(f);
+      const del = document.createElement('button'); del.textContent='删除'; del.className='danger';
+      del.onclick = async () => { if(!confirm(`确定删除流程「${f.name}」？其执行记录将一并删除。`))return; try{await api('/api/admin/automation/flows/'+f.id,{method:'DELETE'});toast('已删除');loadFlows();}catch(e){toast('删除失败：'+e.message)} };
+      act.append(edit, run, del);
+      tr.append(name, cnt, sched, upd, act);
+      body.append(tr);
+    });
+  }
+
+  // --- 保存流程 ---
+  $('autoSaveFlowBtn').addEventListener('click', async () => {
+    const name = $('autoFlowName').value.trim();
+    if (!name) { toast('请填写流程名称'); return; }
+    const body = {
+      name,
+      description: $('autoFlowDesc').value.trim(),
+      steps: editingSteps,
+      schedule: editingFlow && editingFlow.schedule ? editingFlow.schedule : '',
+    };
+    const btn = $('autoSaveFlowBtn'); btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      if (editingFlow && editingFlow.id) {
+        await api('/api/admin/automation/flows/'+editingFlow.id, {method:'PUT', body:JSON.stringify(body)});
+      } else {
+        await api('/api/admin/automation/flows', {method:'POST', body:JSON.stringify(body)});
+      }
+      toast('流程已保存'); closeEditor(); loadFlows();
+    } catch (e) { toast('保存失败：'+e.message); }
+    finally { btn.disabled = false; btn.textContent = '保存流程'; }
+  });
+
+  // --- 运行：设备选择 ---
+  function renderRunDevices() {
+    const box = $('autoRunDeviceList');
+    box.replaceChildren();
+    const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
+    const candidates = list.filter(d => d && d.online && d.adbOnline === true && d.enabled);
+    if (!candidates.length) {
+      const empty = document.createElement('div'); empty.className='muted'; empty.textContent='没有可用的在线设备（需业务在线且 ADB 在线）';
+      box.append(empty); return;
+    }
+    candidates.forEach(d => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line-2);border-radius:9px;cursor:pointer;font-size:13.5px';
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.value=d.id; cb.className='auto-run-device';
+      const nm = document.createElement('span'); nm.textContent = (d.name || d.model || d.id);
+      row.append(cb, nm);
+      box.append(row);
+    });
+  }
+
+  $('autoRunConfirmBtn').addEventListener('click', async () => {
+    const ids = [...document.querySelectorAll('.auto-run-device:checked')].map(cb => cb.value);
+    if (!ids.length) { toast('请至少选择一台设备'); return; }
+    const btn = $('autoRunConfirmBtn'); btn.disabled = true; btn.textContent = '执行中…';
+    try {
+      const res = await api('/api/admin/automation/flows/'+runningFlow.id+'/run', {method:'POST', body:JSON.stringify({deviceIds:ids})});
+      toast('已触发执行，任务 ID：' + res.jobId);
+      closeRun();
+      loadJobs();
+    } catch (e) { toast('执行失败：'+e.message); }
+    finally { btn.disabled = false; btn.textContent = '开始执行'; }
+  });
+
+  // --- 执行记录 ---
+  async function loadJobs() {
+    try {
+      const jobs = await api('/api/admin/automation/jobs');
+      renderJobRows(jobs || []);
+    } catch (e) { toast('加载执行记录失败：'+e.message); }
+  }
+  function renderJobRows(jobs) {
+    const body = $('autoJobRows');
+    body.replaceChildren();
+    if (!jobs.length) { body.innerHTML = '<tr><td colspan="6" class="muted">暂无执行记录</td></tr>'; return; }
+    const flowName = id => { const f = flows.find(x=>x.id===id); return f ? f.name : id; };
+    jobs.forEach(j => {
+      const tr = document.createElement('tr');
+      const id = document.createElement('td'); id.textContent = j.id.slice(0,12)+'…'; id.title = j.id; id.className='num-cell';
+      const fn = document.createElement('td'); fn.textContent = flowName(j.flowId);
+      const cnt = document.createElement('td'); cnt.textContent = (j.deviceIds ? j.deviceIds.split(',').length : 0);
+      const st = document.createElement('td');
+      const statusMap = {pending:'待执行',running:'执行中',success:'成功',failed:'失败',partial:'部分成功'};
+      st.innerHTML = `<span class="chip">${statusMap[j.status] || j.status}</span>`;
+      const ct = document.createElement('td'); ct.textContent = j.createdAt ? new Date(j.createdAt*1000).toLocaleString() : '—';
+      const act = document.createElement('td');
+      const view = document.createElement('button'); view.textContent='详情'; view.className='secondary';
+      view.onclick = () => viewJob(j);
+      act.append(view);
+      tr.append(id, fn, cnt, st, ct, act);
+      body.append(tr);
+    });
+  }
+
+  async function viewJob(job) {
+    try {
+      const res = await api('/api/admin/automation/jobs/'+job.id);
+      const logs = res.logs || [];
+      const lines = logs.map(l => {
+        const act = ACTION_LABELS[l.action] || l.action;
+        const dev = l.deviceId ? ' ['+l.deviceId.slice(0,8)+']' : '';
+        const ok = l.status === 'success' ? '✓' : '✗';
+        const err = l.error ? '：'+l.error : '';
+        return `步骤${l.stepIndex+1}${dev} ${act} ${ok}${err}`;
+      });
+      alert('任务 '+job.id.slice(0,12)+'（'+job.status+'）\n\n' + (lines.join('\n') || '暂无步骤日志'));
+    } catch (e) { toast('加载详情失败：'+e.message); }
+  }
+
+  // --- 标签页切换 ---
+  const autoTabs = $('autoTabs');
+  if (autoTabs) autoTabs.addEventListener('click', e => {
+    const btn = e.target.closest('.mdm-tab'); if (!btn) return;
+    autoTabs.querySelectorAll('.mdm-tab').forEach(b => b.classList.toggle('active', b===btn));
+    const tab = btn.dataset.tab;
+    $('autoPanel-flows').classList.toggle('active', tab==='flows');
+    $('autoPanel-jobs').classList.toggle('active', tab==='jobs');
+    if (tab==='flows') loadFlows();
+    if (tab==='jobs') loadJobs();
+  });
+
+  // --- 事件绑定 ---
+  $('autoNewFlowBtn').addEventListener('click', () => openEditor(null));
+  $('autoEditorCloseBtn').addEventListener('click', closeEditor);
+  $('autoEditorBackdrop').addEventListener('click', closeEditor);
+  $('autoRunCloseBtn').addEventListener('click', closeRun);
+  $('autoRunBackdrop').addEventListener('click', closeRun);
+
+  // 暴露给页面切换钩子：切到自动化页时刷新列表。
+  window.renderAutomationPage = () => { loadFlows(); loadJobs(); };
+
+  // 初始化：进入页面即加载。
+  loadFlows();
+})();
+</script>
+<script>
 /* 视觉增强层：只做展示增强，不改动上面的业务逻辑与任何 DOM id。 */
 (() => {
   'use strict';
@@ -2091,6 +2453,10 @@ if(dpcForm){
     // 切换到「设备分组」页时刷新镜像组列表。
     if (targetId === 'sec-device-groups' && typeof window.renderDeviceGroupsPage === 'function') {
       window.renderDeviceGroupsPage();
+    }
+    // 切换到「自动化」页时刷新流程与执行记录。
+    if (targetId === 'sec-automation' && typeof window.renderAutomationPage === 'function') {
+      window.renderAutomationPage();
     }
   }
 
