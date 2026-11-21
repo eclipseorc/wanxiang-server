@@ -60,8 +60,15 @@ func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
 		r.svc.Store,
 		automation.NewEngine(adb, "./data/automation-shots", buildOCR()),
 		adb,
+		automationMaxConcurrency(),
 	)
 	return r
+}
+
+// AutomationExecutor 返回自动化执行引擎(未启用 scrcpy 时为 nil),供上层启动
+// 定时调度器。
+func (r *Router) AutomationExecutor() *automation.Executor {
+	return r.automation
 }
 
 func (r *Router) Handler() http.Handler {

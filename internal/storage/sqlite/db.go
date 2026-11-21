@@ -94,7 +94,7 @@ func InitSchema(db *sql.DB) error {
 		// automation_flows 是自动化流程定义表：steps_json 为步骤数组（表单编排产物），
 		// 每个步骤形如 {action, params}。action 是动作原语名（tap/swipe/launchApp 等），
 		// params 是动作参数键值对。schedule 为可选 cron 表达式（空 = 手动触发）。
-		`CREATE TABLE IF NOT EXISTS automation_flows(id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', steps_json TEXT NOT NULL DEFAULT '[]', schedule TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS automation_flows(id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', steps_json TEXT NOT NULL DEFAULT '[]', schedule TEXT NOT NULL DEFAULT '', device_ids TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
 		// automation_jobs 是一次具体执行：device_ids 为逗号分隔的目标设备 ID 列表，
 		// status 取 pending/running/success/failed/partial，snapshot_json 记录触发时
 		// 的流程步骤快照（流程后续被编辑不影响历史任务可追溯）。
@@ -136,6 +136,11 @@ func InitSchema(db *sql.DB) error {
 	// 增量迁移：为旧库补齐 mdm_enabled 列（设备是否已被 Device Owner 纳管）。
 	// 由设备端心跳上报，服务端据此分流「MDM 自动化路径」与「adb 传统路径」。
 	if err := addColumnIfMissing(db, "devices", "mdm_enabled", `INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+	// 增量迁移：为旧库补齐 automation_flows.device_ids 列（定时调度的默认目标设备，
+	// 逗号分隔；空 = 定时触发时跑全部在线设备）。
+	if err := addColumnIfMissing(db, "automation_flows", "device_ids", `TEXT NOT NULL DEFAULT ''`); err != nil {
 		return err
 	}
 	return nil

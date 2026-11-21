@@ -15,14 +15,19 @@ import (
 // Executor 负责把一条任务(job)下发到多台设备并发执行,并回写步骤日志与状态。
 // 它依赖 Store 做持久化,依赖 Engine 执行动作原语。
 type Executor struct {
-	store  *sqlite.Store
-	engine *Engine
-	adb    *scrcpy.ADB
+	store          *sqlite.Store
+	engine         *Engine
+	adb            *scrcpy.ADB
+	maxConcurrency int
 }
 
-// NewExecutor 构造执行器。maxConcurrency 为批量设备并发上限(0 表示不限,建议设上限)。
-func NewExecutor(store *sqlite.Store, engine *Engine, adb *scrcpy.ADB) *Executor {
-	return &Executor{store: store, engine: engine, adb: adb}
+// NewExecutor 构造执行器。maxConcurrency 为批量设备并发上限(<=0 时取默认 8),
+// 避免 adb 被海量设备同时操作打爆。
+func NewExecutor(store *sqlite.Store, engine *Engine, adb *scrcpy.ADB, maxConcurrency int) *Executor {
+	if maxConcurrency <= 0 {
+		maxConcurrency = 8
+	}
+	return &Executor{store: store, engine: engine, adb: adb, maxConcurrency: maxConcurrency}
 }
 
 // Run 同步执行一条任务:按 deviceIDs 逐台(并发)跑完整个流程,写步骤日志,
@@ -54,7 +59,7 @@ func (x *Executor) Run(ctx context.Context, jobID string) error {
 	// 逐设备并发执行,用 WaitGroup 收集结果,信号量限制并发上限。
 	results := make([]bool, len(deviceIDs))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 8) // 并发上限 8,避免 adb 被海量设备打爆
+	sem := make(chan struct{}, x.maxConcurrency)
 
 	for i, deviceID := range deviceIDs {
 		wg.Add(1)

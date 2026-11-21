@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/eclipseorc/wanxiang-server/internal/automation"
@@ -20,6 +21,7 @@ type automationFlowBody struct {
 	Description string             `json:"description"`
 	Steps       []automation.Step  `json:"steps"`
 	Schedule    string             `json:"schedule"`
+	DeviceIDs   []string           `json:"deviceIds"`
 }
 
 // flowResponse 是流程的展示结构(含解析后的步骤)。
@@ -29,6 +31,7 @@ type flowResponse struct {
 	Description string            `json:"description"`
 	Steps       []automation.Step `json:"steps"`
 	Schedule    string            `json:"schedule"`
+	DeviceIDs   []string          `json:"deviceIds"`
 	CreatedAt   int64             `json:"createdAt"`
 	UpdatedAt   int64             `json:"updatedAt"`
 }
@@ -39,12 +42,19 @@ func flowToResponse(f sqlite.AutomationFlow) flowResponse {
 	if steps == nil {
 		steps = []automation.Step{}
 	}
+	deviceIDs := []string{}
+	for _, p := range strings.Split(f.DeviceIDs, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			deviceIDs = append(deviceIDs, p)
+		}
+	}
 	return flowResponse{
 		ID:          f.ID,
 		Name:        f.Name,
 		Description: f.Description,
 		Steps:       steps,
 		Schedule:    f.Schedule,
+		DeviceIDs:   deviceIDs,
 		CreatedAt:   f.CreatedAt,
 		UpdatedAt:   f.UpdatedAt,
 	}
@@ -108,6 +118,7 @@ func (r *Router) createAutomationFlow(w http.ResponseWriter, req *http.Request, 
 		Description: body.Description,
 		StepsJSON:   string(stepsJSON),
 		Schedule:    strings.TrimSpace(body.Schedule),
+		DeviceIDs:   strings.Join(body.DeviceIDs, ","),
 	}
 	if err := r.svc.Store.CreateAutomationFlow(flow); err != nil {
 		failInternal(w, "create automation flow", err)
@@ -168,6 +179,7 @@ func (r *Router) updateAutomationFlow(w http.ResponseWriter, req *http.Request, 
 		Description: body.Description,
 		StepsJSON:   string(stepsJSON),
 		Schedule:    strings.TrimSpace(body.Schedule),
+		DeviceIDs:   strings.Join(body.DeviceIDs, ","),
 	}
 	if err := r.svc.Store.UpdateAutomationFlow(flow); err != nil {
 		failNotFound(w, "flow", err)
@@ -303,6 +315,20 @@ func buildOCR() automation.OCRClient {
 	langs := os.Getenv("AUTOMATION_OCR_LANGS")
 	prefix := os.Getenv("AUTOMATION_OCR_TESSDATA")
 	return automation.NewTesseractOCR(langs, prefix)
+}
+
+// automationMaxConcurrency 从环境变量 AUTOMATION_MAX_CONCURRENCY 读取批量设备
+// 并发上限;非法或未设置时返回 0(由 Executor 回退到默认 8)。
+func automationMaxConcurrency() int {
+	v := strings.TrimSpace(os.Getenv("AUTOMATION_MAX_CONCURRENCY"))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 // failNotFound 统一处理「不存在」错误:ErrNotFound 返回 404,其余内部错误。

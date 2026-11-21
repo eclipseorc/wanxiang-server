@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/eclipseorc/wanxiang-server/internal/automation"
 	"github.com/eclipseorc/wanxiang-server/internal/envfile"
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
@@ -66,6 +67,14 @@ func RunAdmin() error {
 		router.WithScrcpy(adb)
 	} else {
 		log.Printf("warning: scrcpy disabled: %v", err)
+	}
+
+	// 定时调度器：仅当自动化执行引擎可用时启动。它周期性检查带 schedule 的
+	// 流程并到点自动触发，随进程生命周期停止。
+	if ex := router.AutomationExecutor(); ex != nil {
+		scheduler := automation.NewScheduler(store, ex)
+		scheduler.Start()
+		defer scheduler.Stop()
 	}
 
 	mux.Handle("/api/", router.Handler())

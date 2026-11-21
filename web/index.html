@@ -131,6 +131,26 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .auto-canvas .lf-node .lf-node-content{color:var(--ink)}
 .auto-canvas-hint{font-size:12px;color:var(--muted);line-height:1.6}
 .auto-canvas-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;pointer-events:none}
+.auto-canvas-param{position:absolute;top:10px;right:10px;width:240px;max-height:380px;overflow:auto;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--sh-md,0 8px 24px rgba(0,0,0,.12));padding:12px;z-index:10}
+.auto-canvas-param .param-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.auto-canvas-param .param-title{font-size:13px;font-weight:600;color:var(--ink)}
+.auto-canvas-param .param-close{border:0;background:transparent;color:var(--muted);font-size:15px;cursor:pointer;padding:0 4px}
+.auto-canvas-param .param-cell{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.auto-canvas-param .param-cell label{font-size:11.5px;color:var(--muted)}
+.auto-canvas-param .param-cell input{font-size:12.5px;padding:6px 9px}
+.auto-canvas-param .param-delete{border:0;background:transparent;color:var(--danger,#d5393f);font-size:12px;cursor:pointer;padding:2px 4px;border-radius:6px}
+.auto-canvas-param .param-delete:hover{background:var(--danger-soft,#fdeaea)}
+
+/* ===== 自动化：任务详情日志 ===== */
+.job-log{background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.job-log-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.job-log-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink)}
+.job-log-badge{font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px}
+.job-log-badge.success{background:var(--ok-soft,#e8f7ee);color:var(--ok,#1a9e4b)}
+.job-log-badge.failed{background:var(--danger-soft,#fdeaea);color:var(--danger,#d5393f)}
+.job-log-err{font-size:12px;color:var(--danger,#d5393f);background:var(--danger-soft,#fdeaea);border-radius:6px;padding:6px 8px;line-height:1.5}
+.job-log-dev{font-size:11.5px;color:var(--muted)}
+.job-summary-chip{font-size:12px;color:var(--ink-2);background:var(--surface-soft);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
 
 /* ===== 设备权限设置：分组卡片 + 开关/单选/输入列表 ===== */
 .perm-group{display:grid;gap:16px;margin-bottom:20px}
@@ -1343,6 +1363,20 @@ table .col-select{width:34px;text-align:center;padding:0}
               <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程说明（可选）</label>
               <input id="autoFlowDesc" style="margin-bottom:16px" placeholder="简要描述该流程的用途">
 
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+                <div>
+                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">定时调度（cron，可选）</label>
+                  <input id="autoFlowSchedule" placeholder="如 0 9 * * *（每天9点）">
+                  <div class="muted" style="font-size:11.5px;margin-top:4px;line-height:1.5">5 字段：分 时 日 月 周。留空 = 仅手动触发。示例：0 9 * * 1 每周一9点；*/30 * * * * 每30分钟</div>
+                </div>
+                <div>
+                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">默认目标设备（可选）</label>
+                  <div id="autoFlowDevices" style="max-height:120px;overflow:auto;border:1px solid var(--line-2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px">
+                    <div class="muted" style="font-size:12px">留空 = 定时触发时跑全部在线设备</div>
+                  </div>
+                </div>
+              </div>
+
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
                 <label style="font-size:13px;font-weight:500">动作步骤</label>
                 <div class="auto-view-toggle" style="margin:0;width:180px">
@@ -1372,8 +1406,10 @@ table .col-select{width:34px;text-align:center;padding:0}
               <!-- 画布式编排器 -->
               <div id="autoCanvasView" style="display:none">
                 <div class="auto-canvas-toolbar" id="autoCanvasToolbar"></div>
-                <div class="auto-canvas" id="autoCanvas"></div>
-                <p class="auto-canvas-hint">点击上方动作按钮添加步骤节点；拖拽节点调整执行顺序；节点之间箭头表示执行顺序。步骤参数请切换到「表单」视图填写。</p>
+                <div class="auto-canvas" id="autoCanvas">
+                  <div class="auto-canvas-param" id="autoCanvasParamPanel" style="display:none"></div>
+                </div>
+                <p class="auto-canvas-hint">点击上方动作按钮添加步骤节点；拖拽节点调整执行顺序；点击节点可在画布内直接编辑其参数。</p>
               </div>
 
               <div class="perm-save-row">
@@ -1395,6 +1431,22 @@ table .col-select{width:34px;text-align:center;padding:0}
               <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:500">选择目标设备（可多选）</label>
               <div id="autoRunDeviceList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;margin-bottom:16px"></div>
               <div class="perm-save-row"><button class="btn primary" id="autoRunConfirmBtn">开始执行</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务详情抽屉 -->
+        <div class="scr-drawer hidden" id="autoJobDrawer">
+          <div class="scr-drawer-backdrop" id="autoJobBackdrop"></div>
+          <div class="scr-drawer-panel" style="max-width:760px">
+            <div class="scr-drawer-head">
+              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3>任务详情</h3><span class="muted small" id="autoJobId">—</span></div></div>
+              <button id="autoJobCloseBtn" class="btn-ghost" title="关闭"><svg class="ico ico-sm"><use href="#i-arrow"/></svg>关闭</button>
+            </div>
+            <div class="scr-drawer-body">
+              <div id="autoJobSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
+              <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:500">步骤执行日志</label>
+              <div id="autoJobLogs" style="display:flex;flex-direction:column;gap:8px;max-height:440px;overflow:auto"></div>
             </div>
           </div>
         </div>
@@ -2132,6 +2184,7 @@ if(dpcForm){
   let flows = [];
   let editingFlow = null;   // 正在编辑的流程(id) 或 'new'
   let editingSteps = [];    // 编辑器里的步骤数组
+  let editingDeviceIds = []; // 编辑器里的默认目标设备
   let runningFlow = null;   // 正在运行的流程
 
   // --- 抽屉开关 ---
@@ -2140,13 +2193,40 @@ if(dpcForm){
     $('autoEditorTitle').textContent = flow ? '编辑流程' : '新建流程';
     $('autoFlowName').value = flow ? flow.name : '';
     $('autoFlowDesc').value = flow ? flow.description : '';
+    $('autoFlowSchedule').value = flow ? (flow.schedule || '') : '';
+    editingDeviceIds = flow ? JSON.parse(JSON.stringify(flow.deviceIds || [])) : [];
     editingSteps = flow ? JSON.parse(JSON.stringify(flow.steps || [])) : [];
     renderStepList();
+    renderFlowDevices();
     // 默认回到表单视图；画布视图在用户点击「画布」时才惰性初始化。
     showFormView();
     $('autoEditor').classList.remove('hidden');
   }
   function closeEditor() { $('autoEditor').classList.add('hidden'); }
+
+  // --- 默认目标设备选择(定时调度用) ---
+  function renderFlowDevices() {
+    const box = $('autoFlowDevices');
+    box.replaceChildren();
+    const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
+    if (!list.length) {
+      const empty = document.createElement('div'); empty.className='muted'; empty.style.fontSize='12px';
+      empty.textContent = '暂无设备，留空则定时触发时跑全部在线设备';
+      box.append(empty); return;
+    }
+    list.forEach(d => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:2px 0';
+      const cb = document.createElement('input'); cb.type='checkbox'; cb.value=d.id; cb.className='auto-flow-device';
+      if (editingDeviceIds.includes(d.id)) cb.checked = true;
+      cb.addEventListener('change', () => {
+        editingDeviceIds = [...document.querySelectorAll('.auto-flow-device:checked')].map(x => x.value);
+      });
+      const nm = document.createElement('span'); nm.textContent = (d.name || d.model || d.id);
+      row.append(cb, nm);
+      box.append(row);
+    });
+  }
 
   function openRun(flow) {
     runningFlow = flow;
@@ -2332,12 +2412,67 @@ if(dpcForm){
     });
     lf.on('node:drop', () => { reorderStepsByY(); });
     lf.on('node:click', ({ data }) => {
-      // 点击节点可定位到对应步骤（在表单视图高亮）。
       const idx = canvasNodeIds.indexOf(data.id);
-      if (idx >= 0) toast(`第 ${idx + 1} 步：${ACTION_LABELS[editingSteps[idx].action] || editingSteps[idx].action}`);
+      if (idx >= 0) openCanvasParam(idx);
     });
     renderCanvasToolbar();
     syncCanvasFromSteps();
+  }
+
+  // 画布内点击节点时，在画布右上角弹出该步骤的参数编辑面板。
+  let canvasParamIdx = -1;
+  function openCanvasParam(idx) {
+    canvasParamIdx = idx;
+    const step = editingSteps[idx];
+    if (!step) return;
+    const panel = $('autoCanvasParamPanel');
+    panel.replaceChildren();
+    const head = document.createElement('div');
+    head.className = 'param-head';
+    const title = document.createElement('span');
+    title.className = 'param-title';
+    title.textContent = `步骤 ${idx + 1} · ${ACTION_LABELS[step.action] || step.action}`;
+    const close = document.createElement('button');
+    close.className = 'param-close'; close.textContent = '×'; close.title = '关闭';
+    close.onclick = () => { panel.style.display = 'none'; canvasParamIdx = -1; };
+    head.append(title, close);
+    panel.append(head);
+
+    const defs = ACTION_PARAMS[step.action] || [];
+    if (!defs.length) {
+      const noParam = document.createElement('div');
+      noParam.className = 'muted'; noParam.style.fontSize = '12px';
+      noParam.textContent = '该动作无需参数';
+      panel.append(noParam);
+    } else {
+      defs.forEach(p => {
+        const cell = document.createElement('div');
+        cell.className = 'param-cell';
+        const label = document.createElement('label');
+        label.textContent = p.label;
+        const input = document.createElement('input');
+        input.value = step.params[p.key] || '';
+        input.placeholder = p.label;
+        input.addEventListener('change', () => {
+          step.params[p.key] = input.value.trim();
+          renderStepList(); // 保持表单视图与画布参数同步（不重建画布，避免焦点丢失）
+        });
+        cell.append(label, input);
+        panel.append(cell);
+      });
+    }
+    // 删除本步骤
+    const del = document.createElement('button');
+    del.className = 'param-delete'; del.textContent = '删除此步骤';
+    del.onclick = () => {
+      editingSteps.splice(idx, 1);
+      canvasParamIdx = -1;
+      panel.style.display = 'none';
+      syncCanvasFromSteps();
+      renderStepList();
+    };
+    panel.append(del);
+    panel.style.display = 'block';
   }
 
   function showCanvasView() {
@@ -2396,7 +2531,8 @@ if(dpcForm){
       name,
       description: $('autoFlowDesc').value.trim(),
       steps: editingSteps,
-      schedule: editingFlow && editingFlow.schedule ? editingFlow.schedule : '',
+      schedule: $('autoFlowSchedule').value.trim(),
+      deviceIds: editingDeviceIds,
     };
     const btn = $('autoSaveFlowBtn'); btn.disabled = true; btn.textContent = '保存中…';
     try {
@@ -2474,19 +2610,84 @@ if(dpcForm){
   }
 
   async function viewJob(job) {
+    $('autoJobId').textContent = job.id;
+    // 先展示汇总，再异步拉取日志。
+    const statusMap = {pending:'待执行',running:'执行中',success:'成功',failed:'失败',partial:'部分成功'};
+    const summary = $('autoJobSummary');
+    summary.replaceChildren();
+    const chips = [
+      ['状态', statusMap[job.status] || job.status],
+      ['设备数', (job.deviceIds ? job.deviceIds.split(',').length : 0)],
+      ['创建', job.createdAt ? new Date(job.createdAt*1000).toLocaleString() : '—'],
+    ];
+    chips.forEach(([k, v]) => {
+      const c = document.createElement('span'); c.className='job-summary-chip'; c.textContent = `${k}：${v}`;
+      summary.append(c);
+    });
+    $('autoJobLogs').replaceChildren();
+    const loading = document.createElement('div'); loading.className='muted'; loading.textContent='加载日志中…';
+    $('autoJobLogs').append(loading);
+    $('autoJobDrawer').classList.remove('hidden');
+
     try {
       const res = await api('/api/admin/automation/jobs/'+job.id);
-      const logs = res.logs || [];
-      const lines = logs.map(l => {
-        const act = ACTION_LABELS[l.action] || l.action;
-        const dev = l.deviceId ? ' ['+l.deviceId.slice(0,8)+']' : '';
-        const ok = l.status === 'success' ? '✓' : '✗';
-        const err = l.error ? '：'+l.error : '';
-        return `步骤${l.stepIndex+1}${dev} ${act} ${ok}${err}`;
-      });
-      alert('任务 '+job.id.slice(0,12)+'（'+job.status+'）\n\n' + (lines.join('\n') || '暂无步骤日志'));
-    } catch (e) { toast('加载详情失败：'+e.message); }
+      renderJobLogs(res.logs || []);
+    } catch (e) {
+      $('autoJobLogs').replaceChildren();
+      const err = document.createElement('div'); err.className='muted'; err.textContent='加载详情失败：'+e.message;
+      $('autoJobLogs').append(err);
+    }
   }
+
+  function renderJobLogs(logs) {
+    const box = $('autoJobLogs');
+    box.replaceChildren();
+    if (!logs.length) {
+      const empty = document.createElement('div'); empty.className='muted'; empty.textContent='暂无步骤日志';
+      box.append(empty); return;
+    }
+    // 按设备分组，展示每台设备上每一步的执行结果。
+    const byDevice = {};
+    logs.forEach(l => { (byDevice[l.deviceId] = byDevice[l.deviceId] || []).push(l); });
+    Object.keys(byDevice).forEach(devId => {
+      const devLogs = byDevice[devId].sort((a,b) => a.stepIndex - b.stepIndex);
+      const devHead = document.createElement('div');
+      devHead.className = 'job-log-dev';
+      devHead.style.cssText = 'margin:8px 0 4px;font-weight:600;color:var(--ink)';
+      devHead.textContent = '设备 ' + (devId ? devId.slice(0,12) : '—');
+      box.append(devHead);
+      devLogs.forEach(l => {
+        const item = document.createElement('div');
+        item.className = 'job-log';
+        const head = document.createElement('div');
+        head.className = 'job-log-head';
+        const title = document.createElement('div');
+        title.className = 'job-log-title';
+        title.innerHTML = `<span>步骤 ${l.stepIndex+1}</span><span>${ACTION_LABELS[l.action] || l.action}</span>`;
+        const badge = document.createElement('span');
+        badge.className = 'job-log-badge ' + (l.status === 'success' ? 'success' : 'failed');
+        badge.textContent = l.status === 'success' ? '✓ 成功' : '✗ 失败';
+        head.append(title, badge);
+        item.append(head);
+        if (l.error) {
+          const err = document.createElement('div');
+          err.className = 'job-log-err';
+          err.textContent = l.error;
+          item.append(err);
+        }
+        if (l.screenshotPath) {
+          const shot = document.createElement('div');
+          shot.className = 'muted';
+          shot.style.fontSize = '11.5px';
+          shot.textContent = '截图：' + l.screenshotPath;
+          item.append(shot);
+        }
+        box.append(item);
+      });
+    });
+  }
+
+  function closeJob() { $('autoJobDrawer').classList.add('hidden'); }
 
   // --- 标签页切换 ---
   const autoTabs = $('autoTabs');
@@ -2506,6 +2707,8 @@ if(dpcForm){
   $('autoEditorBackdrop').addEventListener('click', closeEditor);
   $('autoRunCloseBtn').addEventListener('click', closeRun);
   $('autoRunBackdrop').addEventListener('click', closeRun);
+  $('autoJobCloseBtn').addEventListener('click', closeJob);
+  $('autoJobBackdrop').addEventListener('click', closeJob);
 
   // 暴露给页面切换钩子：切到自动化页时刷新列表。
   window.renderAutomationPage = () => { loadFlows(); loadJobs(); };

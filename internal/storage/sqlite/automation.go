@@ -7,13 +7,15 @@ import (
 )
 
 // AutomationFlow 是一条自动化流程定义。StepsJSON 是步骤数组的原始 JSON（表单编排
-// 产物），由执行引擎解析；本层只负责持久化，不做结构校验。
+// 产物），由执行引擎解析；本层只负责持久化，不做结构校验。DeviceIDs 为定时调度的
+// 默认目标设备（逗号分隔，空 = 定时触发时跑全部在线设备）。
 type AutomationFlow struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	StepsJSON   string `json:"stepsJson"`
 	Schedule    string `json:"schedule"`
+	DeviceIDs   string `json:"deviceIds"`
 	CreatedAt   int64  `json:"createdAt"`
 	UpdatedAt   int64  `json:"updatedAt"`
 }
@@ -50,9 +52,9 @@ type AutomationStepLog struct {
 func (s *Store) CreateAutomationFlow(f AutomationFlow) error {
 	now := time.Now().Unix()
 	_, err := s.DB.Exec(
-		`INSERT INTO automation_flows(id,name,description,steps_json,schedule,created_at,updated_at)
-		 VALUES(?,?,?,?,?,?,?)`,
-		f.ID, f.Name, f.Description, f.StepsJSON, f.Schedule, now, now,
+		`INSERT INTO automation_flows(id,name,description,steps_json,schedule,device_ids,created_at,updated_at)
+		 VALUES(?,?,?,?,?,?,?,?)`,
+		f.ID, f.Name, f.Description, f.StepsJSON, f.Schedule, f.DeviceIDs, now, now,
 	)
 	return err
 }
@@ -60,7 +62,7 @@ func (s *Store) CreateAutomationFlow(f AutomationFlow) error {
 // ListAutomationFlows 返回全部流程，按更新时间倒序。
 func (s *Store) ListAutomationFlows() ([]AutomationFlow, error) {
 	rows, err := s.DB.Query(
-		`SELECT id,name,description,steps_json,schedule,created_at,updated_at
+		`SELECT id,name,description,steps_json,schedule,device_ids,created_at,updated_at
 		 FROM automation_flows ORDER BY updated_at DESC, id`,
 	)
 	if err != nil {
@@ -71,7 +73,7 @@ func (s *Store) ListAutomationFlows() ([]AutomationFlow, error) {
 	flows := make([]AutomationFlow, 0)
 	for rows.Next() {
 		var f AutomationFlow
-		if err := rows.Scan(&f.ID, &f.Name, &f.Description, &f.StepsJSON, &f.Schedule, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Description, &f.StepsJSON, &f.Schedule, &f.DeviceIDs, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		flows = append(flows, f)
@@ -83,21 +85,21 @@ func (s *Store) ListAutomationFlows() ([]AutomationFlow, error) {
 func (s *Store) AutomationFlowByID(id string) (AutomationFlow, error) {
 	var f AutomationFlow
 	err := s.DB.QueryRow(
-		`SELECT id,name,description,steps_json,schedule,created_at,updated_at
+		`SELECT id,name,description,steps_json,schedule,device_ids,created_at,updated_at
 		 FROM automation_flows WHERE id=?`, id,
-	).Scan(&f.ID, &f.Name, &f.Description, &f.StepsJSON, &f.Schedule, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.Name, &f.Description, &f.StepsJSON, &f.Schedule, &f.DeviceIDs, &f.CreatedAt, &f.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return f, ErrNotFound
 	}
 	return f, err
 }
 
-// UpdateAutomationFlow 更新流程的名称、描述、步骤与调度。返回 ErrNotFound 表示不存在。
+// UpdateAutomationFlow 更新流程的名称、描述、步骤、调度与默认设备。返回 ErrNotFound 表示不存在。
 func (s *Store) UpdateAutomationFlow(f AutomationFlow) error {
 	result, err := s.DB.Exec(
-		`UPDATE automation_flows SET name=?,description=?,steps_json=?,schedule=?,updated_at=?
+		`UPDATE automation_flows SET name=?,description=?,steps_json=?,schedule=?,device_ids=?,updated_at=?
 		 WHERE id=?`,
-		f.Name, f.Description, f.StepsJSON, f.Schedule, time.Now().Unix(), f.ID,
+		f.Name, f.Description, f.StepsJSON, f.Schedule, f.DeviceIDs, time.Now().Unix(), f.ID,
 	)
 	if err != nil {
 		return err
@@ -226,4 +228,26 @@ func (s *Store) ListAutomationStepLogs(jobID string) ([]AutomationStepLog, error
 		logs = append(logs, l)
 	}
 	return logs, rows.Err()
+}
+
+// ListOnlineAdbDevices 返回「业务在线且 ADB 在线、已启用」的设备 ID 列表，
+// 供定时调度在流程未指定默认设备时自动选择目标。
+func (s *Store) ListOnlineAdbDevices() ([]string, error) {
+	rows, err := s.DB.Query(
+		`SELECT id FROM devices WHERE enabled=1 AND online=1 AND adb_online=1 ORDER BY name,id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
