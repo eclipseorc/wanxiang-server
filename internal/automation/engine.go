@@ -199,7 +199,7 @@ func (e *Engine) launchApp(ctx context.Context, serial string, p map[string]stri
 
 // installApk 安装应用。优先用 params 里的本地 APK 路径(apkPath);否则用
 // package 名从设备的包管理器卸载——一期只支持「本地路径安装」,远程 APK 复用
-// 既有 MDM 能力,不在本动作内实现。
+// 既有 APK 上传 + adb install 能力,不在本动作内实现。
 func (e *Engine) installApk(ctx context.Context, serial string, p map[string]string) error {
 	if err := e.requireAdb(); err != nil {
 		return err

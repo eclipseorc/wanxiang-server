@@ -86,11 +86,6 @@ func InitSchema(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS sync_groups(id TEXT PRIMARY KEY, name TEXT NOT NULL, master_id TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS sync_group_members(sync_group_id TEXT NOT NULL REFERENCES sync_groups(id) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, sort_order INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(sync_group_id,device_id))`,
 		`CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT, action TEXT NOT NULL, device_id TEXT, detail TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
-		// mdm_policies 是全局统一 MDM 策略配置表：key 为策略名（如 install_mode、
-		// install_blacklist、install_whitelist、uninstall_blocked、run_blacklist、
-		// keep_alive、auto_start），value 为 JSON 编码的策略内容。一张全局配置，
-		// 下发到所有 Device Owner 纳管设备。name/value 均为 TEXT，便于存包名列表。
-		`CREATE TABLE IF NOT EXISTS mdm_policies(key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)`,
 		// device_model_scripts 是「设备自动配对」的机型脚本表：每台机型（按厂商+型号
 		// 匹配）一份「动作序列」JSON，由服务端经 WebSocket 下发给设备端，设备端用
 		// 通用引擎执行，实现「加新机型不改 APK」。match_patterns 为候选匹配串数组
@@ -138,11 +133,6 @@ func InitSchema(db *sql.DB) error {
 	// 增量迁移：为旧库补齐 adb_port 列（无线调试连接端口，拼真实 serial 用）。
 	// 无线调试端口是动态分配的，不能假设固定 5555，因此单独存一列。
 	if err := addColumnIfMissing(db, "devices", "adb_port", `INTEGER NOT NULL DEFAULT 0`); err != nil {
-		return err
-	}
-	// 增量迁移：为旧库补齐 mdm_enabled 列（设备是否已被 Device Owner 纳管）。
-	// 由设备端心跳上报，服务端据此分流「MDM 自动化路径」与「adb 传统路径」。
-	if err := addColumnIfMissing(db, "devices", "mdm_enabled", `INTEGER NOT NULL DEFAULT 0`); err != nil {
 		return err
 	}
 	// 增量迁移：为旧库补齐 adb_mode 列（区分安卓端上报的 "auto" 自动模式与管理后台连接的 "manual" 手动模式）。

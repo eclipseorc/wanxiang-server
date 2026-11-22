@@ -1,7 +1,7 @@
 # 万象自动化引擎设计(内嵌轻量 RPA)
 
 > 目标:把「影刀」这类 RPA 工具的核心价值——**自动操作界面**——内嵌进万象,
-> 复用万象已有的 ADB / scrcpy / Device Owner 能力,让万象自己就能编排、执行、
+> 复用万象已有的 ADB / scrcpy 能力,让万象自己就能编排、执行、
 > 调度「真机自动化」任务,不依赖用户另外安装影刀。
 >
 > 状态:**待确认设计**(确认后分批复现)
@@ -12,10 +12,10 @@
 
 | 维度 | 说明 |
 |---|---|
-| 控制对象 | **只控安卓真机**(复用 ADB / scrcpy / MDM),不控电脑桌面 |
+| 控制对象 | **只控安卓真机**(复用 ADB / scrcpy),不控电脑桌面 |
 | 流程定义 | 一期「表单式步骤编排」,二期再上「画布拖拽」 |
 | 元素定位 | 坐标 + OCR(本地 OCR,离线免费) |
-| 复用什么 | ADB 命令、scrcpy 截帧、MDM 安装/卸载、设备连接管理 |
+| 复用什么 | ADB 命令、scrcpy 截帧、APK 上传安装、设备连接管理 |
 
 本质:在已有「设备控制」能力之上,加一层 **「动作原语 + 流程编排 + 调度器」**,
 而不是从零造 RPA,也不是去集成影刀本体(影刀是闭源商业软件,无嵌入 SDK)。
@@ -100,7 +100,7 @@ automation_step_logs(
 | `swipe` | 滑动 (x1,y1)→(x2,y2) | `adb shell input swipe` |
 | `inputText` | 输入文字 | `adb shell input text` |
 | `launchApp` | 打开应用 | `adb shell am start` |
-| `installApk` | 安装应用 | 复用 MDM / adb install |
+| `installApk` | 安装应用 | 复用 APK 上传 + adb install |
 | `screenshot` | 截图并保存 | scrcpy 截帧 |
 | `wait` | 等待 N 毫秒 | 纯延时 |
 | `ocrFind` | OCR 识别文字并返回坐标 | 调本地 OCR 服务 |

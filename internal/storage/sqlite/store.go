@@ -58,10 +58,6 @@ type Device struct {
 	// AdbMode 记录当前/最近一次 ADB 连接的模式："auto"（安卓端自动化上报 adb-ready）
 	// 或 "manual"（管理后台通过无线调试模式或传统模式手动连接）。
 	AdbMode string `json:"adbMode"`
-	// MdmEnabled 是设备是否已被 Device Owner 纳管（由设备端心跳上报）。true 时
-	// 走「MDM 自动化路径」（策略下发 + PackageInstaller 静默安装），false 时走
-	// 「adb 传统路径」。
-	MdmEnabled bool `json:"mdmEnabled"`
 }
 
 type Group struct {
@@ -81,14 +77,6 @@ type SyncGroup struct {
 type Ticket struct {
 	Type      string
 	SubjectID string
-}
-
-// MdmPolicy 是一条全局 MDM 策略。Key 是策略名，Value 是 JSON 编码的策略内容
-// （如包名列表、模式开关），UpdatedAt 是最近一次修改的 Unix 秒时间戳。
-type MdmPolicy struct {
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // NewStore creates a Store backed by db.
@@ -210,17 +198,17 @@ func (s *Store) DeviceEnabled(id string) (bool, error) {
 // DeviceByID 返回单台设备记录（含 adb_ip），用于按 ID 取设备的连接信息。
 func (s *Store) DeviceByID(id string) (Device, error) {
 	var device Device
-	var enabled, online, adbOnline, mdmEnabled int
+	var enabled, online, adbOnline int
 	var groupIDs sql.NullString
 	err := s.DB.QueryRow(
-		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,d.mdm_enabled,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 WHERE d.id=? GROUP BY d.id`,
 		id,
 	).Scan(
 		&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
-		&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &mdmEnabled, &groupIDs,
+		&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &groupIDs,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return device, ErrNotFound
@@ -228,7 +216,6 @@ func (s *Store) DeviceByID(id string) (Device, error) {
 	device.Enabled = enabled == 1
 	device.Online = online == 1
 	device.AdbOnline = adbOnline == 1
-	device.MdmEnabled = mdmEnabled == 1
 	device.GroupIDs = []string{}
 	if groupIDs.Valid && groupIDs.String != "" {
 		device.GroupIDs = strings.Split(groupIDs.String, ",")
@@ -280,22 +267,9 @@ func (s *Store) SetDeviceAdbWithMode(id, ip string, port int, online bool, mode 
 	return err
 }
 
-// SetDeviceMdmEnabled 记录设备的 MDM 纳管状态（由设备端心跳上报）。
-// true 表示设备已被 Device Owner 纳管，走自动化路径；false 走 adb 传统路径。
-func (s *Store) SetDeviceMdmEnabled(id string, enabled bool) error {
-	value := 0
-	if enabled {
-		value = 1
-	}
-	_, err := s.DB.Exec(
-		`UPDATE devices SET mdm_enabled=? WHERE id=?`, value, id,
-	)
-	return err
-}
-
 func (s *Store) ListDevices() ([]Device, error) {
 	rows, err := s.DB.Query(
-		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,d.mdm_enabled,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 GROUP BY d.id ORDER BY d.name,d.id`,
@@ -308,18 +282,17 @@ func (s *Store) ListDevices() ([]Device, error) {
 	devices := make([]Device, 0)
 	for rows.Next() {
 		var device Device
-		var enabled, online, adbOnline, mdmEnabled int
+		var enabled, online, adbOnline int
 		var groupIDs sql.NullString
 		if err := rows.Scan(
 			&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
-			&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &mdmEnabled, &groupIDs,
+			&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &groupIDs,
 		); err != nil {
 			return nil, err
 		}
 		device.Enabled = enabled == 1
 		device.Online = online == 1
 		device.AdbOnline = adbOnline == 1
-		device.MdmEnabled = mdmEnabled == 1
 		device.GroupIDs = []string{}
 		if groupIDs.Valid && groupIDs.String != "" {
 			device.GroupIDs = strings.Split(groupIDs.String, ",")
@@ -738,63 +711,4 @@ func notFound(err error) error {
 		return ErrNotFound
 	}
 	return err
-}
-
-// --- MDM 策略（全局统一，下发到所有 Device Owner 纳管设备） ---
-
-// GetMdmPolicy 返回指定 key 的策略；不存在时返回 ErrNotFound。
-func (s *Store) GetMdmPolicy(key string) (MdmPolicy, error) {
-	var p MdmPolicy
-	err := s.DB.QueryRow(
-		`SELECT key,value,updated_at FROM mdm_policies WHERE key=?`, key,
-	).Scan(&p.Key, &p.Value, &p.UpdatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return p, ErrNotFound
-	}
-	return p, err
-}
-
-// ListMdmPolicies 返回全部 MDM 策略，按 key 排序。
-func (s *Store) ListMdmPolicies() ([]MdmPolicy, error) {
-	rows, err := s.DB.Query(`SELECT key,value,updated_at FROM mdm_policies ORDER BY key`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	policies := make([]MdmPolicy, 0)
-	for rows.Next() {
-		var p MdmPolicy
-		if err := rows.Scan(&p.Key, &p.Value, &p.UpdatedAt); err != nil {
-			return nil, err
-		}
-		policies = append(policies, p)
-	}
-	return policies, rows.Err()
-}
-
-// SetMdmPolicy 写入（新建或覆盖）一条 MDM 策略。
-func (s *Store) SetMdmPolicy(key, value string) error {
-	_, err := s.DB.Exec(
-		`INSERT INTO mdm_policies(key,value,updated_at) VALUES(?,?,?)
-		 ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`,
-		key, value, time.Now().Unix(),
-	)
-	return err
-}
-
-// DeleteMdmPolicy 删除一条 MDM 策略；返回 ErrNotFound 表示不存在。
-func (s *Store) DeleteMdmPolicy(key string) error {
-	result, err := s.DB.Exec(`DELETE FROM mdm_policies WHERE key=?`, key)
-	if err != nil {
-		return err
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return ErrNotFound
-	}
-	return nil
 }

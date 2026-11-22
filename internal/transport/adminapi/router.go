@@ -34,19 +34,16 @@ type Router struct {
 	// 收敛到 logic.AdbConnector，使 admin-server 与 websocket-server 共享同一份实现。
 	adbConn *logic.AdbConnector
 	apks    *apkStore
-	// mdmTokens 是 MDM 远程安装时「设备端下载 APK」的一次性凭证存储。
-	mdmTokens *mdmApkTokenStore
 	// automation 是自动化执行引擎(动作原语 + 流程执行),由 WithScrcpy 注入。
 	automation *automation.Executor
 }
 
 func New(s *logic.Service) *Router {
 	return &Router{
-		svc:       s,
-		limiter:   newLoginLimiter(),
-		tickets:   newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
-		apks:      newAPKStore(),
-		mdmTokens: newMdmApkTokenStore(),
+		svc:     s,
+		limiter: newLoginLimiter(),
+		tickets: newFixedWindowLimiter(ticketMaxPerWindow, ticketWindow),
+		apks:    newAPKStore(),
 	}
 }
 
@@ -75,9 +72,6 @@ func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", r.health)
 	mux.HandleFunc("POST /api/admin/login", r.login)
-	// 设备端 APK 下载：不带 session，凭一次性 token 鉴权（token 由 MDM 安装
-	// 指令随下发内容携带给设备端）。
-	mux.HandleFunc("GET /api/admin/mdm/apk-download", r.handleMdmApkDownload)
 	mux.Handle("/api/admin/", r.auth(http.HandlerFunc(r.admin)))
 	return SecurityHeaders(mux)
 }
@@ -285,14 +279,6 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleAPKUninstall(w, req, u)
 	case "sync-groups":
 		r.handleSyncGroups(w, req, u)
-	case "dpc/qrcode":
-		r.handleDpcQrcode(w, req, u)
-	case "mdm/policies":
-		r.handleMdmPolicies(w, req, u)
-	case "mdm/install":
-		r.handleMdmInstall(w, req, u)
-	case "mdm/uninstall":
-		r.handleMdmUninstall(w, req, u)
 	case "automation/flows":
 		r.handleAutomationFlows(w, req, u)
 	case "automation/jobs":
@@ -315,9 +301,6 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 			return
 		case strings.HasPrefix(path, "groups/"):
 			r.deleteGroup(w, req, u, strings.TrimPrefix(path, "groups/"))
-			return
-		case strings.HasPrefix(path, "mdm/policies/"):
-			r.handleMdmPolicyDelete(w, req, u, strings.TrimPrefix(path, "mdm/policies/"))
 			return
 		case strings.HasPrefix(path, "automation/flows/"):
 			rest := strings.TrimPrefix(path, "automation/flows/")
@@ -391,7 +374,7 @@ func (r *Router) listDevices(w http.ResponseWriter, req *http.Request, u sqlite.
 			if device.AdbPort <= 0 {
 				device.AdbPort = 5555
 			}
-			if device.AdbMode == "" && (device.AdbOnline || device.MdmEnabled || (device.Online && device.AdbIP != "")) {
+			if device.AdbMode == "" && (device.AdbOnline || (device.Online && device.AdbIP != "")) {
 				device.AdbMode = "auto"
 			}
 			out = append(out, device)

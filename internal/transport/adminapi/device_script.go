@@ -8,7 +8,7 @@
 //   - 匹配用「厂商+型号」字符串：设备端上报 Build.MANUFACTURER+" "+Build.MODEL
 //     （已落库 devices.model），脚本 matchPatterns 里写候选串，命中即匹配。
 //   - 本文件只负责脚本数据的读写与「已上报型号」的汇总；真正把脚本推给设备的
-//     动作由 websocket 转发进程完成（见 websocket 包，与 mdm-policy 同链路）。
+//     动作由 websocket 转发进程完成（见 websocket 包，与机型脚本下发同链路）。
 package adminapi
 
 import (

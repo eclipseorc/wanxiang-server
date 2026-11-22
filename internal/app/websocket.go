@@ -49,7 +49,7 @@ func RunWebsocket() error {
 
 	hub := wsserver.NewHub(store)
 
-	// 装配 adb 能力：既是「业务在线但 adb 离线」状态扫描器，也是 MDM 路径下
+	// 装配 adb 能力：既是「业务在线但 adb 离线」状态扫描器，也是设备「ADB 就绪」
 	// 设备「ADB 就绪」事件的 connect 执行器。两者共享同一个 logic.AdbConnector
 	// （连接管理唯一入口），复用同一 adb 实例与共享 SQLite。
 	// adb 找不到时静默停用（远程控制本就不可用），不影响转发服务。

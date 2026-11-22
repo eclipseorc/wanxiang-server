@@ -408,12 +408,6 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 			h.hub.deviceIPs[c.id] = ip
 			h.hub.mu.Unlock()
 		}
-		// 设备上报 MDM 纳管状态（Device Owner 与否），落库供管理端分流。
-		if mdm, ok := message["mdmEnabled"].(bool); ok {
-			if err := h.hub.store.SetDeviceMdmEnabled(c.id, mdm); err != nil {
-				log.Printf("device mdm state update failed device_id=%s: %v", c.id, err)
-			}
-		}
 		if err := h.hub.store.UpdateDeviceState(c.id, battery, rtt, status); err != nil {
 			log.Printf("device heartbeat state update failed device_id=%s: %v", c.id, err)
 		}
@@ -423,21 +417,9 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		})
 	case "adb-ready":
 		h.handleAdbReady(c, message)
-	case "mdm-pull-policy":
-		// 设备端（连接建立后）主动拉取当前全局 MDM 策略。
-		h.sendMdmPolicies(c)
-	case "mdm-pull-script":
+	case "pull-device-script":
 		// 设备端（连接建立后）主动拉取本机型号对应的「自动配对」机型脚本。
 		h.sendDeviceScript(c)
-	case "mdm-command-result":
-		// 设备端执行完 MDM 安装/卸载后回传结果，转发给所有管理端。
-		payload := map[string]any{"deviceId": c.id}
-		for _, key := range []string{"action", "packageName", "ok", "error"} {
-			if v, ok := message[key]; ok {
-				payload[key] = boundedPayload(v)
-			}
-		}
-		h.hub.broadcastDevice(c.id, "mdm-command-result", payload)
 	case "status":
 		h.hub.broadcastDevice(c.id, "device-state", boundedPayload(message["data"]))
 	case "command-result":
@@ -454,7 +436,7 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 
 // handleAdbReady 处理设备端上行的「ADB 就绪」事件：设备在本地完成「无线调试
 // 自配对 + 固化 5555」后通知服务端，服务端据此执行 adb connect IP:5555，把设备
-// 拉进 adb 连接列表（MDM 全自动路径）。connect 逻辑由注入的 connector 执行；
+// 拉进 adb 连接列表（自动配对路径）。connect 逻辑由注入的 connector 执行；
 // 未注入或执行失败时只记日志、不阻塞连接，也不会回退到其它路径。
 func (h *Handler) handleAdbReady(c *client, message map[string]any) {
 	ip, _ := message["lan_ip"].(string)
@@ -549,7 +531,7 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 			visible[i].AdbPort = 5555
 		}
 		// 若设备在线且已通过 5555 自动连接（或上报了 IP 且未曾被标记为 manual），默认为 auto 自动模式。
-		if visible[i].AdbMode == "" && (visible[i].AdbOnline || visible[i].MdmEnabled || (visible[i].Online && visible[i].AdbIP != "")) {
+		if visible[i].AdbMode == "" && (visible[i].AdbOnline || (visible[i].Online && visible[i].AdbIP != "")) {
 			visible[i].AdbMode = "auto"
 		}
 	}
@@ -564,88 +546,12 @@ func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]an
 		h.handleCommand(c, message)
 	case "device-control":
 		h.handleDeviceControl(c, user, message)
-	case "mdm-policy-push":
-		h.handleMdmPolicyPush(c, user, message)
-	case "mdm-device-command":
-		h.handleMdmDeviceCommand(c, user, message)
 	case "ping":
 		_ = c.send(map[string]any{"type": "pong", "sentAt": message["sentAt"]})
 	}
 }
 
-// handleMdmDeviceCommand 处理管理端对单台 MDM 设备下发的安装/卸载指令：
-// 把指令转发给指定 deviceId 的设备连接，由设备端 PackageInstaller 静默执行。
-// 仅管理员可用；设备必须在线（存在连接）才能送达。
-func (h *Handler) handleMdmDeviceCommand(c *client, user sqlite.User, message map[string]any) {
-	if user.Role != "admin" {
-		_ = c.send(map[string]string{"type": "error", "message": "admin only"})
-		return
-	}
-	deviceID, _ := message["deviceId"].(string)
-	action, _ := message["action"].(string)
-	if deviceID == "" || (action != "install" && action != "uninstall") {
-		_ = c.send(map[string]string{"type": "error", "message": "invalid mdm device command"})
-		return
-	}
-
-	h.hub.mu.RLock()
-	device := h.hub.devices[deviceID]
-	h.hub.mu.RUnlock()
-	if device == nil {
-		_ = c.send(map[string]any{
-			"type": "mdm-command-result", "deviceId": deviceID,
-			"ok": false, "error": "device offline",
-		})
-		return
-	}
-
-	// 转发给设备端，附上管理端回传所需的信息。
-	payload := map[string]any{"type": "mdm-device-command", "action": action}
-	for _, key := range []string{"packageName", "apkId", "token", "downloadUrl"} {
-		if v, ok := message[key]; ok {
-			payload[key] = v
-		}
-	}
-	if err := device.send(payload); err != nil {
-		_ = c.send(map[string]any{
-			"type": "mdm-command-result", "deviceId": deviceID,
-			"ok": false, "error": "send failed",
-		})
-		return
-	}
-	_ = c.send(map[string]any{
-		"type": "mdm-command-result", "deviceId": deviceID,
-		"ok": true, "sent": true,
-	})
-	_ = h.hub.store.Audit(user.ID, "mdm-device-"+action, deviceID, "")
-}
-
-// handleMdmPolicyPush 处理管理端下发的「策略已变更」通知：读库后把最新策略
-// 推送给所有在线的 Device Owner 设备。仅管理员可触发；普通用户无权改策略。
-func (h *Handler) handleMdmPolicyPush(c *client, user sqlite.User, message map[string]any) {
-	if user.Role != "admin" {
-		_ = c.send(map[string]string{"type": "error", "message": "admin only"})
-		return
-	}
-	h.pushMdmPolicies()
-	_ = c.send(map[string]any{"type": "mdm-policy-pushed"})
-}
-
-// sendMdmPolicies 把当前全局 MDM 策略打包下发给单台设备（设备端主动拉取）。
-func (h *Handler) sendMdmPolicies(c *client) {
-	policies, err := h.hub.store.ListMdmPolicies()
-	if err != nil {
-		log.Printf("load mdm policies for device failed device_id=%s: %v", c.id, err)
-		_ = c.send(map[string]any{"type": "mdm-policy", "policies": map[string]string{}})
-		return
-	}
-	out := make(map[string]string, len(policies))
-	for _, p := range policies {
-		out[p.Key] = p.Value
-	}
-	_ = c.send(map[string]any{"type": "mdm-policy", "policies": out})
-}
-
+// handleCommand 负责把 message 解析为统一的 CommandMessage，再调用命令分发器处理。
 // sendDeviceScript 把设备型号对应的「自动配对」机型脚本下发给单台设备（设备端
 // 主动拉取）。用设备已上报的 model（落库 devices.model）在机型脚本表的
 // match_patterns 里做匹配，命中即下发完整脚本；未命中下发空脚本 + found=false，
@@ -655,18 +561,18 @@ func (h *Handler) sendDeviceScript(c *client) {
 	device, err := h.hub.store.DeviceByID(c.id)
 	if err != nil {
 		log.Printf("load device for script failed device_id=%s: %v", c.id, err)
-		_ = c.send(map[string]any{"type": "mdm-script", "found": false})
+		_ = c.send(map[string]any{"type": "device-script", "found": false})
 		return
 	}
 	script, err := h.hub.store.DeviceModelScriptByMatch(device.Model)
 	if err != nil {
 		// 未匹配到脚本（ErrNotFound）或查询失败：下发 found=false，设备端不自动配对。
 		log.Printf("device script not found device_id=%s model=%q: %v", c.id, device.Model, err)
-		_ = c.send(map[string]any{"type": "mdm-script", "found": false, "model": device.Model})
+		_ = c.send(map[string]any{"type": "device-script", "found": false, "model": device.Model})
 		return
 	}
 	_ = c.send(map[string]any{
-		"type":    "mdm-script",
+		"type":    "device-script",
 		"found":   true,
 		"model":   device.Model,
 		"script": map[string]any{
@@ -677,34 +583,6 @@ func (h *Handler) sendDeviceScript(c *client) {
 			"version":       script.Version,
 		},
 	})
-}
-
-// pushMdmPolicies 把当前全局 MDM 策略推送给所有在线的 Device Owner 设备。
-// 读取一次策略、广播给所有 MDM 设备，避免逐设备查库。
-func (h *Handler) pushMdmPolicies() {
-	policies, err := h.hub.store.ListMdmPolicies()
-	if err != nil {
-		log.Printf("load mdm policies for push failed: %v", err)
-		return
-	}
-	out := make(map[string]string, len(policies))
-	for _, p := range policies {
-		out[p.Key] = p.Value
-	}
-
-	h.hub.mu.RLock()
-	targets := make([]*client, 0)
-	for id, device := range h.hub.devices {
-		mdm, err := h.hub.store.DeviceByID(id)
-		if err == nil && mdm.MdmEnabled {
-			targets = append(targets, device)
-		}
-	}
-	h.hub.mu.RUnlock()
-
-	for _, device := range targets {
-		_ = device.send(map[string]any{"type": "mdm-policy", "policies": out})
-	}
 }
 
 // handleCommand 负责把 message 解析为统一的 CommandMessage，再调用命令分发器处理。

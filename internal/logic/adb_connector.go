@@ -16,8 +16,8 @@ import (
 //  1. 连接管理的薄代理（下方 Pair/Connect/Tcpip/Disconnect/OnlineDevices 等）——
 //     原样转发 scrcpy.ADB 的同名方法，不改变任何语义，只是把「连接管理」这组
 //     写/读操作从 transport 层收敛到 logic 层统一入口；
-//  2. MDM 路径的业务动作（ConnectAfterReady）——封装「设备本地自配对完成后，
-//     服务端查授权并 connect」的完整链路。
+//  2. 「设备本地自配对完成后自动 connect」的业务动作（ConnectAfterReady）——
+//     封装「设备本地自配对完成后，服务端查授权并 connect」的完整链路。
 //
 // 注意：AdbConnector 只收口「连接管理」（把设备拉进/移出 adb 连接列表）相关方法；
 // 文件/会话类操作（Forward/Push/Pull/Install/Shell/ListFiles/PullStream 等）仍由
@@ -157,6 +157,6 @@ func (c *AdbConnector) ConnectAfterReady(ctx context.Context, deviceID, ip strin
 	if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, port, true, "auto"); err != nil {
 		return false, err
 	}
-	_ = c.svc.Store.Audit("mdm", "mdm-adb-ready", deviceID, serial)
+	_ = c.svc.Store.Audit("device", "adb-ready", deviceID, serial)
 	return true, nil
 }
