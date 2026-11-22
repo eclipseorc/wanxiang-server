@@ -68,8 +68,9 @@ func (m *ADBMonitor) Start(ctx context.Context) {
 	go m.loop(ctx)
 }
 
-// loop 周期性扫描 adb，对比业务在线设备，对状态变化下发通知。
+// loop 周期性扫描 adb，对比业务在线设备，对状态变化下发通知。启动时立即扫一次。
 func (m *ADBMonitor) loop(ctx context.Context) {
+	m.scanOnce()
 	ticker := time.NewTicker(adbStatusScanInterval)
 	defer ticker.Stop()
 	for {
@@ -255,10 +256,27 @@ func (m *ADBMonitor) publishState(deviceID, ip string, connected bool) {
 		}
 	}
 
-	// 广播给管理端（前端据此标注「ADB 掉线」状态）。
+	// 广播给管理端（前端据此标注「ADB 掉线」或「在线」状态，同时同步 IP、端口与模式）。
+	port := adbReconnectPort
+	mode := "auto"
+	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil {
+		if dev.AdbPort > 0 {
+			port = dev.AdbPort
+		}
+		if dev.AdbMode == "manual" && port != adbReconnectPort {
+			mode = "manual"
+		}
+	}
+	if connected {
+		_ = m.hub.store.SetDeviceAdbWithMode(deviceID, ip, port, true, mode)
+	} else {
+		_ = m.hub.store.SetDeviceAdb(deviceID, ip, port, false)
+	}
 	m.hub.broadcastDevice(deviceID, "device-adb-state", map[string]any{
 		"adbOnline": connected,
 		"ip":        ip,
+		"port":      port,
+		"adbMode":   mode,
 	})
 
 	state := "online"

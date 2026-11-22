@@ -114,6 +114,17 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .auto-step-params .param-cell{display:flex;flex-direction:column;gap:4px}
 .auto-step-params .param-cell label{font-size:11.5px;color:var(--muted)}
 .auto-step-params input{font-size:13px;padding:7px 10px}
+.param-pick-btn{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:4px 8px;border:1px solid var(--line);background:var(--surface-soft);color:var(--brand);border-radius:6px;cursor:pointer}
+.param-pick-btn:hover{background:var(--brand-soft);border-color:var(--brand)}
+
+/* 取点设备选择浮层 */
+.pick-device-modal{position:fixed;inset:0;background:rgba(10,17,32,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:400;padding:24px}
+.pick-device-modal .pick-device-title{color:#fff;font-size:14px;font-weight:600;margin-bottom:12px}
+.pick-device-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto;width:min(320px,90vw)}
+.pick-device-item{display:block;width:100%;text-align:left;padding:11px 14px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.06);color:#e7ecf5;font-size:13.5px;cursor:pointer;transition:background .15s}
+.pick-device-item:hover{background:rgba(91,113,239,.25)}
+.pick-device-cancel{display:block;margin:14px auto 0;padding:8px 20px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:transparent;color:#c3cde0;font-size:13px;cursor:pointer}
+.pick-device-cancel:hover{background:rgba(255,255,255,.08)}
 
 /* ===== 自动化：画布式编排器（LogicFlow） ===== */
 .auto-view-toggle{display:flex;gap:6px;margin-bottom:12px}
@@ -462,6 +473,14 @@ tbody tr:hover{background:#fafbff}
 .scr-window-body{flex:1;min-height:0;display:flex;flex-direction:column;background:#05070b}
 .scr-window .screen-frame{border:none;padding:0;border-radius:0;background:#05070b}
 .scr-window canvas{display:block;width:100%;height:auto;background:#000;aspect-ratio:var(--scr-ratio,9/19.5);cursor:crosshair;touch-action:none}
+/* 取点模式：画面上的提示横幅 + 取点高亮光标 */
+.scr-window.is-picking canvas{cursor:crosshair;outline:2px solid var(--brand,#4a62e0);outline-offset:-2px}
+.scr-pick-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(74,98,224,.16);border-bottom:1px solid rgba(74,98,224,.3);color:#e7ecf5;font-size:12.5px;line-height:1.4;flex-wrap:wrap}
+.scr-pick-banner .scr-pick-dot{flex:none;width:8px;height:8px;border-radius:50%;background:#4a62e0;box-shadow:0 0 0 4px rgba(74,98,224,.25);animation:pickPulse 1.4s ease-in-out infinite}
+.scr-pick-banner .scr-pick-text{flex:1;min-width:0}
+.scr-pick-banner .scr-pick-cancel{flex:none;border:1px solid rgba(255,255,255,.25);background:transparent;color:#e7ecf5;font-size:12px;padding:3px 12px;border-radius:6px;cursor:pointer}
+.scr-pick-banner .scr-pick-cancel:hover{background:rgba(255,255,255,.12)}
+@keyframes pickPulse{0%,100%{opacity:1}50%{opacity:.45}}
 /* 窗口内的配对/配置区 */
 .scr-win-setup{flex:1;overflow-y:auto;padding:14px;background:#10131a;color:#d7dce7}
 .scr-win-setup .scr-mode-toggle{margin-bottom:12px}
@@ -731,10 +750,8 @@ table .col-select{width:34px;text-align:center;padding:0}
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="3" width="7" height="7" rx="1.5"/><rect x="13" y="3" width="7" height="7" rx="1.5"/><rect x="4" y="14" width="7" height="7" rx="1.5"/><rect x="13" y="14" width="7" height="7" rx="1.5"/></symbol>
-  <symbol id="i-location" viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
-  <symbol id="i-call" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
   <symbol id="i-shield-key" viewBox="0 0 24 24"><path d="M12 2.5 20 6v6c0 5-3.4 8.4-8 9.5-4.6-1.1-8-4.5-8-9.5V6z"/><circle cx="12" cy="10" r="2"/><path d="M12 12v3"/></symbol>
-  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 21V4A1.5 1.5 0 0 1 5.5 2.5z"/><path d="M14 2.5V7h4M8 12h8M8 16h8M8 8h3"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
 </svg>
 
 <!-- ===== 登录视图 ===== -->
@@ -796,10 +813,8 @@ table .col-select{width:34px;text-align:center;padding:0}
       <div class="nav-group-title">设备管理</div>
       <a class="nav-link" data-target="sec-mdm-phones" href="#sec-mdm-phones"><svg class="ico"><use href="#i-phone"/></svg><span class="nav-label">手机管理</span></a>
       <a class="nav-link" data-target="sec-mdm-apps" href="#sec-mdm-apps"><svg class="ico"><use href="#i-app"/></svg><span class="nav-label">应用管理</span></a>
-      <a class="nav-link" data-target="sec-mdm-location" href="#sec-mdm-location"><svg class="ico"><use href="#i-location"/></svg><span class="nav-label">定位管理</span></a>
-      <a class="nav-link" data-target="sec-mdm-calls" href="#sec-mdm-calls"><svg class="ico"><use href="#i-call"/></svg><span class="nav-label">有效通话设置</span></a>
       <a class="nav-link" data-target="sec-mdm-perms" href="#sec-mdm-perms"><svg class="ico"><use href="#i-shield-key"/></svg><span class="nav-label">设备权限设置</span></a>
-      <a class="nav-link" data-target="sec-mdm-agreement" href="#sec-mdm-agreement"><svg class="ico"><use href="#i-doc"/></svg><span class="nav-label">领用协议</span></a>
+      <a class="nav-link" data-target="sec-device-scripts" href="#sec-device-scripts"><svg class="ico"><use href="#i-bolt"/></svg><span class="nav-label">机型脚本</span></a>
       <a class="nav-link" data-target="sec-automation" href="#sec-automation"><svg class="ico"><use href="#i-bolt"/></svg><span class="nav-label">自动化</span></a>
     </nav>
     <div class="sidebar-foot">
@@ -852,6 +867,7 @@ table .col-select{width:34px;text-align:center;padding:0}
               <button id="syncPanelBtn" class="secondary" title="把多台已连接的设备编组，主控操作同步到组内所有设备"><svg class="ico ico-sm"><use href="#i-layers"/></svg>群控</button>
               <button id="installAppBtn" class="secondary" title="对列表中勾选的设备批量安装 APK"><svg class="ico ico-sm"><use href="#i-download"/></svg>安装应用</button>
               <button id="uninstallAppBtn" class="secondary" title="对列表中勾选的设备批量卸载应用"><svg class="ico ico-sm"><use href="#i-trash"/></svg>卸载应用</button>
+              <button id="pruneOfflineBtn" class="secondary" title="一键清理所有离线状态的重复/历史设备记录"><svg class="ico ico-sm"><use href="#i-trash"/></svg>清理离线设备</button>
               <div class="view-toggle" role="group" aria-label="视图切换">
                 <button id="viewListBtn" class="view-toggle-btn active" title="列表视图"><svg class="ico ico-sm"><use href="#i-list"/></svg></button>
                 <button id="viewGridBtn" class="view-toggle-btn" title="卡片视图"><svg class="ico ico-sm"><use href="#i-grid"/></svg></button>
@@ -864,8 +880,8 @@ table .col-select{width:34px;text-align:center;padding:0}
             <span class="device-select-count" id="deviceSelectCount">已选 0 台</span>
           </div>
           <div class="scroll" id="deviceListView"><table>
-            <thead><tr><th class="col-select"></th><th>状态</th><th>设备</th><th>电量</th><th>RTT</th><th>分组</th><th>最后在线</th><th>操作</th></tr></thead>
-            <tbody id="deviceRows"><tr><td colspan="8" class="muted">暂无设备</td></tr></tbody>
+            <thead><tr><th class="col-select"></th><th>状态</th><th>设备</th><th>电量</th><th>RTT</th><th>ADB 模式</th><th>ADB 状态</th><th>分组</th><th>最后在线</th><th>操作</th></tr></thead>
+            <tbody id="deviceRows"><tr><td colspan="10" class="muted">暂无设备</td></tr></tbody>
           </table></div>
           <div class="device-grid hidden" id="deviceGridView"></div>
         </div>
@@ -960,6 +976,7 @@ table .col-select{width:34px;text-align:center;padding:0}
                 </select>
               </label>
               <label>租户凭证（tenant_token）<input id="dpcToken" placeholder="设备初始注册凭证"></label>
+              <label>APK 下载地址（可选）<input id="dpcDl" placeholder="http://192.168.1.100:9002/wanxiang-client.apk，留空表示已预装"></label>
               <div class="dpc-actions">
                 <button type="submit" class="primary" id="dpcGenBtn">生成二维码</button>
               </div>
@@ -1118,18 +1135,6 @@ table .col-select{width:34px;text-align:center;padding:0}
             </div>
           </div>
         </div>
-      </section>
-
-      <!-- 页面：定位管理（占位） -->
-      <section id="sec-mdm-location" class="section page" data-title="定位管理" data-crumb="定位管理">
-        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>定位管理</h2><p>查看与追踪设备实时位置</p></div></div>
-        <div class="card"><div class="card-head"><div><h3>设备位置</h3><p>功能规划中，敬请期待</p></div></div></div>
-      </section>
-
-      <!-- 页面：有效通话设置（占位） -->
-      <section id="sec-mdm-calls" class="section page" data-title="有效通话设置" data-crumb="有效通话设置">
-        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>有效通话设置</h2><p>配置设备通话相关策略</p></div></div>
-        <div class="card"><div class="card-head"><div><h3>通话策略</h3><p>功能规划中，敬请期待</p></div></div></div>
       </section>
 
       <!-- 页面：设备权限设置 -->
@@ -1305,10 +1310,72 @@ table .col-select{width:34px;text-align:center;padding:0}
         <div class="perm-save-row"><button class="btn primary" id="devicePermsSaveBtn">保存</button></div>
       </section>
 
-      <!-- 页面：领用协议（占位） -->
-      <section id="sec-mdm-agreement" class="section page" data-title="领用协议" data-crumb="领用协议">
-        <div class="section-head"><div><span class="eyebrow">05 / Device Management</span><h2>领用协议</h2><p>配置设备领用时的协议与须知</p></div></div>
-        <div class="card"><div class="card-head"><div><h3>协议内容</h3><p>功能规划中，敬请期待</p></div></div></div>
+      <!-- 页面：机型脚本 -->
+      <section id="sec-device-scripts" class="section page" data-title="机型脚本" data-crumb="机型脚本">
+        <div class="section-head"><div><span class="eyebrow">Device Scripts</span><h2>机型脚本</h2><p>为不同机型配置「无线调试自动配对」动作序列，服务端按设备型号下发，设备端通用引擎执行</p></div></div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h3>脚本列表</h3><p>一份脚本描述一台机型的配对流程，加新机型 = 加一份脚本，无需改动 App</p></div>
+            <div class="card-head-right"><button class="btn-primary" id="dsNewBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>新建脚本</button></div>
+          </div>
+          <div class="table-card">
+            <table>
+              <thead><tr><th>脚本名称</th><th>匹配型号</th><th>步骤数</th><th>版本</th><th>更新时间</th><th style="width:180px">操作</th></tr></thead>
+              <tbody id="dsRows"><tr><td colspan="6" class="muted">暂无脚本，点击「新建脚本」开始</td></tr></tbody>
+            </table>
+          </div>
+          <div class="mdm-tip" style="margin-top:14px">
+            <b>匹配说明</b>：设备端上报的型号（如 <code>motorola moto e14</code>）会与「匹配型号」中的候选串做<b>子串匹配</b>（忽略大小写）。
+            建议同时填写完整型号与简称（如 <code>motorola moto e14</code>、<code>moto e14</code>），可从下方「已上报型号」下拉直接选取，避免手打出错。
+          </div>
+        </div>
+
+        <!-- 脚本编辑抽屉 -->
+        <div class="scr-drawer hidden" id="dsEditor">
+          <div class="scr-drawer-backdrop" id="dsEditorBackdrop"></div>
+          <div class="scr-drawer-panel" style="max-width:760px">
+            <div class="scr-drawer-head">
+              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3 id="dsEditorTitle">新建脚本</h3><span class="muted small">配置该机型的自动配对动作序列</span></div></div>
+              <button id="dsEditorCloseBtn" class="btn-ghost" title="关闭"><svg class="ico ico-sm"><use href="#i-arrow"/></svg>关闭</button>
+            </div>
+            <div class="scr-drawer-body">
+              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">脚本名称</label>
+              <input id="dsName" style="margin-bottom:14px" placeholder="例如：Moto E14">
+
+              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">匹配型号（候选串，子串匹配，可多个）</label>
+              <div style="display:flex;gap:8px;margin-bottom:8px">
+                <select id="dsModelSelect" style="flex:1;margin:0">
+                  <option value="">— 从已上报型号选取 —</option>
+                </select>
+                <button id="dsModelAddBtn" class="secondary" type="button" style="flex:none">添加</button>
+              </div>
+              <div id="dsModelTags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;min-height:20px"></div>
+              <input id="dsModelInput" placeholder="或手动输入型号候选串，回车添加（如 moto e14）" style="margin-bottom:16px">
+
+              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">动作步骤（自动配对流程）</label>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                <select id="dsAddAction" style="max-width:240px;margin:0">
+                  <option value="launch">打开系统页 (launch)</option>
+                  <option value="click">点击元素 (click)</option>
+                  <option value="readPair">读配对码并配对 (readPair)</option>
+                  <option value="waitFor">等待元素出现 (waitFor)</option>
+                  <option value="end">结束标记 (end)</option>
+                </select>
+                <button class="secondary" id="dsAddStepBtn" type="button"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加步骤</button>
+              </div>
+              <div id="dsStepList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:8px"></div>
+              <div class="muted" style="font-size:11.5px;line-height:1.6">
+                提示：脚本<b>最后一步应为「结束标记 (end)」</b>。典型流程：打开系统页 → 点击「无线调试」→ 点击开关 → 读配对码并配对 → 结束。
+              </div>
+
+              <div style="display:flex;gap:10px;margin-top:20px">
+                <button id="dsSaveBtn" class="btn-primary" style="flex:1">保存脚本</button>
+                <button id="dsCancelBtn" class="secondary">取消</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- 页面：自动化 -->
@@ -1610,6 +1677,16 @@ $('refreshBtn').onclick=loadAll;$('connectBtn').onclick=connectRealtime;
 $('syncPanelBtn').onclick=()=>{ if(typeof window.openSyncPanel==='function') window.openSyncPanel(); else toast('远程控制模块未加载'); };
 $('installAppBtn').onclick=()=>{ openInstallModal(); };
 $('uninstallAppBtn').onclick=()=>{ openUninstallModal(); };
+$('pruneOfflineBtn').onclick=async()=>{
+  const offCount=devices.filter(d=>!d.online).length;
+  if(!offCount){toast('当前没有离线设备需要清理');return}
+  if(!confirm(`确定清理全部 ${offCount} 台离线设备记录吗？`))return;
+  try{
+    const r=await api('/api/admin/devices/prune-offline',{method:'POST'});
+    toast(`已清理 ${(r&&r.deleted)??offCount} 台离线设备`);
+    await loadAll();
+  }catch(e){toast('清理失败：'+e.message)}
+};
 // selectedDevices 记录在主列表勾选的设备 id（Set），供批量安装/卸载复用。
 const selectedDevices=new Set();
 // 判断设备是否可被选中（在线 + adb 在线 + 未停用）。
@@ -1624,27 +1701,42 @@ async function loadAll(){try{const [ds,gs]=await Promise.all([api('/api/admin/de
 function logoutLocal(){token='';sessionStorage.removeItem('adminToken');if(ws)ws.close();showApp()}
 let deviceView='list';
 function deviceDisplayName(d){return d.name||d.model||('设备 '+d.id.slice(0,8))}
-// 设备状态：区分「在线」「ADB 掉线」「离线」三种。adbOnline 缺省视为 true（旧数据/未扫描时）。
-function deviceStatusInfo(d){if(!d.online)return{dot:'offline',label:'离线'};if(d.adbOnline===false)return{dot:'adb-offline',label:'ADB 掉线'};return{dot:'online',label:'在线'}}
+// 设备业务在线状态（第一列「状态」）。
+function deviceStatusInfo(d){if(!d.online)return{dot:'offline',label:'离线'};return{dot:'online',label:'在线'}}
+// ADB 模式：区分安卓端上报/直接一键直连的「自动模式」与管理后台通过无线调试/传统模式主动连接的「手动模式」。
+function deviceAdbModeInfo(d){const isAuto=d.adbMode==='auto'||(d.adbMode!=='manual'&&(d.adbOnline===true||d.mdmEnabled||!!(d.online&&d.adbIp)));return isAuto?{mode:'auto',label:'自动模式'}:{mode:'manual',label:'手动模式'}}
+// ADB 状态：无论通过安卓端自动开启上报 5555 还是管理后台手动连接，只要设备在线且连上 ADB 就显示「在线」，否则「离线」。
+function deviceAdbStatusInfo(d){return (!!d.online&&d.adbOnline===true)?{dot:'online',label:'在线'}:{dot:'offline',label:'离线'}}
 function deviceGroupLabel(d){return (d.groupIds||[]).map(id=>groups.find(g=>g.id===id)?.name||id).join(', ')||'—'}
 function deviceActions(d){const box=document.createElement('div');box.className='actions';
-  // 已连接：业务在线（online）且 adb 明确在线（adbOnline===true）。
-  // 任何缺失/未知/未授权（adbOnline 非 true）都视为未连接，避免把「未授权」
-  // 或「尚未扫描」的设备误判为可操作而点亮按钮。
-  const connected=!!d.online&&d.adbOnline===true;
-  // 远程控制：未连接时置灰（需先「连接设备」）。禁用设备同样置灰。
-  const remote=document.createElement('button');remote.textContent='远程控制';remote.className='secondary';remote.disabled=!(d.enabled&&connected);remote.onclick=()=>openScrcpy(d);box.append(remote);
-  // 读取文件：常态显示，未连接（或未取到 IP）时置灰，与「远程控制」保持一致。
-  const files=document.createElement('button');files.textContent='读取文件';files.className='secondary';files.disabled=!(d.enabled&&connected&&d.adbIp);files.onclick=()=>{const ip=d.adbIp;if(!ip){toast('未获取到设备 IP，请重新连接');return;}const port=(d.adbPort&&d.adbPort>0)?d.adbPort:5555;if(typeof window.openFilePanel==='function')window.openFilePanel(ip+':'+port,deviceDisplayName(d));else toast('文件模块未加载')};box.append(files);
-  // 连接/断开：未连接显示「连接设备」，已连接显示「断开」。
-  if(!connected){
-    const conn=document.createElement('button');conn.textContent='连接设备';conn.className='primary';conn.disabled=!d.enabled;conn.onclick=()=>openScrcpy(d);box.append(conn);
+  const adbConnected=!!d.online&&d.adbOnline===true;
+  // 远程控制：只要 ADB 在线，点击直接打开手机屏幕；不在线时点击按 ADB 模式判断（未上报或上报连接失败自动降级到无线调试/传统模式手动连接面板）。
+  const remote=document.createElement('button');remote.textContent='远程控制';remote.className=adbConnected?'primary':'secondary';remote.disabled=!d.enabled;remote.onclick=()=>openScrcpy(d);box.append(remote);
+  // 读取文件：ADB 在线且有 IP 时可用。
+  const files=document.createElement('button');files.textContent='读取文件';files.className='secondary';files.disabled=!(d.enabled&&adbConnected&&d.adbIp);files.onclick=()=>{const ip=d.adbIp;if(!ip){toast('未获取到设备 IP，请重新连接');return;}const port=(d.adbPort&&d.adbPort>0)?d.adbPort:5555;if(typeof window.openFilePanel==='function')window.openFilePanel(ip+':'+port,deviceDisplayName(d));else toast('文件模块未加载')};box.append(files);
+  // 连接/断开：ADB 未在线显示「连接设备」，已在线显示「断开」。
+  if(!adbConnected){
+    const conn=document.createElement('button');conn.textContent='连接设备';conn.className='primary';conn.disabled=!d.enabled;conn.onclick=()=>openScrcpy(d,{manualSetup:true});box.append(conn);
   }else{
     const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
   }
-  if(user){const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle)}
+  if(user){
+    const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle);
+    if(!d.online){
+      const del=document.createElement('button');del.className='danger';del.textContent='删除';del.onclick=async()=>{
+        if(!confirm(`确定删除离线设备「${deviceDisplayName(d)}」记录吗？`))return;
+        try{
+          await api(`/api/admin/devices/${encodeURIComponent(d.id)}`,{method:'DELETE'});
+          devices=devices.filter(x=>x.id!==d.id);
+          renderDevices();
+          toast('已删除离线设备');
+        }catch(e){toast('删除失败：'+e.message)}
+      };
+      box.append(del);
+    }
+  }
   return box}
-function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="8" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const sel=document.createElement('td');sel.className='col-select';const cb=document.createElement('input');cb.type='checkbox';cb.className='device-check';cb.dataset.deviceId=d.id;cb.checked=selectedDevices.has(d.id);cb.disabled=!(d.online&&d.adbOnline===true&&d.enabled);cb.addEventListener('change',()=>{if(cb.checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id);updateDeviceSelectBar()});sel.append(cb);const st=deviceStatusInfo(d);const state=document.createElement('td');state.innerHTML=`<span class="dot ${st.dot}"></span>${st.label}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(sel,state,name,battery,rtt,group,last,actions);body.append(tr)}updateDeviceSelectBar()}
+function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="10" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const sel=document.createElement('td');sel.className='col-select';const cb=document.createElement('input');cb.type='checkbox';cb.className='device-check';cb.dataset.deviceId=d.id;cb.checked=selectedDevices.has(d.id);cb.disabled=!(d.online&&d.adbOnline===true&&d.enabled);cb.addEventListener('change',()=>{if(cb.checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id);updateDeviceSelectBar()});sel.append(cb);const st=deviceStatusInfo(d);const state=document.createElement('td');state.innerHTML=`<span class="dot ${st.dot}"></span>${st.label}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const modeInfo=deviceAdbModeInfo(d);const adbModeTd=document.createElement('td');adbModeTd.textContent=modeInfo.label;const adbSt=deviceAdbStatusInfo(d);const adbStateTd=document.createElement('td');adbStateTd.innerHTML=`<span class="dot ${adbSt.dot}"></span>${adbSt.label}`;const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(sel,state,name,battery,rtt,adbModeTd,adbStateTd,group,last,actions);body.append(tr)}updateDeviceSelectBar()}
 function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren();if(!devices.length){const empty=document.createElement('div');empty.className='device-grid-empty';empty.textContent='没有可见设备';grid.append(empty);return}for(const d of devices){const card=document.createElement('div');card.className='device-card';
   // 缩略图：优先用 d.screenshot，否则深色占位图（图标 + 型号）
   const thumb=document.createElement('div');thumb.className='device-card-thumb';if(d.screenshot){thumb.classList.add('has-shot');thumb.style.backgroundImage=`url(${d.screenshot})`;}else{const ic=document.createElement('svg');ic.className='ico ico-lg thumb-icon';ic.innerHTML='<use href="#i-device"></use>';const model=document.createElement('span');model.className='thumb-model';model.textContent=d.model||deviceDisplayName(d);thumb.append(ic,model);}
@@ -1655,13 +1747,13 @@ function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren
   const name=document.createElement('div');name.className='device-card-name';name.textContent=deviceDisplayName(d);
   const model=document.createElement('div');model.className='device-card-model';model.textContent=d.model||'—';
   nameBox.append(name,model);
-  const st=document.createElement('span');st.className='device-card-status '+(deviceStatusInfo(d).dot==='adb-offline'?'adb-offline':(d.online?'online':'offline'));st.textContent=d.online?(deviceStatusInfo(d).label==='ADB 掉线'?'ADB 掉线':(d.enabled?'在线':'已停用')):'离线';
+  const st=document.createElement('span');st.className='device-card-status '+(d.online?'online':'offline');st.textContent=d.online?(d.enabled?'在线':'已停用'):'离线';
   top.append(nameBox,st);
   const metrics=document.createElement('div');metrics.className='device-card-metrics';
   const mk=(label,value,cls)=>{const m=document.createElement('div');m.className='device-card-metric';const l=document.createElement('span');l.className='m-label';l.textContent=label;const v=document.createElement('span');v.className='m-value'+(cls?' '+cls:'');v.textContent=value;m.append(l,v);return m};
   metrics.append(mk('电量',d.online?`${d.battery}%`:'—',d.battery<=20?'low':(d.battery<=50?'mid':'')));
-  metrics.append(mk('延迟',d.online?`${d.rttMs}ms`:'—'));
-  metrics.append(mk('状态',!d.online?'离线':(d.adbOnline===false?'ADB 掉线':(d.status||'运行中')),d.adbOnline===false?'warn':''));
+  metrics.append(mk('ADB模式',deviceAdbModeInfo(d).label));
+  metrics.append(mk('ADB状态',deviceAdbStatusInfo(d).label,d.adbOnline===true?'':'warn'));
   const grp=document.createElement('div');grp.className='device-card-group';grp.textContent='分组：'+deviceGroupLabel(d);
   const acts=document.createElement('div');acts.className='device-card-actions';acts.append(deviceActions(d));
   body.append(top,metrics,grp,acts);
@@ -1671,7 +1763,7 @@ function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGrid
 function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
 async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
-async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline')d.online=false;if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip}renderDevices()}else loadAll();return}if(m.type==='mdm-command-result'){const nm=(m.deviceId&&devices.find(x=>x.id===m.deviceId))?deviceDisplayName(devices.find(x=>x.id===m.deviceId)):m.deviceId;const act=m.data?.action==='install'?'安装':(m.data?.action==='uninstall'?'卸载':'操作');if(m.data&&m.data.ok===false){toast(`${nm} ${act}失败：${m.data.error||'未知错误'}`)}else if(m.data&&m.data.ok===true){toast(`${nm} ${act}成功`)}return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
+async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline'){d.online=false;d.adbOnline=false}if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip;if(m.data.port>0)d.adbPort=m.data.port;else if(!d.adbPort)d.adbPort=5555;if(m.data.adbMode)d.adbMode=m.data.adbMode}renderDevices()}else loadAll();return}if(m.type==='mdm-command-result'){const nm=(m.deviceId&&devices.find(x=>x.id===m.deviceId))?deviceDisplayName(devices.find(x=>x.id===m.deviceId)):m.deviceId;const act=m.data?.action==='install'?'安装':(m.data?.action==='uninstall'?'卸载':'操作');if(m.data&&m.data.ok===false){toast(`${nm} ${act}失败：${m.data.error||'未知错误'}`)}else if(m.data&&m.data.ok===true){toast(`${nm} ${act}成功`)}return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
 async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定停用并断开此设备？':'确定重新启用此设备？'))return;if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪，无法下发控制指令');return}sendWS({type:'device-control',deviceId:id,action:action})}
 
 /* ===== 资源管理：账号 / 分组 / 权限 三个列表页 ===== */
@@ -1851,6 +1943,7 @@ if(dpcForm){
         wifiPassword:$('dpcPwd').value,
         wifiSecurityType:$('dpcSec').value,
         tenantToken:$('dpcToken').value.trim(),
+        packageDownloadUrl:$('dpcDl').value.trim(),
       };
       if(!body.wifiSsid){ toast('请填写 WiFi 名称'); return; }
       const data=await api('/api/admin/dpc/qrcode',{method:'POST',body:JSON.stringify(body)});
@@ -2257,6 +2350,8 @@ if(dpcForm){
       const params = document.createElement('div');
       params.className = 'auto-step-params';
       const defs = ACTION_PARAMS[step.action] || [];
+      // 坐标类字段：加「从屏幕取点」按钮。
+      const COORD_KEYS = { x:true, y:true, x1:true, y1:true, x2:true, y2:true };
       defs.forEach(p => {
         const cell = document.createElement('div');
         cell.className = 'param-cell';
@@ -2267,6 +2362,17 @@ if(dpcForm){
         input.placeholder = p.label;
         input.addEventListener('change', () => { step.params[p.key] = input.value.trim(); });
         cell.append(label, input);
+
+        // 坐标字段：附加取点按钮。
+        if (COORD_KEYS[p.key]) {
+          const pickBtn = document.createElement('button');
+          pickBtn.type = 'button';
+          pickBtn.className = 'param-pick-btn';
+          pickBtn.title = '从设备屏幕点选此坐标';
+          pickBtn.innerHTML = `<svg class="ico ico-sm"><use href="#i-target"/></svg>取点`;
+          pickBtn.addEventListener('click', () => pickCoordinate(step, p.key, input));
+          cell.append(pickBtn);
+        }
         params.append(cell);
       });
       if (defs.length) div.append(params);
@@ -2278,6 +2384,64 @@ if(dpcForm){
       empty.textContent = '暂无步骤，从上方选择动作并「添加步骤」';
       box.append(empty);
     }
+  }
+
+  // --- 从屏幕取点：为坐标字段回填真实设备坐标 ---
+  // 目标设备优先用「流程默认目标设备」里的第一台；否则弹设备选择。
+  function pickCoordinate(step, key, input) {
+    const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
+    if (!list.length) { toast('暂无可用设备'); return; }
+
+    const doPick = (device) => {
+      if (!device) { toast('请选择设备'); return; }
+      if (typeof window.pickPoint !== 'function') { toast('屏幕取点未就绪'); return; }
+      toast('请在设备画面上点击目标位置');
+      window.pickPoint(device, (x, y) => {
+        const val = (key === 'x' || key === 'x1' || key === 'x2') ? x : y;
+        step.params[key] = String(val);
+        input.value = String(val);
+        toast(`已取点：${key}=${val}`);
+        // 同步画布视图（若激活）。
+        if (lf) syncCanvasFromSteps();
+      });
+    };
+
+    // 已有默认设备：直接取第一台。
+    const defaultDevice = list.find(d => editingDeviceIds.includes(d.id)) || list[0];
+    if (editingDeviceIds.length === 1) { doPick(defaultDevice); return; }
+
+    // 多设备或未选：弹出设备选择浮层。
+    openPickDeviceModal(list, doPick);
+  }
+
+  // 轻量设备选择浮层（取点时用）。
+  function openPickDeviceModal(list, onSelect) {
+    // 移除旧浮层。
+    document.querySelectorAll('.pick-device-modal').forEach(el => el.remove());
+    const modal = document.createElement('div');
+    modal.className = 'pick-device-modal';
+    const title = document.createElement('div');
+    title.className = 'pick-device-title';
+    title.textContent = '选择取点设备';
+    const body = document.createElement('div');
+    body.className = 'pick-device-list';
+    list.forEach(d => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'pick-device-item';
+      item.textContent = (d.name || d.model || d.id);
+      item.addEventListener('click', () => { modal.remove(); onSelect(d); });
+      body.append(item);
+    });
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'pick-device-cancel';
+    cancel.textContent = '取消';
+    cancel.addEventListener('click', () => modal.remove());
+    modal.append(title, body, cancel);
+    document.body.appendChild(modal);
+    // 点击遮罩关闭。
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   }
 
   // --- 添加步骤 ---
@@ -2716,6 +2880,298 @@ if(dpcForm){
   // 初始化：进入页面即加载。
   loadFlows();
 })();
+
+/* ===== 机型脚本管理：列表 + 编辑（device-scripts CRUD） ===== */
+(() => {
+  'use strict';
+  let scripts = [];                 // 已加载的脚本列表
+  let editingScript = null;         // 正在编辑的脚本（null 表示新建）
+  let editingModels = [];           // 编辑中的匹配型号候选串数组
+  let editingDsSteps = [];          // 编辑中的动作步骤数组（结构化，非 JSON）
+
+  // 机型脚本动作类型的中文名与字段定义。
+  const DS_ACTION_LABELS = {
+    launch:'打开系统页', click:'点击元素', readPair:'读配对码并配对',
+    waitFor:'等待元素出现', end:'结束标记'
+  };
+  // 每个动作类型的可填字段。type 字段由渲染/保存时自动带上，无需用户填。
+  // value 在 click/waitFor 里是「候选文案」，保存时拆成数组。
+  const DS_ACTION_PARAMS = {
+    launch: [
+      {key:'action', label:'系统页 Action（默认开发者选项）', placeholder:'android.settings.APPLICATION_DEVELOPMENT_SETTINGS', def:'android.settings.APPLICATION_DEVELOPMENT_SETTINGS'}
+    ],
+    click: [
+      {key:'value', label:'要点击的文字（多个用逗号分隔）', placeholder:'例如：无线调试'},
+      {key:'node', label:'节点类型（可选）', placeholder:'找开关时填 switch，其余留空'},
+      {key:'by', label:'匹配方式', placeholder:'text（默认）/ id / desc / class', def:'text'},
+      {key:'scroll', label:'找不到时滚动查找', type:'checkbox'},
+      {key:'scrollMax', label:'最大滚动次数', placeholder:'12', def:'12'},
+      {key:'optional', label:'可选步骤（找不到不报错）', type:'checkbox'}
+    ],
+    readPair: [
+      {key:'codeRegex', label:'配对码正则', placeholder:'^\\d{6}$', def:'^\\d{6}$'}
+    ],
+    waitFor: [
+      {key:'value', label:'等待出现的文字', placeholder:'例如：使用配对码配对设备'}
+    ],
+    end: []
+  };
+
+  async function loadScripts() {
+    try {
+      const data = await api('/api/admin/device-scripts');
+      scripts = data.scripts || [];
+      renderScriptRows();
+    } catch (e) { toast('加载机型脚本失败：' + e.message); }
+  }
+
+  function parseSteps(stepsJson) {
+    try { const arr = JSON.parse(stepsJson || '[]'); return Array.isArray(arr) ? arr : []; }
+    catch (e) { return []; }
+  }
+  function parsePatterns(matchPatterns) {
+    try { const arr = JSON.parse(matchPatterns || '[]'); return Array.isArray(arr) ? arr : []; }
+    catch (e) { return []; }
+  }
+
+  function renderScriptRows() {
+    const body = $('dsRows');
+    body.replaceChildren();
+    if (!scripts.length) {
+      body.innerHTML = '<tr><td colspan="6" class="muted">暂无脚本，点击「新建脚本」开始</td></tr>';
+      return;
+    }
+    scripts.forEach(sc => {
+      const tr = document.createElement('tr');
+      const name = document.createElement('td'); name.textContent = sc.name;
+      const match = document.createElement('td');
+      match.textContent = parsePatterns(sc.matchPatterns).join(' / ');
+      const cnt = document.createElement('td'); cnt.textContent = parseSteps(sc.stepsJson).length;
+      const ver = document.createElement('td'); ver.textContent = 'v' + (sc.version || 0);
+      const upd = document.createElement('td'); upd.textContent = sc.updatedAt ? new Date(sc.updatedAt*1000).toLocaleString() : '—';
+      const act = document.createElement('td');
+      const edit = document.createElement('button'); edit.textContent='编辑'; edit.className='secondary'; edit.style.marginRight='6px';
+      edit.onclick = () => openEditor(sc);
+      const del = document.createElement('button'); del.textContent='删除'; del.className='danger';
+      del.onclick = async () => {
+        if(!confirm(`确定删除脚本「${sc.name}」？删除后对应机型将无法自动配对。`)) return;
+        try { await api('/api/admin/device-scripts/'+sc.id, {method:'DELETE'}); toast('已删除'); loadScripts(); }
+        catch(e){ toast('删除失败：'+e.message); }
+      };
+      act.append(edit, del);
+      tr.append(name, match, cnt, ver, upd, act);
+      body.append(tr);
+    });
+  }
+
+  // 打开编辑抽屉：sc 为 null 表示新建。
+  function openEditor(sc) {
+    editingScript = sc || null;
+    editingModels = sc ? parsePatterns(sc.matchPatterns) : [];
+    editingDsSteps = sc ? parseSteps(sc.stepsJson) : [];
+    $('dsEditorTitle').textContent = sc ? '编辑脚本' : '新建脚本';
+    $('dsName').value = sc ? sc.name : '';
+    renderModelTags();
+    renderDsStepList();
+    loadModelOptions();
+    $('dsEditor').classList.remove('hidden');
+  }
+  function closeEditor() {
+    $('dsEditor').classList.add('hidden');
+    editingScript = null;
+    editingModels = [];
+    editingDsSteps = [];
+  }
+
+  // 渲染动作步骤列表（结构化表单，替代手写 JSON）。
+  function renderDsStepList() {
+    const box = $('dsStepList');
+    box.replaceChildren();
+    if (!editingDsSteps.length) {
+      const empty = document.createElement('div');
+      empty.className = 'muted'; empty.style.textAlign = 'center'; empty.style.padding = '16px 0';
+      empty.style.border = '1px dashed var(--line-2)'; empty.style.borderRadius = '9px';
+      empty.textContent = '暂无步骤，从上方选择动作并「添加步骤」';
+      box.append(empty);
+      return;
+    }
+    editingDsSteps.forEach((step, i) => {
+      const div = document.createElement('div');
+      div.className = 'auto-step';
+      const head = document.createElement('div');
+      head.className = 'auto-step-head';
+      const title = document.createElement('div');
+      title.className = 'auto-step-title';
+      title.innerHTML = `<span class="auto-step-idx">${i+1}</span><span>${DS_ACTION_LABELS[step.type] || step.type}</span>`;
+      const del = document.createElement('button');
+      del.className = 'auto-step-del'; del.textContent = '×'; del.title = '删除此步骤';
+      del.onclick = () => { editingDsSteps.splice(i,1); renderDsStepList(); };
+      head.append(title, del);
+      div.append(head);
+
+      const defs = DS_ACTION_PARAMS[step.type] || [];
+      if (defs.length) {
+        const params = document.createElement('div');
+        params.className = 'auto-step-params';
+        defs.forEach(p => {
+          const cell = document.createElement('div');
+          cell.className = 'param-cell';
+          const label = document.createElement('label');
+          label.textContent = p.label;
+          if (p.type === 'checkbox') {
+            // 布尔字段：checkbox
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = !!step[p.key];
+            cb.addEventListener('change', () => { step[p.key] = cb.checked; });
+            cell.append(cb, label);
+          } else {
+            const input = document.createElement('input');
+            // value 字段存的是数组，渲染时 join(',')，保存时再拆回数组。
+            const raw = Array.isArray(step[p.key]) ? step[p.key].join(',') : (step[p.key] ?? '');
+            input.value = raw === '' && p.def ? p.def : raw;
+            input.placeholder = p.placeholder || p.label;
+            if (p.key === 'scrollMax') input.type = 'number';
+            input.addEventListener('change', () => { step[p.key] = input.value.trim(); });
+            cell.append(label, input);
+          }
+          params.append(cell);
+        });
+        div.append(params);
+      } else {
+        const note = document.createElement('div');
+        note.className = 'muted'; note.style.fontSize = '11.5px'; note.style.padding = '4px 0';
+        note.textContent = step.type === 'end' ? '该步骤为结束标记，无需配置参数。' : '无需配置参数。';
+        div.append(note);
+      }
+      box.append(div);
+    });
+  }
+
+  // 已上报型号下拉：数据源 = devices 去重，另可后台接口兜底。
+  async function loadModelOptions() {
+    const sel = $('dsModelSelect');
+    const seen = new Set();
+    const opts = [];
+    if (Array.isArray(devices)) {
+      devices.forEach(d => { const m = d && d.model; if (m && !seen.has(m)) { seen.add(m); opts.push(m); } });
+    }
+    // 后台接口兜底，返回所有历史上报型号（含离线设备）。
+    try {
+      const data = await api('/api/admin/device-models');
+      (data.models || []).forEach(o => { const m = o && o.model; if (m && !seen.has(m)) { seen.add(m); opts.push(m); } });
+    } catch (e) { /* 接口失败时仍用 devices 去重结果 */ }
+    sel.replaceChildren();
+    const none = document.createElement('option'); none.value=''; none.textContent='— 从已上报型号选取 —';
+    sel.append(none);
+    opts.sort().forEach(m => {
+      const o = document.createElement('option'); o.value = m;
+      o.textContent = m + (editingModels.includes(m) ? '（已添加）' : '');
+      sel.append(o);
+    });
+  }
+
+  function renderModelTags() {
+    const box = $('dsModelTags');
+    box.replaceChildren();
+    if (!editingModels.length) {
+      const tip = document.createElement('span');
+      tip.className = 'muted'; tip.style.fontSize = '12.5px';
+      tip.textContent = '尚未添加匹配型号';
+      box.append(tip);
+      return;
+    }
+    editingModels.forEach((m, i) => {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--brand);border-radius:999px;font-size:12.5px;color:var(--brand);background:var(--brand-soft)';
+      const txt = document.createElement('span'); txt.textContent = m;
+      const x = document.createElement('button'); x.type='button'; x.textContent='×';
+      x.style.cssText = 'border:none;background:transparent;color:var(--brand);cursor:pointer;font-size:14px;line-height:1;padding:0';
+      x.onclick = () => { editingModels.splice(i,1); renderModelTags(); loadModelOptions(); };
+      tag.append(txt, x);
+      box.append(tag);
+    });
+  }
+
+  function addModel(m) {
+    m = (m || '').trim();
+    if (!m) return;
+    if (editingModels.includes(m)) { toast('该型号已添加'); return; }
+    editingModels.push(m);
+    renderModelTags();
+    loadModelOptions();
+  }
+
+  // 把结构化的 editingDsSteps 规范化为后端要的 steps 数组（type 保留、value 拆数组、
+  // 空字段剔除、布尔/数字类型转换）。
+  function buildStepsPayload() {
+    return editingDsSteps.map(step => {
+      const out = { type: step.type };
+      (DS_ACTION_PARAMS[step.type] || []).forEach(p => {
+        let v = step[p.key];
+        if (v === undefined || v === null || v === '') return; // 空值不输出
+        if (p.type === 'checkbox') { out[p.key] = !!v; return; }
+        if (p.key === 'value') {
+          // value：逗号分隔拆成数组
+          const arr = String(v).split(/[,，]/).map(s => s.trim()).filter(Boolean);
+          if (arr.length) out[p.key] = arr;
+          return;
+        }
+        if (p.key === 'scrollMax') { out[p.key] = parseInt(v, 10) || 0; return; }
+        out[p.key] = v;
+      });
+      return out;
+    });
+  }
+
+  // 保存脚本。
+  $('dsSaveBtn').addEventListener('click', async () => {
+    const name = $('dsName').value.trim();
+    if (!name) { toast('请填写脚本名称'); return; }
+    if (!editingModels.length) { toast('请至少添加一个匹配型号'); return; }
+    if (!editingDsSteps.length) { toast('请至少添加一个动作步骤'); return; }
+
+    const steps = buildStepsPayload();
+    const body = { name, matchPatterns: editingModels, steps };
+    if (editingScript && editingScript.id) body.id = editingScript.id;
+
+    const btn = $('dsSaveBtn'); btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      await api('/api/admin/device-scripts', { method:'POST', body: JSON.stringify(body) });
+      toast('脚本已保存（版本已更新，设备重连后自动下发）');
+      closeEditor();
+      loadScripts();
+    } catch (e) { toast('保存失败：' + e.message); }
+    finally { btn.disabled = false; btn.textContent = '保存脚本'; }
+  });
+
+  // 添加步骤：按所选动作类型新建一个步骤对象（带默认值）。
+  $('dsAddStepBtn').addEventListener('click', () => {
+    const type = $('dsAddAction').value;
+    const step = { type };
+    (DS_ACTION_PARAMS[type] || []).forEach(p => {
+      if (p.type === 'checkbox') step[p.key] = false;
+      else if (p.def !== undefined) step[p.key] = p.def;
+      else step[p.key] = '';
+    });
+    editingDsSteps.push(step);
+    renderDsStepList();
+  });
+
+  // 事件绑定。
+  $('dsNewBtn').addEventListener('click', () => openEditor(null));
+  $('dsEditorCloseBtn').addEventListener('click', closeEditor);
+  $('dsEditorBackdrop').addEventListener('click', closeEditor);
+  $('dsCancelBtn').addEventListener('click', closeEditor);
+  $('dsModelAddBtn').addEventListener('click', () => addModel($('dsModelSelect').value));
+  $('dsModelInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addModel($('dsModelInput').value); $('dsModelInput').value=''; }
+  });
+
+  // 暴露给页面切换钩子：切到机型脚本页时刷新列表。
+  window.renderDeviceScriptsPage = () => { loadScripts(); };
+})();
+
 </script>
 <script>
 /* 视觉增强层：只做展示增强，不改动上面的业务逻辑与任何 DOM id。 */
@@ -2751,14 +3207,14 @@ if(dpcForm){
     for (const tr of body.querySelectorAll('tr')) {
       if (tr.dataset.decorated === '1') continue;
       const td = tr.querySelectorAll('td');
-      if (td.length !== 7) { tr.dataset.decorated = '1'; continue; }
+      if (td.length !== 10) { tr.dataset.decorated = '1'; continue; }
       tr.dataset.decorated = '1';
-      td[1].classList.add('name-cell');
-      td[3].classList.add('num-cell');
-      td[4].classList.add('group-cell');
-      td[5].classList.add('time-cell');
-      td[6].classList.add('action-cell');
-      const match = /^(\d{1,3})%/.exec(td[2].textContent.trim());
+      td[2].classList.add('name-cell');
+      td[4].classList.add('num-cell');
+      td[7].classList.add('group-cell');
+      td[8].classList.add('time-cell');
+      td[9].classList.add('action-cell');
+      const match = /^(\d{1,3})%/.exec(td[3].textContent.trim());
       if (match) {
         const value = Math.max(0, Math.min(100, Number(match[1])));
         const text = document.createElement('span');
@@ -2771,8 +3227,8 @@ if(dpcForm){
         if (value <= 20) fill.className = 'low';
         else if (value <= 50) fill.className = 'mid';
         track.appendChild(fill);
-        td[2].classList.add('battery-cell');
-        td[2].replaceChildren(text, track);
+        td[3].classList.add('battery-cell');
+        td[3].replaceChildren(text, track);
       }
     }
   }
@@ -2846,6 +3302,10 @@ if(dpcForm){
     // 切换到「自动化」页时刷新流程与执行记录。
     if (targetId === 'sec-automation' && typeof window.renderAutomationPage === 'function') {
       window.renderAutomationPage();
+    }
+    // 切换到「机型脚本」页时刷新脚本列表。
+    if (targetId === 'sec-device-scripts' && typeof window.renderDeviceScriptsPage === 'function') {
+      window.renderDeviceScriptsPage();
     }
   }
 

@@ -236,8 +236,9 @@
   }
 
   class ScrcpySession {
-    constructor(device) {
+    constructor(device, opts) {
       this.device = device || null;
+      this.opts = opts || {};
       this.mode = 'wireless';      // 'wireless' | 'tcpip'
       this.ws = null;              // scrcpy 会话 WebSocket
       this.decoder = null;         // WebCodecs VideoDecoder
@@ -263,7 +264,7 @@
       // display:none，新打开窗口时第一步折叠、看不到输入框（restore 仅在
       // 有保存配置时才改变步骤状态）。
       this.resetAccordion();
-      this.restore();
+      this.initSession(this.opts);
     }
 
     // —— DOM 构建 ——
@@ -276,6 +277,7 @@
           <span class="scr-win-status" data-status-dot></span>
           <span class="scr-win-title">${name}</span>
           <span class="scr-win-fps" data-fps>-- fps</span>
+          <button type="button" class="scr-win-min" data-toggle-setup title="手动连接设置">⚙</button>
           <button type="button" class="scr-win-min" data-min title="最小化"><svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
           <button type="button" class="scr-win-close" data-close title="关闭">✕</button>
         </div>
@@ -432,6 +434,21 @@
       const minBtn = this.el.querySelector('[data-min]');
       if (minBtn) minBtn.addEventListener('click', () => this.minimize());
 
+      // 切换手动连接设置面板（兜底用）
+      const setupBtn = this.el.querySelector('[data-toggle-setup]');
+      if (setupBtn) {
+        setupBtn.addEventListener('click', () => {
+          const showingSetup = !this.setup.classList.contains('hidden');
+          if (showingSetup && this.alive) {
+            this.setup.classList.add('hidden');
+            this.stage.classList.remove('hidden');
+          } else {
+            this.setup.classList.remove('hidden');
+            this.stage.classList.add('hidden');
+          }
+        });
+      }
+
       // 模式切换按钮
       this.el.querySelectorAll('.scr-mode-btn').forEach((b) => {
         b.addEventListener('click', () => this.setMode(b.dataset.mode));
@@ -522,17 +539,30 @@
     // 数组，让「设备分组」「读取文件」等依赖 adbIp/adbPort 的逻辑立即生效、
     // 无需刷新页面。失败不阻断控制流程（下次连接或刷新时仍可由心跳 IP / ADB
     // 扫描兜底）。
-    async persistAdbOnline(host, port) {
+    async persistAdbOnline(host, port, mode = 'manual') {
       if (!this.device || !this.device.id || !host) return;
-      const body = { deviceId: this.device.id, host };
+      const body = { deviceId: this.device.id, host, mode };
       if (port) body.port = port;
       try {
         const r = await adminApi('/api/admin/device/connect', body);
         const realPort = (r && r.port) ? r.port : (port || 0);
+        const realMode = (r && r.adbMode) ? r.adbMode : mode;
+        if (this.device) {
+          this.device.adbIp = host;
+          this.device.adbPort = realPort;
+          this.device.adbOnline = true;
+          this.device.adbMode = realMode;
+        }
         if (typeof devices !== 'undefined' && Array.isArray(devices)) {
           const dev = devices.find((d) => d && d.id === this.device.id);
-          if (dev) { dev.adbIp = host; dev.adbPort = realPort; dev.adbOnline = true; }
+          if (dev) {
+            dev.adbIp = host;
+            dev.adbPort = realPort;
+            dev.adbOnline = true;
+            dev.adbMode = realMode;
+          }
         }
+        if (typeof renderDevices === 'function') renderDevices();
         toast('已记录设备连接状态');
       } catch (e) {
         toast('记录连接状态失败：' + (e && e.message ? e.message : e));
@@ -645,45 +675,131 @@
       if (ip || port) saveConfig(this.device.id, { tcpipIp: ip, tcpipPort: port });
     }
 
-    // —— 恢复已有配置 ——
-    restore() {
+    // —— 初始化：区分「ADB 已在线直开屏幕」「自动模式重连/降级」「手动模式（无线调试/传统模式）」 ——
+    async initSession(opts) {
       if (!this.device) return;
-      const saved = loadSavedConfig(this.device.id);
-      if (!saved) return;
-      if (saved.host) this.field('ip').value = saved.host;
+      const saved = loadSavedConfig(this.device.id) || {};
+      const host = (this.device.adbIp && String(this.device.adbIp).trim())
+        || saved.host
+        || saved.tcpipIp
+        || '';
+      const port = (this.device.adbPort && this.device.adbPort > 0)
+        ? this.device.adbPort
+        : (parseInt(saved.connPort || saved.tcpipPort, 10) || 5555);
+
+      if (host) {
+        this.field('ip').value = host;
+        this.field('tcpipIp').value = host;
+      }
       if (saved.pairPort) this.field('pairPort').value = saved.pairPort;
-      if (saved.connPort) this.field('connPort').value = saved.connPort;
-      if (saved.tcpipIp) this.field('tcpipIp').value = saved.tcpipIp;
-      if (saved.tcpipPort) this.field('tcpipConnPort').value = saved.tcpipPort;
-      // 有保存的配置时，查后端真实状态，在线则直接标记就绪。
-      if (saved.host && saved.connPort) {
-        this.restoreFromBackend(saved.host, saved.connPort);
-      } else if (saved.tcpipIp && saved.tcpipPort) {
-        this.setMode('tcpip');
-        this.restoreFromBackend(saved.tcpipIp, saved.tcpipPort);
+      if (port) {
+        this.field('connPort').value = String(port);
+        this.field('tcpipConnPort').value = String(port);
+      }
+
+      if (opts && opts.manualSetup) {
+        this.showManualSetup('请使用「无线调试模式」或「传统模式」手动连接 ADB');
+        return;
+      }
+
+      // 1. 只要 ADB 在线（无论是安卓端上报 5555 的自动模式，还是后台无线调试/传统模式手动连上的），直接打开投屏画面！
+      if (this.device.adbOnline === true && host && port) {
+        // 若直接点「远程控制」即可打开屏幕，且并非刚才通过手动面板连接的，确保模式标记为自动模式
+        if (this.device.adbMode !== 'manual' || Number(port) === 5555) {
+          this.setDeviceAdbMode('auto', true);
+        }
+        this.startDirectStream(host, port);
+        return;
+      }
+
+      // 2. ADB 不在线时，区分 ADB 模式：
+      //    - 若有安卓端上报的 IP（自动模式），先尝试自动连接 5555；成功则标记为自动模式并直开屏幕，失败则自动降级到手动模式面板。
+      //    - 若安卓端未上报 IP，直接降级展示管理后台的「无线调试模式」和「传统模式」面板供手动连接。
+      if (host && this.device.online) {
+        await this.tryAutoConnectOrFallback(host, port || 5555);
+      } else {
+        this.setDeviceAdbMode('manual', false);
+        this.showManualSetup('当前设备 ADB 未在线（未收到安卓端自动上报），请通过「无线调试模式」或「传统模式」手动连接');
       }
     }
 
-    async restoreFromBackend(host, port) {
-      this.setStepNotice(1, '正在检查设备连接状态…', 'info');
-      this.status('正在检查设备连接状态…');
-      try {
-        const r = await api(`/api/admin/scrcpy/status?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`, { method: 'GET' });
-        if (r && r.online) { this.markReady(); await this.persistAdbOnline(host, port); return; }
-        this.status('设备不在线，正在自动重连…');
-        try {
-          await adminApi('/api/admin/scrcpy/connect', { host, port: parseInt(port, 10) });
-          this.markReady();
-          await this.persistAdbOnline(host, port);
-        } catch (e2) {
-          this.setStepState(1, 'error');
-          this.setStepNotice(1, '设备未连接（adb 无此设备）', 'err');
-          this.status('设备未连接：' + e2.message, false);
+    setDeviceAdbMode(mode, online) {
+      if (this.device) {
+        this.device.adbMode = mode;
+        if (typeof online === 'boolean') this.device.adbOnline = online;
+      }
+      if (typeof devices !== 'undefined' && Array.isArray(devices) && this.device) {
+        const dev = devices.find((d) => d && d.id === this.device.id);
+        if (dev) {
+          dev.adbMode = mode;
+          if (typeof online === 'boolean') dev.adbOnline = online;
         }
+      }
+      if (typeof renderDevices === 'function') renderDevices();
+    }
+
+    startDirectStream(host, port) {
+      const realPort = Number(port) || 5555;
+      this.setup.classList.add('hidden');
+      this.stage.classList.remove('hidden');
+      this.markReady();
+      this.status(`ADB 在线 (${host}:${realPort})，正在打开远程画面…`, true);
+      this.connectWs(`${host}:${realPort}`);
+    }
+
+    showManualSetup(reasonMsg) {
+      this.stage.classList.add('hidden');
+      this.setup.classList.remove('hidden');
+      if (reasonMsg) {
+        this.status(reasonMsg, false);
+      }
+    }
+
+    async tryAutoConnectOrFallback(host, port) {
+      let realPort = Number(port) || 5555;
+      this.setup.classList.add('hidden');
+      this.stage.classList.remove('hidden');
+      this.status(`自动模式：正在连接安卓端上报地址 (${host}:${realPort})…`);
+
+      try {
+        const r = await adminApi('/api/admin/device/connect', {
+          deviceId: this.device.id,
+          host,
+          port: realPort,
+          mode: 'auto',
+        });
+        if (r && r.port) realPort = r.port;
+        if (this.device) {
+          this.device.adbIp = host;
+          this.device.adbPort = realPort;
+          this.device.adbOnline = true;
+          this.device.adbMode = 'auto';
+        }
+        if (typeof devices !== 'undefined' && Array.isArray(devices)) {
+          const dev = devices.find((d) => d && d.id === this.device.id);
+          if (dev) {
+            dev.adbIp = host;
+            dev.adbPort = realPort;
+            dev.adbOnline = true;
+            dev.adbMode = 'auto';
+          }
+        }
+        if (typeof renderDevices === 'function') renderDevices();
+        this.field('connPort').value = String(realPort);
+        this.field('tcpipConnPort').value = String(realPort);
+        saveConfig(this.device.id, {
+          host,
+          connPort: String(realPort),
+          tcpipIp: host,
+          tcpipPort: String(realPort),
+        });
+        this.startDirectStream(host, realPort);
       } catch (e) {
-        this.setStepState(1, 'error');
-        this.setStepNotice(1, '无法确认设备状态', 'err');
-        this.status('无法确认设备状态：' + e.message, false);
+        // 安卓端上报连接失败 → 自动降级到管理后台的「无线调试模式」和「传统模式」，并将列表模式更新为手动模式
+        this.setDeviceAdbMode('manual', false);
+        this.showManualSetup(`自动模式连接 ${host}:${realPort} 失败（${e.message}），已自动降级为手动连接模式`);
+        this.setStepState(1, 'active');
+        this.setStepNotice(1, `自动模式连接失败（${e.message}），已降级为手动模式，请用无线调试模式或传统模式连接。`, 'err');
       }
     }
 
@@ -765,7 +881,13 @@
         this.serial = null;
         this.statusDot.classList.remove('on');
         this.stopFpsCounter();
-        if (err) { this.status('启动失败：' + err, false); }
+        if (err) {
+          if (!this.decoder) {
+            this.showManualSetup('启动失败：' + err + '（已自动降级为手动连接模式）');
+          } else {
+            this.status('启动失败：' + err, false);
+          }
+        }
         else { this.status('远程会话已断开'); }
       };
       sock.onerror = () => { this.status('远程连接失败', false); };
@@ -987,17 +1109,84 @@
     }
   }
 
+  // ============ 取点模式（供自动化引擎复用） ============
+  // 取点状态：同一时刻只允许一个取点会话，存 { session, onPick, cleanup }。
+  let pickState = null;
+
+  // 进入取点模式：在指定设备窗口上，用户点击一次即回调「真实设备坐标」。
+  // onPick(x, y) 拿到的是等比换算回设备分辨率的坐标（与 tap 动作一致）。
+  function enterPickMode(device, onPick) {
+    if (!device || typeof onPick !== 'function') return;
+    // 已有取点则先清理，避免串台。
+    if (pickState) exitPickMode();
+
+    const session = new ScrcpySession(device);
+    sessions.set(device.id, session);
+    session.el.style.zIndex = ++topZ;
+
+    // 画面提示层：告诉用户当前处于取点模式，并提供一个「取消」退出入口。
+    // 放在 body 顶部（标题栏下方），不遮挡窗口自带的关闭按钮。
+    const banner = document.createElement('div');
+    banner.className = 'scr-pick-banner';
+    banner.innerHTML = `<span class="scr-pick-dot"></span><span class="scr-pick-text">点击屏幕上要定位的位置</span><button type="button" class="scr-pick-cancel">取消</button>`;
+
+    // 取点逻辑：监听画布点击，命中后换算坐标并回调。
+    const onDown = (e) => {
+      if (session.screenW <= 0 || session.screenH <= 0) {
+        // 尚未拿到视频分辨率，提示稍后再点。
+        toast && toast('画面尚未就绪，请稍候再点');
+        return;
+      }
+      const rect = session.canvas.getBoundingClientRect();
+      const x = Math.round(Math.max(0, Math.min(session.screenW - 1, (e.clientX - rect.left) / rect.width * session.screenW)));
+      const y = Math.round(Math.max(0, Math.min(session.screenH - 1, (e.clientY - rect.top) / rect.height * session.screenH)));
+      onPick(x, y);
+      exitPickMode();
+    };
+    session.canvas.addEventListener('pointerdown', onDown, true);
+    session.el.classList.add('is-picking');
+
+    // 取消按钮：主动退出取点模式。
+    const cancelBtn = banner.querySelector('.scr-pick-cancel');
+    cancelBtn.addEventListener('click', () => exitPickMode());
+
+    // 插入到 body 顶部，作为取点模式的固定提示条。
+    const body = session.el.querySelector('.scr-window-body');
+    if (body) body.insertBefore(banner, body.firstChild);
+
+    pickState = {
+      session,
+      onPick,
+      cleanup: () => {
+        session.canvas.removeEventListener('pointerdown', onDown, true);
+        session.close();
+      },
+    };
+  }
+
+  function exitPickMode() {
+    if (!pickState) return;
+    const { cleanup } = pickState;
+    pickState = null;
+    try { cleanup(); } catch (_) {}
+  }
+
+  // 对外暴露：pickPoint(device, onPick)。device 需含 id 字段。
+  window.pickPoint = (device, onPick) => enterPickMode(device, onPick);
+
   // 打开某台设备的独立手机窗口。
-  function openScrcpy(device) {
+  function openScrcpy(device, opts) {
     if (!device) return;
     // 同设备去重：已有窗口则恢复并置顶（含最小化状态）。
     if (sessions.has(device.id)) {
       const existing = sessions.get(device.id);
+      existing.device = device;
       if (existing.minimized) existing.restore();
       existing.el.style.zIndex = ++topZ;
+      if (!existing.alive) existing.initSession(opts);
       return;
     }
-    const session = new ScrcpySession(device);
+    const session = new ScrcpySession(device, opts);
     sessions.set(device.id, session);
     session.el.style.zIndex = ++topZ;
   }

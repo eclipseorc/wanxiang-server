@@ -119,8 +119,8 @@ func (c *AdbConnector) ConnectAfterReady(ctx context.Context, deviceID, ip strin
 		return false, err
 	}
 
-	// 先落库设备上报的 IP/端口（无论后续 connect 是否成功，都保留最新地址）。
-	if err := c.svc.Store.SetDeviceAdb(deviceID, ip, port, false); err != nil {
+	// 先落库设备上报的 IP/端口与自动模式（无论后续 connect 是否成功，都保留最新地址与模式）。
+	if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, port, false, "auto"); err != nil {
 		return false, err
 	}
 
@@ -128,34 +128,33 @@ func (c *AdbConnector) ConnectAfterReady(ctx context.Context, deviceID, ip strin
 		return false, nil
 	}
 
+	_ = c.adb.EnsureServer(ctx)
 	serial := ip + ":" + strconv.Itoa(port)
 
-	// 先查已配对再 connect：adb 设备列表里已出现该 serial 才执行 connect，
-	// 避免对尚未完成 TLS 配对/授权的设备反复 connect 造成 unauthorized。
-	present, online, unauthorized, err := c.adb.IsPaired(ctx, serial)
+	// 检查当前 adb 列表状态：已 online 则无需重复 connect；处于 unauthorized
+	// 说明已发起过连接、正在等待手机上点击 RSA 授权，不重复 connect；
+	// 其余情况（首次连接 !present 或 offline）立即执行 adb connect 拉上线。
+	_, online, unauthorized, err := c.adb.IsPaired(ctx, serial)
 	if err != nil {
 		return false, err
 	}
-	if !present {
-		return false, nil
-	}
 	if unauthorized {
-		// 已配对但尚未在设备上点「允许」，提示等待授权，不反复 connect。
+		// 已连接但尚未在设备上点「允许」，提示等待授权，不反复 connect。
 		return false, nil
 	}
 	if online {
 		// 已经在线，无需重复 connect。
-		if err := c.svc.Store.SetDeviceAdb(deviceID, ip, port, true); err != nil {
+		if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, port, true, "auto"); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
-	// 已配对但尚未在线（offline 等），执行 connect 拉上线。
+	// 首次收到 adb-ready（!present）或处于 offline，立即执行 connect 拉上线。
 	if err := c.adb.Connect(ctx, ip, port); err != nil {
 		return false, err
 	}
-	if err := c.svc.Store.SetDeviceAdb(deviceID, ip, port, true); err != nil {
+	if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, port, true, "auto"); err != nil {
 		return false, err
 	}
 	_ = c.svc.Store.Audit("mdm", "mdm-adb-ready", deviceID, serial)

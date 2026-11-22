@@ -43,6 +43,7 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 		PairPort int    `json:"pairPort"`
 		Code     string `json:"code"`
 		Port     int    `json:"port"`
+		Mode     string `json:"mode"`
 	}
 	if decode(w, req, &body) != nil {
 		fail(w, http.StatusBadRequest, "invalid JSON")
@@ -88,17 +89,23 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 		_ = r.svc.Store.Audit(u.ID, "device-connect-resolve-port-failed", body.DeviceID, body.Host+": "+err.Error())
 	}
 
-	// 落库：记录 IP、真实端口与在线状态。
-	if err := r.svc.Store.SetDeviceAdb(body.DeviceID, body.Host, realPort, true); err != nil {
+	mode := strings.TrimSpace(body.Mode)
+	if mode != "auto" && mode != "manual" {
+		mode = "manual"
+	}
+
+	// 落库：记录 IP、真实端口、在线状态以及连接模式（"auto" 或 "manual"）。
+	if err := r.svc.Store.SetDeviceAdbWithMode(body.DeviceID, body.Host, realPort, true, mode); err != nil {
 		fail(w, http.StatusInternalServerError, "persist adb state failed: "+err.Error())
 		return
 	}
 
 	_ = r.svc.Store.Audit(u.ID, "device-connect", body.DeviceID, body.Host)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":   true,
-		"ip":   body.Host,
-		"port": realPort,
+		"ok":      true,
+		"ip":      body.Host,
+		"port":    realPort,
+		"adbMode": mode,
 	})
 }
 

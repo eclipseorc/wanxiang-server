@@ -91,6 +91,13 @@ func InitSchema(db *sql.DB) error {
 		// keep_alive、auto_start），value 为 JSON 编码的策略内容。一张全局配置，
 		// 下发到所有 Device Owner 纳管设备。name/value 均为 TEXT，便于存包名列表。
 		`CREATE TABLE IF NOT EXISTS mdm_policies(key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)`,
+		// device_model_scripts 是「设备自动配对」的机型脚本表：每台机型（按厂商+型号
+		// 匹配）一份「动作序列」JSON，由服务端经 WebSocket 下发给设备端，设备端用
+		// 通用引擎执行，实现「加新机型不改 APK」。match_patterns 为候选匹配串数组
+		// （JSON，如 ["motorola moto e14","moto e14"]），steps_json 为动作步骤数组
+		// （JSON，形如 [{type:"launch",...},{type:"click",...}]），version 用于设备端
+		// 版本比较避免旧消息覆盖新脚本。
+		`CREATE TABLE IF NOT EXISTS device_model_scripts(id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', match_patterns TEXT NOT NULL DEFAULT '[]', steps_json TEXT NOT NULL DEFAULT '[]', version INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)`,
 		// automation_flows 是自动化流程定义表：steps_json 为步骤数组（表单编排产物），
 		// 每个步骤形如 {action, params}。action 是动作原语名（tap/swipe/launchApp 等），
 		// params 是动作参数键值对。schedule 为可选 cron 表达式（空 = 手动触发）。
@@ -136,6 +143,10 @@ func InitSchema(db *sql.DB) error {
 	// 增量迁移：为旧库补齐 mdm_enabled 列（设备是否已被 Device Owner 纳管）。
 	// 由设备端心跳上报，服务端据此分流「MDM 自动化路径」与「adb 传统路径」。
 	if err := addColumnIfMissing(db, "devices", "mdm_enabled", `INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+	// 增量迁移：为旧库补齐 adb_mode 列（区分安卓端上报的 "auto" 自动模式与管理后台连接的 "manual" 手动模式）。
+	if err := addColumnIfMissing(db, "devices", "adb_mode", `TEXT NOT NULL DEFAULT ''`); err != nil {
 		return err
 	}
 	// 增量迁移：为旧库补齐 automation_flows.device_ids 列（定时调度的默认目标设备，

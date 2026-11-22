@@ -241,6 +241,8 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.adminTicket(w, req, u)
 	case "devices":
 		r.listDevices(w, req, u)
+	case "devices/prune-offline":
+		r.pruneOfflineDevices(w, req, u)
 	case "users":
 		r.users(w, req, u)
 	case "groups":
@@ -295,9 +297,16 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleAutomationFlows(w, req, u)
 	case "automation/jobs":
 		r.handleAutomationJobs(w, req, u)
+	case "device-scripts":
+		r.handleDeviceScripts(w, req, u)
+	case "device-models":
+		r.handleDeviceModelOptions(w, req, u)
 	default:
 		// 单资源删除路径：/api/admin/sync-groups/{id}、/api/admin/users/{id}、/api/admin/groups/{id}。
 		switch {
+		case strings.HasPrefix(path, "devices/"):
+			r.deleteDevice(w, req, u, strings.TrimPrefix(path, "devices/"))
+			return
 		case strings.HasPrefix(path, "sync-groups/"):
 			r.handleSyncGroup(w, req, u)
 			return
@@ -321,6 +330,9 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 			return
 		case strings.HasPrefix(path, "automation/jobs/"):
 			r.handleAutomationJob(w, req, u, strings.TrimPrefix(path, "automation/jobs/"))
+			return
+		case strings.HasPrefix(path, "device-scripts/"):
+			r.handleDeviceScriptDelete(w, req, u, strings.TrimPrefix(path, "device-scripts/"))
 			return
 		}
 		http.NotFound(w, req)
@@ -373,10 +385,61 @@ func (r *Router) listDevices(w http.ResponseWriter, req *http.Request, u sqlite.
 			continue
 		}
 		if allowed {
+			if !device.Online {
+				device.AdbOnline = false
+			}
+			if device.AdbPort <= 0 {
+				device.AdbPort = 5555
+			}
+			if device.AdbMode == "" && (device.AdbOnline || device.MdmEnabled || (device.Online && device.AdbIP != "")) {
+				device.AdbMode = "auto"
+			}
 			out = append(out, device)
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// deleteDevice 删除单台设备记录。路径 DELETE /api/admin/devices/{id}。
+func (r *Router) deleteDevice(w http.ResponseWriter, req *http.Request, u sqlite.User, id string) {
+	if !requireMethod(w, req, http.MethodDelete) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		fail(w, http.StatusBadRequest, "device id required")
+		return
+	}
+	if err := r.svc.Store.DeleteDevice(id); err != nil {
+		if errors.Is(err, sqlite.ErrNotFound) {
+			fail(w, http.StatusNotFound, "device not found")
+			return
+		}
+		failInternal(w, "delete device", err)
+		return
+	}
+	_ = r.svc.Store.Audit(u.ID, "delete-device", id, "")
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// pruneOfflineDevices 批量清理所有处于离线状态（online=0）的历史设备记录。路径 POST /api/admin/devices/prune-offline。
+func (r *Router) pruneOfflineDevices(w http.ResponseWriter, req *http.Request, u sqlite.User) {
+	if !requireMethod(w, req, http.MethodPost) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	deleted, err := r.svc.Store.DeleteOfflineDevices()
+	if err != nil {
+		failInternal(w, "prune offline devices", err)
+		return
+	}
+	_ = r.svc.Store.Audit(u.ID, "prune-offline-devices", "", fmt.Sprintf("deleted=%d", deleted))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted": deleted})
 }
 
 // users 处理 GET /api/admin/users（账号列表）与 POST（创建用户）。

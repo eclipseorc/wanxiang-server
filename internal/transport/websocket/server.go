@@ -354,6 +354,13 @@ func (h *Handler) removeDevice(c *client) {
 	h.hub.mu.Unlock()
 	if current {
 		_ = h.hub.store.SetOnline(c.id, false)
+		// 设备断开时同步将 adb_online 置为 false（保留原 IP 与端口供下次重连）。
+		if dev, err := h.hub.store.DeviceByID(c.id); err == nil {
+			_ = h.hub.store.SetDeviceAdb(c.id, dev.AdbIP, dev.AdbPort, false)
+		}
+		h.hub.mu.Lock()
+		h.hub.adbOnline[c.id] = false
+		h.hub.mu.Unlock()
 		h.hub.broadcastDevice(c.id, "device-offline", nil)
 		log.Printf("websocket device disconnected device_id=%s", c.id)
 	}
@@ -419,6 +426,9 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 	case "mdm-pull-policy":
 		// 设备端（连接建立后）主动拉取当前全局 MDM 策略。
 		h.sendMdmPolicies(c)
+	case "mdm-pull-script":
+		// 设备端（连接建立后）主动拉取本机型号对应的「自动配对」机型脚本。
+		h.sendDeviceScript(c)
 	case "mdm-command-result":
 		// 设备端执行完 MDM 安装/卸载后回传结果，转发给所有管理端。
 		payload := map[string]any{"deviceId": c.id}
@@ -458,6 +468,10 @@ func (h *Handler) handleAdbReady(c *client, message map[string]any) {
 		return
 	}
 
+	h.hub.mu.Lock()
+	h.hub.deviceIPs[c.id] = ip
+	h.hub.mu.Unlock()
+
 	if h.hub.connector == nil {
 		log.Printf("adb-ready received but connector not configured device_id=%s ip=%s", c.id, ip)
 		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "connector not configured"})
@@ -467,6 +481,8 @@ func (h *Handler) handleAdbReady(c *client, message map[string]any) {
 	connected, err := h.hub.connector.ConnectAfterReady(context.Background(), c.id, ip, port)
 	if err != nil {
 		log.Printf("adb-ready connect failed device_id=%s ip=%s: %v", c.id, ip, err)
+		// 即使首次 connect 因待授权未立刻变为 device，也先把上报的 IP、端口与 auto 模式推给前端。
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": "auto"})
 		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "connect failed"})
 		return
 	}
@@ -477,7 +493,9 @@ func (h *Handler) handleAdbReady(c *client, message map[string]any) {
 		h.hub.mu.Lock()
 		h.hub.adbOnline[c.id] = true
 		h.hub.mu.Unlock()
-		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": true, "ip": ip})
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": true, "ip": ip, "port": port, "adbMode": "auto"})
+	} else {
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": "auto"})
 	}
 	_ = c.send(map[string]any{"type": "adb-ready-ack", "connected": strconv.FormatBool(connected)})
 }
@@ -516,6 +534,9 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	for i := range visible {
 		if v, ok := h.hub.adbOnline[visible[i].ID]; ok {
 			visible[i].AdbOnline = v
+		} else if !visible[i].Online {
+			// 设备业务已离线且无内存态连接时，ADB 状态不应残留为 true。
+			visible[i].AdbOnline = false
 		}
 		// 设备心跳上报的 IP 比落库的 adb_ip 更实时；落库为空时用上报值兜底，
 		// 让前端始终能拿到一个可拼 serial 的 IP。
@@ -523,6 +544,13 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 			if ip, ok := h.hub.deviceIPs[visible[i].ID]; ok {
 				visible[i].AdbIP = ip
 			}
+		}
+		if visible[i].AdbPort <= 0 {
+			visible[i].AdbPort = 5555
+		}
+		// 若设备在线且已通过 5555 自动连接（或上报了 IP 且未曾被标记为 manual），默认为 auto 自动模式。
+		if visible[i].AdbMode == "" && (visible[i].AdbOnline || visible[i].MdmEnabled || (visible[i].Online && visible[i].AdbIP != "")) {
+			visible[i].AdbMode = "auto"
 		}
 	}
 	h.hub.mu.RUnlock()
@@ -616,6 +644,39 @@ func (h *Handler) sendMdmPolicies(c *client) {
 		out[p.Key] = p.Value
 	}
 	_ = c.send(map[string]any{"type": "mdm-policy", "policies": out})
+}
+
+// sendDeviceScript 把设备型号对应的「自动配对」机型脚本下发给单台设备（设备端
+// 主动拉取）。用设备已上报的 model（落库 devices.model）在机型脚本表的
+// match_patterns 里做匹配，命中即下发完整脚本；未命中下发空脚本 + found=false，
+// 设备端据此记日志、本次不自动配对。脚本字段（id/name/matchPatterns/steps/version）
+// 原样透传给设备端，由设备端解析成 DeviceScript 执行。
+func (h *Handler) sendDeviceScript(c *client) {
+	device, err := h.hub.store.DeviceByID(c.id)
+	if err != nil {
+		log.Printf("load device for script failed device_id=%s: %v", c.id, err)
+		_ = c.send(map[string]any{"type": "mdm-script", "found": false})
+		return
+	}
+	script, err := h.hub.store.DeviceModelScriptByMatch(device.Model)
+	if err != nil {
+		// 未匹配到脚本（ErrNotFound）或查询失败：下发 found=false，设备端不自动配对。
+		log.Printf("device script not found device_id=%s model=%q: %v", c.id, device.Model, err)
+		_ = c.send(map[string]any{"type": "mdm-script", "found": false, "model": device.Model})
+		return
+	}
+	_ = c.send(map[string]any{
+		"type":    "mdm-script",
+		"found":   true,
+		"model":   device.Model,
+		"script": map[string]any{
+			"scriptId":      script.ID,
+			"name":          script.Name,
+			"matchPatterns": script.MatchPatterns,
+			"steps":         json.RawMessage(script.StepsJSON),
+			"version":       script.Version,
+		},
+	})
 }
 
 // pushMdmPolicies 把当前全局 MDM 策略推送给所有在线的 Device Owner 设备。

@@ -1,0 +1,43 @@
+{
+  "scriptId": "moto-e14",
+  "name": "Moto E14",
+  "version": 1,
+  "matchPatterns": ["motorola moto e14", "moto e14", "e14"],
+  "steps": [
+    {
+      "type": "launch",
+      "action": "android.settings.APPLICATION_DEVELOPMENT_SETTINGS"
+    },
+    {
+      "type": "click",
+      "by": "text",
+      "value": ["无线调试"],
+      "scroll": true,
+      "scrollMax": 12
+    },
+    {
+      "type": "click",
+      "by": "text",
+      "node": "switch",
+      "value": ["使用\"无线调试\""]
+    },
+    {
+      "type": "click",
+      "by": "text",
+      "value": ["允许", "Allow"],
+      "optional": true
+    },
+    {
+      "type": "click",
+      "by": "text",
+      "value": ["使用配对码配对设备"]
+    },
+    {
+      "type": "readPair",
+      "codeRegex": "^\\d{6}$"
+    },
+    {
+      "type": "end"
+    }
+  ]
+}

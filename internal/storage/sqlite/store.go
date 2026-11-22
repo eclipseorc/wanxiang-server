@@ -55,6 +55,9 @@ type Device struct {
 	// 断开/未授权/未连接 false。用于在 ADBMonitor 尚未扫描到内存态时，
 	// 给前端一个可靠的兜底判断，避免「未授权」设备被误判为可操作。
 	AdbOnline bool `json:"adbOnline"`
+	// AdbMode 记录当前/最近一次 ADB 连接的模式："auto"（安卓端自动化上报 adb-ready）
+	// 或 "manual"（管理后台通过无线调试模式或传统模式手动连接）。
+	AdbMode string `json:"adbMode"`
 	// MdmEnabled 是设备是否已被 Device Owner 纳管（由设备端心跳上报）。true 时
 	// 走「MDM 自动化路径」（策略下发 + PackageInstaller 静默安装），false 时走
 	// 「adb 传统路径」。
@@ -210,14 +213,14 @@ func (s *Store) DeviceByID(id string) (Device, error) {
 	var enabled, online, adbOnline, mdmEnabled int
 	var groupIDs sql.NullString
 	err := s.DB.QueryRow(
-		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.mdm_enabled,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,d.mdm_enabled,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 WHERE d.id=? GROUP BY d.id`,
 		id,
 	).Scan(
 		&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
-		&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &mdmEnabled, &groupIDs,
+		&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &mdmEnabled, &groupIDs,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return device, ErrNotFound
@@ -265,6 +268,18 @@ func (s *Store) SetDeviceAdb(id, ip string, port int, online bool) error {
 	return err
 }
 
+// SetDeviceAdbWithMode 记录设备最近一次 adb 连接的 IP、端口、在线状态以及连接模式（"auto" 或 "manual"）。
+func (s *Store) SetDeviceAdbWithMode(id, ip string, port int, online bool, mode string) error {
+	value := 0
+	if online {
+		value = 1
+	}
+	_, err := s.DB.Exec(
+		`UPDATE devices SET adb_ip=?,adb_port=?,adb_online=?,adb_mode=? WHERE id=?`, ip, port, value, mode, id,
+	)
+	return err
+}
+
 // SetDeviceMdmEnabled 记录设备的 MDM 纳管状态（由设备端心跳上报）。
 // true 表示设备已被 Device Owner 纳管，走自动化路径；false 走 adb 传统路径。
 func (s *Store) SetDeviceMdmEnabled(id string, enabled bool) error {
@@ -280,7 +295,7 @@ func (s *Store) SetDeviceMdmEnabled(id string, enabled bool) error {
 
 func (s *Store) ListDevices() ([]Device, error) {
 	rows, err := s.DB.Query(
-		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.mdm_enabled,
+		`SELECT d.id,d.name,d.model,d.enabled,d.online,d.last_seen,d.battery,d.rtt_ms,d.status_json,d.adb_ip,d.adb_port,d.adb_online,d.adb_mode,d.mdm_enabled,
 		        group_concat(DISTINCT dg.group_id)
 		 FROM devices d LEFT JOIN device_groups dg ON dg.device_id=d.id
 		 GROUP BY d.id ORDER BY d.name,d.id`,
@@ -297,7 +312,7 @@ func (s *Store) ListDevices() ([]Device, error) {
 		var groupIDs sql.NullString
 		if err := rows.Scan(
 			&device.ID, &device.Name, &device.Model, &enabled, &online, &device.LastSeen,
-			&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &mdmEnabled, &groupIDs,
+			&device.Battery, &device.RTTMS, &device.Status, &device.AdbIP, &device.AdbPort, &adbOnline, &device.AdbMode, &mdmEnabled, &groupIDs,
 		); err != nil {
 			return nil, err
 		}
@@ -354,6 +369,31 @@ func (s *Store) DeleteGroup(id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// DeleteDevice 删除单台设备记录；device_groups / sync_group_members 由外键级联清理。
+func (s *Store) DeleteDevice(id string) error {
+	result, err := s.DB.Exec(`DELETE FROM devices WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteOfflineDevices 批量清理所有处于离线状态（online=0）的历史僵尸设备记录。
+func (s *Store) DeleteOfflineDevices() (int64, error) {
+	result, err := s.DB.Exec(`DELETE FROM devices WHERE online=0`)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // ListUsers 返回全部用户（含角色与创建时间），按用户名排序。
