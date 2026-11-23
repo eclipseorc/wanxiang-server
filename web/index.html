@@ -86,7 +86,7 @@ label{display:block;color:var(--ink-2);font-size:13px;font-weight:600}
 .mdm-tab.active{background:transparent;color:var(--brand);border-bottom-color:var(--brand);font-weight:600;box-shadow:none}
 .mdm-panel{display:none}
 .mdm-panel.active{display:block;animation:pageIn .2s ease}
-.mdm-tip{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 0 14px}
+.mdm-tip{font-size:12.5px;color:var(--muted);line-height:1.6;margin:0 26px 14px}
 
 /* ===== 自动化：步骤编排列表 ===== */
 .auto-step{background:var(--card-bg,var(--surface));border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
@@ -315,32 +315,61 @@ tbody tr:hover{background:#fafbff}
 .actions button{padding:8px 14px;font-size:12.5px;border-radius:9px}
 .table-empty{text-align:center;padding:48px 20px!important;color:var(--faint)!important;font-size:13.5px}
 
-/* ===== 设备卡片网格 ===== */
-.device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding:22px 26px}
-.device-card{display:flex;gap:16px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease)}
-.device-card:hover{transform:translateY(-2px);box-shadow:var(--sh-md);border-color:#dbe2f0}
-.device-card-thumb{flex:none;width:104px;height:104px;border-radius:12px;background:radial-gradient(120% 120% at 20% 0%,#1a2740 0%,#0a1120 70%);border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#5c6b90;position:relative;overflow:hidden}
-.device-card-thumb .thumb-icon{color:#3d4f78}
-.device-card-thumb .thumb-model{font-size:10px;color:#64749a;letter-spacing:.04em;max-width:88px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.device-card-thumb.has-shot{background-size:cover;background-position:center}
-.device-card-thumb.has-shot .thumb-icon,.device-card-thumb.has-shot .thumb-model{display:none}
-.device-card-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
-.device-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.device-card-name{font-size:15px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.device-card-model{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.device-card-status{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+/* ===== 设备卡片网格（V2 云手机墙：左侧高挑大屏 9:18 竖屏实时画面 + 右侧极窄竖排状态与操作条） ===== */
+.device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,274px));gap:16px;padding:22px 26px}
+.device-card{display:flex;align-items:stretch;gap:9px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:18px;transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease)}
+.device-card:hover{transform:translateY(-2px);box-shadow:var(--sh-md);border-color:#d5def0}
+.device-card.is-offline{opacity:.82}
+.device-card-phone{flex:none;width:156px;min-height:296px;align-self:stretch;border-radius:20px;padding:4px;background:linear-gradient(160deg,#1e293b,#0f172a);box-shadow:0 6px 18px rgba(15,23,42,.18);position:relative;cursor:pointer;overflow:hidden}
+.device-card-phone.is-offline{background:linear-gradient(160deg,#475569,#334155);cursor:default}
+.device-card-screen{width:100%;height:100%;border-radius:16px;background:radial-gradient(circle at 30% 20%,#1e293b 0%,#090f1e 78%);position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.device-card-notch{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:#1e293b;border:1px solid rgba(255,255,255,.14);z-index:3;pointer-events:none}
+.device-card-shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;display:none}
+.device-card-screen.has-shot .device-card-shot{display:block}
+.device-card-screen.has-shot .device-card-placeholder{display:none}
+.device-card-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;text-align:center;z-index:1;transition:opacity .16s ease}
+.device-card-phone:not(.is-offline):hover .device-card-placeholder{opacity:0}
+.device-card-placeholder .ph-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,rgba(76,99,230,.42),rgba(6,182,212,.32));border:1px solid rgba(255,255,255,.16);color:#e2e8f0}
+.device-card-placeholder .ph-ic.warn{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#fbbf24}
+.device-card-placeholder .ph-ic.off{background:rgba(148,163,184,.14);border-color:rgba(148,163,184,.2);color:#94a3b8}
+.device-card-placeholder .ph-title{font-size:11px;font-weight:600;color:#e2e8f0;line-height:1.25}
+.device-card-placeholder .ph-sub{font-size:10px;color:#94a3b8}
+.device-card-hover{position:absolute;inset:0;background:rgba(10,17,34,.74);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .16s ease;z-index:2;color:#fff;font-size:12px;font-weight:600;letter-spacing:.04em}
+.device-card-phone:not(.is-offline):hover .device-card-hover{opacity:1}
+.device-card-check{position:absolute;top:8px;left:8px;z-index:4;width:16px;height:16px;margin:0;accent-color:var(--brand);cursor:pointer}
+.device-card-live-tag{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:9.5px;font-weight:600;white-space:nowrap;background:rgba(15,23,42,.76);border:1px solid rgba(255,255,255,.14);color:#6ee7b7;pointer-events:none}
+.device-card-live-tag.warn{color:#fcd34d;border-color:rgba(245,158,11,.32)}
+.device-card-live-tag.off{color:#94a3b8;border-color:rgba(148,163,184,.25)}
+.device-card-live-tag i{width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block}
+.device-card-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;padding:0}
+.device-card-top{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.device-card-name{width:100%;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.device-card-sub{width:100%;font-size:9.5px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--faint);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-status{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.device-card-status::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
 .device-card-status.online{color:#0b7a4d;background:var(--green-soft)}
 .device-card-status.offline{color:#64708a;background:#f1f3f8}
-.device-card-status.adb-offline{color:#9a6a00;background:#fdf1dc}
-.device-card-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.device-card-metric{background:var(--surface-soft);border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
-.device-card-metric .m-label{font-size:10.5px;color:var(--faint);letter-spacing:.03em}
-.device-card-metric .m-value{font-size:13.5px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.device-card-metric .m-value.low{color:var(--red)}
-.device-card-metric .m-value.mid{color:var(--amber)}
-.device-card-group{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.device-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:2px}
-.device-card-actions button{padding:7px 13px;font-size:12.5px;border-radius:8px}
+.device-card-kv{margin-top:6px;background:var(--surface-soft);border:1px solid #eef2f6;border-radius:10px;padding:6px 7px;display:flex;flex-direction:column;gap:5px}
+.device-card-kv-row{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:10.5px;line-height:1.2}
+.device-card-kv-row .kv-k{font-size:9px;color:var(--faint);flex:none}
+.device-card-kv-row .kv-v{width:100%;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.device-card-kv-row .kv-tag{font-size:9.5px;padding:1px 6px;border-radius:4px;font-weight:600}
+.device-card-kv-row .kv-tag.auto{background:var(--brand-soft);color:var(--brand)}
+.device-card-kv-row .kv-tag.manual{background:#f1f4fa;color:var(--muted)}
+.device-card-kv-row .kv-bat-bar{flex:1;max-width:34px;height:4px;border-radius:99px;background:#e6eaf3;overflow:hidden;display:inline-block}
+.device-card-kv-row .kv-bat-bar>i{display:block;height:100%;border-radius:99px;background:#10b981}
+.device-card-kv-row .kv-bat-bar>i.mid{background:#e2a33c}
+.device-card-kv-row .kv-bat-bar>i.low{background:#e0483d}
+.device-card-actions{display:flex;flex-direction:column;gap:5px;margin-top:7px}
+.device-card-actions .dc-primary{width:100%;padding:6px 4px;font-size:11.5px;font-weight:600;border-radius:8px;border:0;cursor:pointer;background:var(--brand);color:#fff;transition:opacity .15s}
+.device-card-actions .dc-primary:hover{opacity:.92}
+.device-card-actions .dc-primary:disabled{opacity:.45;cursor:not-allowed}
+.device-card-actions .dc-sub-row{display:flex;flex-direction:column;gap:4px}
+.device-card-actions .dc-btn{width:100%;padding:5px 4px;font-size:11px;font-weight:600;border-radius:7px;border:1px solid var(--line-2);background:#fff;color:var(--ink-2);cursor:pointer;transition:background .15s;white-space:nowrap}
+.device-card-actions .dc-btn:hover:not(:disabled){background:#f8fafd}
+.device-card-actions .dc-btn:disabled{opacity:.45;cursor:not-allowed}
+.device-card-actions .dc-btn.danger{border-color:transparent;background:var(--red-soft);color:var(--red)}
+.device-card-actions .dc-btn.danger:hover:not(:disabled){background:#fad6d3}
 .device-grid-empty{grid-column:1/-1;text-align:center;padding:52px 20px;color:var(--faint);font-size:13.5px}
 
 /* ===== 表单卡片 ===== */
@@ -854,7 +883,7 @@ table .col-select{width:34px;text-align:center;padding:0}
 
       <!-- 页面：设备清单 -->
       <section id="sec-devices" class="section page" data-title="设备清单" data-crumb="设备清单">
-        <div class="section-head"><div><span class="eyebrow">01 / Devices</span><h2>设备清单</h2><p>所有对你可见的终端及其最近一次上报的运行状态</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">Devices</span><h2>设备清单</h2><p>所有对你可见的终端及其最近一次上报的运行状态</p></div></div>
         <div class="card table-card">
           <div class="card-head">
             <div><h3>已接入设备</h3><p>状态随实时事件自动更新，也可手动刷新</p></div>
@@ -902,7 +931,7 @@ table .col-select{width:34px;text-align:center;padding:0}
 
       <!-- 页面：账号管理 -->
       <section id="sec-accounts" class="section page" data-title="账号管理" data-crumb="账号管理">
-        <div class="section-head"><div><span class="eyebrow">02 / Resources</span><h2>账号管理</h2><p>开通登录账号；管理员账号不可删除，普通账号可创建、删除</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">Accounts</span><h2>账号管理</h2><p>开通登录账号；管理员账号不可删除，普通账号可创建、删除</p></div></div>
         <div class="card table-card">
           <div class="card-head">
             <div><h3>账号列表</h3><p>勾选后点右上角「删除」批量移除普通账号</p></div>
@@ -920,7 +949,7 @@ table .col-select{width:34px;text-align:center;padding:0}
 
       <!-- 页面：角色管理 -->
       <section id="sec-groups" class="section page" data-title="角色管理" data-crumb="角色管理">
-        <div class="section-head"><div><span class="eyebrow">03 / Resources</span><h2>角色管理</h2><p>角色是授权的基本单位，用于对账号和设备归类授权</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">Roles</span><h2>角色管理</h2><p>角色是授权的基本单位，用于对账号和设备归类授权</p></div></div>
         <div class="card table-card">
           <div class="card-head">
             <div><h3>角色列表</h3><p>勾选后点右上角「删除」批量移除角色</p></div>
@@ -938,7 +967,7 @@ table .col-select{width:34px;text-align:center;padding:0}
 
       <!-- 页面：权限管理 -->
       <section id="sec-perms" class="section page" data-title="权限管理" data-crumb="权限管理">
-        <div class="section-head"><div><span class="eyebrow">04 / Access Control</span><h2>权限管理</h2><p>通过「用户组 × 设备组」建立查看与管理权限</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">Access Control</span><h2>权限管理</h2><p>通过「用户组 × 设备组」建立查看与管理权限</p></div></div>
         <div class="card table-card">
           <div class="card-head">
             <div><h3>授权关系</h3><p>勾选后点右上角「删除」移除授权关系</p></div>
@@ -965,7 +994,7 @@ table .col-select{width:34px;text-align:center;padding:0}
           </div>
           <div class="table-card">
             <table>
-              <thead><tr><th>脚本名称</th><th>匹配型号</th><th>步骤数</th><th>版本</th><th>更新时间</th><th style="width:180px">操作</th></tr></thead>
+              <thead><tr><th>脚本名称</th><th>匹配型号</th><th>步骤数</th><th>版本</th><th>更新时间</th><th style="width:200px">操作</th></tr></thead>
               <tbody id="dsRows"><tr><td colspan="6" class="muted">暂无脚本，点击「新建脚本」开始</td></tr></tbody>
             </table>
           </div>
@@ -1024,7 +1053,7 @@ table .col-select{width:34px;text-align:center;padding:0}
 
       <!-- 页面：自动化 -->
       <section id="sec-automation" class="section page" data-title="自动化" data-crumb="自动化">
-        <div class="section-head"><div><span class="eyebrow">06 / Automation</span><h2>自动化</h2><p>编排真机操作流程，批量执行点击、滑动、截图、安装等动作</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">Devices Automation</span><h2>自动化</h2><p>编排真机操作流程，批量执行点击、滑动、截图、安装等动作</p></div></div>
 
         <div class="mdm-tabs" id="autoTabs">
           <button class="mdm-tab active" data-tab="flows">流程编排</button>
@@ -1383,29 +1412,155 @@ function deviceActions(d){const box=document.createElement('div');box.className=
   }
   return box}
 function renderDeviceList(){const body=$('deviceRows');body.replaceChildren();if(!devices.length){body.innerHTML='<tr><td colspan="10" class="muted">没有可见设备</td></tr>';return}for(const d of devices){const tr=document.createElement('tr');const sel=document.createElement('td');sel.className='col-select';const cb=document.createElement('input');cb.type='checkbox';cb.className='device-check';cb.dataset.deviceId=d.id;cb.checked=selectedDevices.has(d.id);cb.disabled=!(d.online&&d.adbOnline===true&&d.enabled);cb.addEventListener('change',()=>{if(cb.checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id);updateDeviceSelectBar()});sel.append(cb);const st=deviceStatusInfo(d);const state=document.createElement('td');state.innerHTML=`<span class="dot ${st.dot}"></span>${st.label}${d.enabled?'':' / 已停用'}`;const name=document.createElement('td');name.textContent=deviceDisplayName(d);const battery=document.createElement('td');battery.textContent=d.online?`${d.battery}%`:'—';const rtt=document.createElement('td');rtt.textContent=d.online?`${d.rttMs} ms`:'—';const modeInfo=deviceAdbModeInfo(d);const adbModeTd=document.createElement('td');adbModeTd.textContent=modeInfo.label;const adbSt=deviceAdbStatusInfo(d);const adbStateTd=document.createElement('td');adbStateTd.innerHTML=`<span class="dot ${adbSt.dot}"></span>${adbSt.label}`;const group=document.createElement('td');group.textContent=deviceGroupLabel(d);const last=document.createElement('td');last.textContent=d.lastSeen?new Date(d.lastSeen*1000).toLocaleString():'—';const actions=document.createElement('td');actions.append(deviceActions(d));tr.append(sel,state,name,battery,rtt,adbModeTd,adbStateTd,group,last,actions);body.append(tr)}updateDeviceSelectBar()}
-function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren();if(!devices.length){const empty=document.createElement('div');empty.className='device-grid-empty';empty.textContent='没有可见设备';grid.append(empty);return}for(const d of devices){const card=document.createElement('div');card.className='device-card';
-  // 缩略图：优先用 d.screenshot，否则深色占位图（图标 + 型号）
-  const thumb=document.createElement('div');thumb.className='device-card-thumb';if(d.screenshot){thumb.classList.add('has-shot');thumb.style.backgroundImage=`url(${d.screenshot})`;}else{const ic=document.createElement('svg');ic.className='ico ico-lg thumb-icon';ic.innerHTML='<use href="#i-device"></use>';const model=document.createElement('span');model.className='thumb-model';model.textContent=d.model||deviceDisplayName(d);thumb.append(ic,model);}
-  // 信息区
+// 卡片模式实时缩略图缓存（deviceId -> objectURL）与 3 秒自动刷新循环
+const cardScreenUrls = new Map();
+const cardScreenBusy = new Set();
+let cardScreenTimer = null;
+
+async function fetchDeviceScreenOnce(deviceId) {
+  if (!token || !deviceId || cardScreenBusy.has(deviceId)) return;
+  cardScreenBusy.add(deviceId);
+  try {
+    const resp = await fetch(`/api/admin/device/screen?deviceId=${encodeURIComponent(deviceId)}&t=${Date.now()}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    if (!blob || blob.size < 100) return;
+    const url = URL.createObjectURL(blob);
+    const prev = cardScreenUrls.get(deviceId);
+    cardScreenUrls.set(deviceId, url);
+    // 直接更新页面上对应的卡片缩略图，不触发整表重绘
+    const img = document.querySelector(`.device-card-shot[data-device-id="${CSS.escape(deviceId)}"]`);
+    if (img) {
+      img.src = url;
+      const scr = img.closest('.device-card-screen');
+      if (scr) scr.classList.add('has-shot');
+    }
+    if (prev && prev !== url) setTimeout(() => URL.revokeObjectURL(prev), 1500);
+  } catch (_) {
+  } finally {
+    cardScreenBusy.delete(deviceId);
+  }
+}
+
+function pollAllCardScreens() {
+  if (deviceView !== 'grid' || document.visibilityState !== 'visible') return;
+  const sec = $('sec-devices');
+  if (!sec || !sec.classList.contains('active')) return;
+  for (const d of devices) {
+    if (d.online && d.adbOnline === true && d.adbIp) {
+      fetchDeviceScreenOnce(d.id);
+    }
+  }
+}
+
+function ensureCardScreenPolling() {
+  if (deviceView === 'grid') {
+    pollAllCardScreens();
+    if (!cardScreenTimer) {
+      cardScreenTimer = setInterval(pollAllCardScreens, 3000);
+    }
+  } else if (cardScreenTimer) {
+    clearInterval(cardScreenTimer);
+    cardScreenTimer = null;
+  }
+}
+
+function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren();if(!devices.length){const empty=document.createElement('div');empty.className='device-grid-empty';empty.textContent='没有可见设备';grid.append(empty);return}for(const d of devices){
+  const adbConnected=!!d.online&&d.adbOnline===true;
+  const card=document.createElement('div');card.className='device-card'+(d.online?'':' is-offline');
+
+  // 左侧：9:16 竖屏真机画面框（实时刷新截屏，点击直接进入远程控制）
+  const phone=document.createElement('div');phone.className='device-card-phone'+(d.online&&d.enabled?'':' is-offline');
+  if(d.online&&d.enabled){phone.title=adbConnected?'点击进入远程控制':'点击连接设备';phone.onclick=()=>openScrcpy(d,adbConnected?undefined:{manualSetup:true});}
+
+  const scr=document.createElement('div');scr.className='device-card-screen';
+  const notch=document.createElement('span');notch.className='device-card-notch';scr.append(notch);
+
+  // 左上角复选框（支持卡片模式多选群控/批量安装）
+  const cb=document.createElement('input');cb.type='checkbox';cb.className='device-card-check';cb.dataset.deviceId=d.id;cb.checked=selectedDevices.has(d.id);cb.disabled=!(d.online&&adbConnected&&d.enabled);
+  cb.addEventListener('click',(e)=>e.stopPropagation());
+  cb.addEventListener('change',()=>{if(cb.checked)selectedDevices.add(d.id);else selectedDevices.delete(d.id);updateDeviceSelectBar()});
+  scr.append(cb);
+
+  // 实时画面 img
+  const shot=document.createElement('img');shot.className='device-card-shot';shot.dataset.deviceId=d.id;shot.alt=deviceDisplayName(d);
+  const cachedUrl=cardScreenUrls.get(d.id)||d.screenshot||'';
+  if(cachedUrl && adbConnected){shot.src=cachedUrl;scr.classList.add('has-shot');}
+  scr.append(shot);
+
+  // 待机/无画面时的精致占位
+  const ph=document.createElement('div');ph.className='device-card-placeholder';
+  const phIcCls=adbConnected?'':(d.online?' warn':' off');
+  const phTitle=adbConnected?'实时画面加载中':(d.online?'ADB 未连接':'设备离线');
+  const phSub=adbConnected?'点击直接控屏':(d.online?'点击配对连接':'暂不可操作');
+  ph.innerHTML=`<div class="ph-ic${phIcCls}"><svg class="ico"><use href="#${adbConnected?'i-monitor':'i-bolt'}"/></svg></div><div class="ph-title">${phTitle}</div><div class="ph-sub">${phSub}</div>`;
+  scr.append(ph);
+
+  if(d.online&&d.enabled){
+    const hov=document.createElement('div');hov.className='device-card-hover';hov.textContent=adbConnected?'点击控屏':'连接设备';scr.append(hov);
+  }
+  const liveTag=document.createElement('span');liveTag.className='device-card-live-tag'+(adbConnected?'':(d.online?' warn':' off'));
+  liveTag.innerHTML=`<i></i>${adbConnected?'实时画面':(d.online?'待连接':'已离线')}`;
+  scr.append(liveTag);
+  phone.append(scr);
+
+  // 右侧：标题 + 单行键值状态清单 + 对齐操作按钮
   const body=document.createElement('div');body.className='device-card-body';
+  const headWrap=document.createElement('div');
   const top=document.createElement('div');top.className='device-card-top';
-  const nameBox=document.createElement('div');nameBox.style.minWidth='0';nameBox.style.flex='1';
-  const name=document.createElement('div');name.className='device-card-name';name.textContent=deviceDisplayName(d);
-  const model=document.createElement('div');model.className='device-card-model';model.textContent=d.model||'—';
-  nameBox.append(name,model);
+  const name=document.createElement('div');name.className='device-card-name';name.textContent=deviceDisplayName(d);name.title=deviceDisplayName(d);
   const st=document.createElement('span');st.className='device-card-status '+(d.online?'online':'offline');st.textContent=d.online?(d.enabled?'在线':'已停用'):'离线';
-  top.append(nameBox,st);
-  const metrics=document.createElement('div');metrics.className='device-card-metrics';
-  const mk=(label,value,cls)=>{const m=document.createElement('div');m.className='device-card-metric';const l=document.createElement('span');l.className='m-label';l.textContent=label;const v=document.createElement('span');v.className='m-value'+(cls?' '+cls:'');v.textContent=value;m.append(l,v);return m};
-  metrics.append(mk('电量',d.online?`${d.battery}%`:'—',d.battery<=20?'low':(d.battery<=50?'mid':'')));
-  metrics.append(mk('ADB模式',deviceAdbModeInfo(d).label));
-  metrics.append(mk('ADB状态',deviceAdbStatusInfo(d).label,d.adbOnline===true?'':'warn'));
-  const grp=document.createElement('div');grp.className='device-card-group';grp.textContent='分组：'+deviceGroupLabel(d);
-  const acts=document.createElement('div');acts.className='device-card-actions';acts.append(deviceActions(d));
-  body.append(top,metrics,grp,acts);
-  card.append(thumb,body);grid.append(card);}}
+  top.append(name,st);
+
+  const sub=document.createElement('div');sub.className='device-card-sub';
+  const ipStr=d.adbIp?`${d.adbIp}:${(d.adbPort&&d.adbPort>0)?d.adbPort:5555}`:(d.lastSeen?`上次在线 ${new Date(d.lastSeen*1000).toLocaleString()}`:'未获取局域网 IP');
+  sub.textContent=ipStr;sub.title=ipStr;
+
+  // 键值状态清单
+  const kv=document.createElement('div');kv.className='device-card-kv';
+  const batPct=d.online?Math.max(0,Math.min(100,Number(d.battery)||0)):0;
+  const batCls=batPct<=20?'low':(batPct<=50?'mid':'');
+  const modeInfo=deviceAdbModeInfo(d);
+  const adbSt=deviceAdbStatusInfo(d);
+  kv.innerHTML=`
+    <div class="device-card-kv-row"><span class="kv-k">电量</span><span class="kv-v">${d.online?`<span class="kv-bat-bar"><i class="${batCls}" style="width:${batPct}%"></i></span>${batPct}%`:'—'}</span></div>
+    <div class="device-card-kv-row"><span class="kv-k">ADB 模式</span><span class="kv-v"><span class="kv-tag ${modeInfo.mode}">${modeInfo.label}</span></span></div>
+    <div class="device-card-kv-row"><span class="kv-k">ADB 状态</span><span class="kv-v" style="color:${adbConnected?'#0e9f63':(d.online?'#b7791f':'#98a3ba')}"><span class="dot ${adbSt.dot}" style="margin-right:2px;width:6px;height:6px"></span>${adbSt.label}</span></div>
+    <div class="device-card-kv-row"><span class="kv-k">分组</span><span class="kv-v" title="${escapeHTML(deviceGroupLabel(d))}">${escapeHTML(deviceGroupLabel(d))}</span></div>`;
+  headWrap.append(top,sub,kv);
+
+  // 底部按钮：上 1 通栏主按钮 + 下 2 等宽副按钮
+  const acts=document.createElement('div');acts.className='device-card-actions';
+  const primary=document.createElement('button');primary.className='dc-primary';primary.disabled=!d.enabled;
+  if(adbConnected){
+    primary.textContent='远程控制';primary.onclick=()=>openScrcpy(d);
+  }else{
+    primary.textContent='连接设备';primary.onclick=()=>openScrcpy(d,{manualSetup:true});
+  }
+  const subRow=document.createElement('div');subRow.className='dc-sub-row';
+  const filesBtn=document.createElement('button');filesBtn.className='dc-btn';filesBtn.textContent='文件';filesBtn.title='读取文件';filesBtn.disabled=!(d.enabled&&adbConnected&&d.adbIp);
+  filesBtn.onclick=()=>{const ip=d.adbIp;if(!ip){toast('未获取到设备 IP，请重新连接');return;}const port=(d.adbPort&&d.adbPort>0)?d.adbPort:5555;if(typeof window.openFilePanel==='function')window.openFilePanel(ip+':'+port,deviceDisplayName(d));else toast('文件模块未加载');};
+
+  const rightBtn=document.createElement('button');
+  if(adbConnected){
+    rightBtn.className='dc-btn danger';rightBtn.textContent='断开';
+    rightBtn.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';cardScreenUrls.delete(d.id);renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};
+  }else if(!d.online && user){
+    rightBtn.className='dc-btn danger';rightBtn.textContent='删除';
+    rightBtn.onclick=async()=>{if(!confirm(`确定删除离线设备「${deviceDisplayName(d)}」记录吗？`))return;try{await api(`/api/admin/devices/${encodeURIComponent(d.id)}`,{method:'DELETE'});devices=devices.filter(x=>x.id!==d.id);renderDevices();toast('已删除离线设备')}catch(e){toast('删除失败：'+e.message)}};
+  }else{
+    rightBtn.className='dc-btn';rightBtn.textContent='远程控制';rightBtn.disabled=!d.enabled;
+    rightBtn.onclick=()=>openScrcpy(d);
+  }
+  subRow.append(filesBtn,rightBtn);
+  acts.append(primary,subRow);
+
+  body.append(headWrap,acts);
+  card.append(phone,body);grid.append(card);}}
 function renderDevices(){renderDeviceList();renderDeviceCards();let online=0,adbOff=0;for(const d of devices){if(d.online){online++;if(d.adbOnline===false)adbOff++}}$('summary').textContent=`${devices.length} 台设备，${online} 台在线${adbOff?`（${adbOff} 台 ADB 掉线）`:''}${ws?.readyState===WebSocket.OPEN?' · 实时更新中':' · 实时连接未连接'}`;applyDeviceView()}
-function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGridView');const listBtn=$('viewListBtn'),gridBtn=$('viewGridBtn');if(!listEl||!gridEl)return;const isList=deviceView==='list';listEl.classList.toggle('hidden',!isList);gridEl.classList.toggle('hidden',isList);if(listBtn&&gridBtn){listBtn.classList.toggle('active',isList);gridBtn.classList.toggle('active',!isList)}}
+function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGridView');const listBtn=$('viewListBtn'),gridBtn=$('viewGridBtn');if(!listEl||!gridEl)return;const isList=deviceView==='list';listEl.classList.toggle('hidden',!isList);gridEl.classList.toggle('hidden',isList);if(listBtn&&gridBtn){listBtn.classList.toggle('active',isList);gridBtn.classList.toggle('active',!isList)}ensureCardScreenPolling()}
 function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
 async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
@@ -2529,8 +2684,9 @@ if(token)showApp();
       const cnt = document.createElement('td'); cnt.textContent = parseSteps(sc.stepsJson).length;
       const ver = document.createElement('td'); ver.textContent = 'v' + (sc.version || 0);
       const upd = document.createElement('td'); upd.textContent = sc.updatedAt ? new Date(sc.updatedAt*1000).toLocaleString() : '—';
-      const act = document.createElement('td');
-      const edit = document.createElement('button'); edit.textContent='编辑'; edit.className='secondary'; edit.style.marginRight='6px';
+      const act = document.createElement('td'); act.className = 'action-cell';
+      const actBox = document.createElement('div'); actBox.className = 'actions'; actBox.style.flexWrap = 'nowrap';
+      const edit = document.createElement('button'); edit.textContent='编辑'; edit.className='secondary';
       edit.onclick = () => openEditor(sc);
       const del = document.createElement('button'); del.textContent='删除'; del.className='danger';
       del.onclick = async () => {
@@ -2538,7 +2694,8 @@ if(token)showApp();
         try { await api('/api/admin/device-scripts/'+sc.id, {method:'DELETE'}); toast('已删除'); loadScripts(); }
         catch(e){ toast('删除失败：'+e.message); }
       };
-      act.append(edit, del);
+      actBox.append(edit, del);
+      act.append(actBox);
       tr.append(name, match, cnt, ver, upd, act);
       body.append(tr);
     });

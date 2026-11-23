@@ -478,6 +478,29 @@ func (a *ADB) Screencap(ctx context.Context, serial, localPath string) error {
 	return nil
 }
 
+// ScreencapBytes 通过 `adb exec-out screencap -p` 直接在内存中抓取设备当前屏幕 PNG 字节流，
+// 供卡片视图实时预览使用（免落盘，6 秒超时避免离线设备长时间阻塞）。
+func (a *ADB) ScreencapBytes(ctx context.Context, serial string) ([]byte, error) {
+	runCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, a.path, "-s", serial, "exec-out", "screencap", "-p")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("adb screencap %s: %s", serial, msg)
+	}
+	if stdout.Len() == 0 {
+		return nil, fmt.Errorf("adb screencap %s: empty output", serial)
+	}
+	return stdout.Bytes(), nil
+}
+
 // DeviceFile 是设备上一个文件/目录的最小信息，供文件浏览界面展示。
 type DeviceFile struct {
 	Name    string // 文件或目录名（不含路径）

@@ -263,6 +263,8 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleDeviceConnect(w, req, u)
 	case "device/disconnect":
 		r.handleDeviceDisconnect(w, req, u)
+	case "device/screen":
+		r.handleDeviceScreen(w, req, u)
 	case "files/list":
 		r.handleFilesList(w, req, u)
 	case "files/download":
