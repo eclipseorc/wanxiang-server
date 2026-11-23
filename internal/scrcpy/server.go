@@ -26,12 +26,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type activeConn struct {
+	conn   *websocket.Conn
+	cancel context.CancelFunc
+}
+
 // Server 桥接浏览器与设备的 scrcpy 会话。
 type Server struct {
-	adb  *ADB
-	cfg  ScrcpyConfig
-	mu   sync.Mutex
-	live map[string]bool // serial -> 是否正在被观看，防止同设备重复控制
+	adb         *ADB
+	cfg         ScrcpyConfig
+	mu          sync.Mutex
+	live        map[string]bool        // serial -> 是否正在被观看，防止同设备重复控制
+	activeConns map[string]*activeConn // serial -> 当前活跃的浏览器 WS 连接与上下文取消函数（新连接到达时可立即中止旧连接接管）
 
 	// 群控相关状态（见 sync.go）：由同一把 mu 保护。
 	sessions map[string]*deviceSession // serial -> 活跃会话（control 通道 + 分辨率）
@@ -42,12 +48,13 @@ type Server struct {
 // NewServer 构造 scrcpy 服务。
 func NewServer(adb *ADB, cfg ScrcpyConfig) *Server {
 	return &Server{
-		adb:      adb,
-		cfg:      cfg,
-		live:     make(map[string]bool),
-		sessions: make(map[string]*deviceSession),
-		groups:   make(map[string]*syncGroup),
-		inGroup:  make(map[string]string),
+		adb:         adb,
+		cfg:         cfg,
+		live:        make(map[string]bool),
+		activeConns: make(map[string]*activeConn),
+		sessions:    make(map[string]*deviceSession),
+		groups:      make(map[string]*syncGroup),
+		inGroup:     make(map[string]string),
 	}
 }
 
@@ -126,6 +133,54 @@ func (s *Server) release(serial string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.live, serial)
+	delete(s.activeConns, serial)
+}
+
+// acquireOrPreempt 尝试获取 serial 的观看锁；若已被旧 WS 会话占用，主动取消旧上下文并关闭旧 WS，
+// 等待最多 3 秒让旧会话清理退出后接管。
+func (s *Server) acquireOrPreempt(serial string, conn *websocket.Conn, cancel context.CancelFunc) bool {
+	ac := &activeConn{conn: conn, cancel: cancel}
+	s.mu.Lock()
+	if !s.live[serial] {
+		s.live[serial] = true
+		s.activeConns[serial] = ac
+		s.mu.Unlock()
+		return true
+	}
+	old := s.activeConns[serial]
+	s.mu.Unlock()
+
+	if old != nil {
+		if old.cancel != nil {
+			old.cancel()
+		}
+		if old.conn != nil {
+			_ = old.conn.Close()
+		}
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+		s.mu.Lock()
+		if !s.live[serial] {
+			s.live[serial] = true
+			s.activeConns[serial] = ac
+			s.mu.Unlock()
+			return true
+		}
+		s.mu.Unlock()
+	}
+	return false
+}
+
+func (s *Server) releaseConn(serial string, conn *websocket.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur := s.activeConns[serial]
+	if cur == nil || cur.conn == conn {
+		delete(s.live, serial)
+		delete(s.activeConns, serial)
+	}
 }
 
 // handleWS 处理一次完整的远程观看会话。
@@ -165,15 +220,19 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// 同一设备同一时刻只允许一个观看会话。
-	if !s.tryAcquire(serial) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	// 同一设备同一时刻只允许一个观看会话；若已有旧连接（如刷新页面或重连时旧连接尚未完全退出），
+	// 主动取消旧连接上下文并关闭旧连接，等待其释放锁后由新连接平滑接管，避免报 "device already being controlled"。
+	if !s.acquireOrPreempt(serial, conn, cancel) {
 		_ = conn.WriteJSON(map[string]string{"type": "error", "message": "device already being controlled"})
 		return
 	}
-	defer s.release(serial)
+	defer s.releaseConn(serial, conn)
 
 	// 完成准备流程（部署 + 启动 + forward）。
-	port, err := s.prepare(r.Context(), serial, cfg)
+	port, err := s.prepare(ctx, serial, cfg)
 	if err != nil {
 		_ = conn.WriteJSON(map[string]string{"type": "error", "message": err.Error()})
 		return
@@ -181,7 +240,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	defer s.cleanup(serial, port)
 
 	// 建立视频 + 控制两条 TCP 通道。
-	tun, err := establish(r.Context(), port)
+	tun, err := establish(ctx, port)
 	if err != nil {
 		_ = conn.WriteJSON(map[string]string{"type": "error", "message": err.Error()})
 		return

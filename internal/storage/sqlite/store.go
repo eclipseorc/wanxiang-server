@@ -157,10 +157,11 @@ func (s *Store) PurgeExpired() error {
 
 // UpsertDevice 登记设备：设备首次上报时插入，重复上报时更新型号。
 // 设备 ID 由 App 本地生成，服务端只负责持久化，不再下发任何设备令牌。
+// 传入空型号（如 adb-ready 先行登记）时保留库中已有型号，避免把型号清空。
 func (s *Store) UpsertDevice(id, model string) error {
 	_, err := s.DB.Exec(
 		`INSERT INTO devices(id,name,model,created_at) VALUES(?,'',?,?)
-		 ON CONFLICT(id) DO UPDATE SET model=excluded.model`,
+		 ON CONFLICT(id) DO UPDATE SET model=CASE WHEN excluded.model<>'' THEN excluded.model ELSE devices.model END`,
 		id, model, time.Now().Unix(),
 	)
 	return err

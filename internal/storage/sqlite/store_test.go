@@ -146,6 +146,24 @@ func TestUpsertDeviceIsIdempotent(t *testing.T) {
 	}
 }
 
+// UpsertDevice 传入空型号（adb-ready 先行登记）时不应清空已有型号。
+func TestUpsertDeviceKeepsModelWhenEmpty(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.UpsertDevice("device-b", "motorola moto e14"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertDevice("device-b", ""); err != nil {
+		t.Fatal(err)
+	}
+	var model string
+	if err := store.DB.QueryRow(`SELECT model FROM devices WHERE id='device-b'`).Scan(&model); err != nil {
+		t.Fatal(err)
+	}
+	if model != "motorola moto e14" {
+		t.Fatalf("expected model to be kept, got %q", model)
+	}
+}
+
 // SetEnabled 对不存在的设备返回 ErrNotFound。
 func TestSetEnabledNotFound(t *testing.T) {
 	store := newTestStore(t)

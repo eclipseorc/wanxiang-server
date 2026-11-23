@@ -274,9 +274,8 @@
       root.className = 'scr-window';
       root.innerHTML = `
         <div class="scr-window-bar" data-drag>
-          <span class="scr-win-status" data-status-dot></span>
-          <span class="scr-win-title">${name}</span>
-          <span class="scr-win-fps" data-fps>-- fps</span>
+          <span class="scr-win-status${(this.device && (this.device.online || this.device.adbOnline)) ? ' on' : ''}" data-status-dot></span>
+          <span class="scr-win-title" title="${name}">${name}</span>
           <button type="button" class="scr-win-min" data-toggle-setup title="手动连接设置">⚙</button>
           <button type="button" class="scr-win-min" data-min title="最小化"><svg class="ico ico-sm" viewBox="0 0 24 24"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg></button>
           <button type="button" class="scr-win-close" data-close title="关闭">✕</button>
@@ -286,7 +285,10 @@
           <div class="screen-frame hidden" data-stage><canvas data-canvas></canvas></div>
           <textarea class="scr-kb-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-kb></textarea>
         </div>
-        <div class="scr-win-status" data-status>准备连接…</div>
+        <div class="scr-win-status" data-status>
+          <span class="scr-win-status-text" data-status-text>准备连接…</span>
+          <span class="scr-win-fps" data-fps>-- fps</span>
+        </div>
         <div class="scr-win-resize" data-resize></div>`;
       document.body.appendChild(root);
       this.el = root;
@@ -295,6 +297,7 @@
       this.canvas = root.querySelector('[data-canvas]');
       this.kb = root.querySelector('[data-kb]');
       this.statusEl = root.querySelector('[data-status]');
+      this.statusTextEl = root.querySelector('[data-status-text]');
       this.statusDot = root.querySelector('[data-status-dot]');
       this.titleEl = root.querySelector('.scr-win-title');
       this.fpsEl = root.querySelector('[data-fps]');
@@ -350,7 +353,8 @@
     }
 
     status(msg, ok) {
-      this.statusEl.textContent = msg;
+      if (this.statusTextEl) this.statusTextEl.textContent = msg;
+      else this.statusEl.textContent = msg;
       this.statusEl.classList.toggle('ok', !!ok);
       this.statusEl.classList.toggle('err', ok === false);
     }
@@ -582,6 +586,13 @@
         if (!host || !port) { toast('请先完成配对与连接'); return; }
         serial = `${host}:${port}`; // 使用无线调试的真实连接端口
         this.persistCfg();
+      }
+      this.setup.classList.add('hidden');
+      this.stage.classList.remove('hidden');
+      // 若当前窗口已经在正常播放该 serial 的视频流（decoder 已就绪），直接切回画面即可，不要重复发起第二条 WS 连接
+      if (this.alive && this.decoder && this.serial === serial && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.status('远程画面进行中', true);
+        return;
       }
       this.status('正在启动远程会话…');
       this.connectWs(serial);
@@ -822,7 +833,16 @@
 
     // —— scrcpy WS 会话 ——
     connectWs(serial, opts) {
-      if (this.ws && this.alive) { try { this.ws.close(); } catch (_) {} }
+      if (this.ws) {
+        try {
+          this.ws.onopen = null;
+          this.ws.onmessage = null;
+          this.ws.onclose = null;
+          this.ws.onerror = null;
+          this.ws.close();
+        } catch (_) {}
+        this.ws = null;
+      }
       if (this.decoder) { try { this.decoder.close(); } catch (_) {} this.decoder = null; }
       if (this.latestFrame) { try { this.latestFrame.close(); } catch (_) {} this.latestFrame = null; }
       this.pendingSpsPps = null;
@@ -843,8 +863,13 @@
       this.alive = true;
       this.lastError = null;
 
-      sock.onopen = () => { this.status('远程会话已建立，等待视频…', true); this.statusDot.classList.add('on'); };
+      sock.onopen = () => {
+        if (this.ws !== sock) return;
+        this.status('远程会话已建立，等待视频…', true);
+        this.statusDot.classList.add('on');
+      };
       sock.onmessage = async (event) => {
+        if (this.ws !== sock) return;
         if (typeof event.data === 'string') {
           try {
             const msg = JSON.parse(event.data);
@@ -875,6 +900,7 @@
         } catch (e) { console.warn('decode chunk failed', e); }
       };
       sock.onclose = () => {
+        if (this.ws !== sock) return;
         const err = this.lastError;
         this.lastError = null;
         this.alive = false;
@@ -890,7 +916,10 @@
         }
         else { this.status('远程会话已断开'); }
       };
-      sock.onerror = () => { this.status('远程连接失败', false); };
+      sock.onerror = () => {
+        if (this.ws !== sock) return;
+        this.status('远程连接失败', false);
+      };
     }
 
     async initDecoder(codec, width, height) {
@@ -1120,9 +1149,18 @@
     // 已有取点则先清理，避免串台。
     if (pickState) exitPickMode();
 
-    const session = new ScrcpySession(device);
-    sessions.set(device.id, session);
-    session.el.style.zIndex = ++topZ;
+    let reused = false;
+    let session;
+    if (sessions.has(device.id)) {
+      session = sessions.get(device.id);
+      if (session.minimized) session.restore();
+      reused = true;
+    } else {
+      session = new ScrcpySession(device);
+      sessions.set(device.id, session);
+    }
+    topZ = Math.max(topZ + 1, 2200);
+    session.el.style.zIndex = topZ;
 
     // 画面提示层：告诉用户当前处于取点模式，并提供一个「取消」退出入口。
     // 放在 body 顶部（标题栏下方），不遮挡窗口自带的关闭按钮。
@@ -1137,6 +1175,8 @@
         toast && toast('画面尚未就绪，请稍候再点');
         return;
       }
+      e.stopPropagation();
+      e.preventDefault();
       const rect = session.canvas.getBoundingClientRect();
       const x = Math.round(Math.max(0, Math.min(session.screenW - 1, (e.clientX - rect.left) / rect.width * session.screenW)));
       const y = Math.round(Math.max(0, Math.min(session.screenH - 1, (e.clientY - rect.top) / rect.height * session.screenH)));
@@ -1159,7 +1199,172 @@
       onPick,
       cleanup: () => {
         session.canvas.removeEventListener('pointerdown', onDown, true);
-        session.close();
+        session.el.classList.remove('is-picking');
+        banner.remove();
+        if (!reused) session.close();
+      },
+    };
+  }
+
+  // 进入「控件悬停高亮拾取器（UI Inspector）」模式（类似影刀捕获元素）：
+  // 自动抓取手机当前 UI 控件树，鼠标在画面上悬停时高亮对应控件矩形并展示 text/resId/desc，
+  // 点击即可将控件选择器（by + value + centerX/Y）回填给流程步骤。
+  function enterInspectMode(device, onPickElement) {
+    if (!device || typeof onPickElement !== 'function') return;
+    if (pickState) exitPickMode();
+
+    let reused = false;
+    let session;
+    if (sessions.has(device.id)) {
+      session = sessions.get(device.id);
+      if (session.minimized) session.restore();
+      reused = true;
+    } else {
+      session = new ScrcpySession(device);
+      sessions.set(device.id, session);
+    }
+    topZ = Math.max(topZ + 1, 2200);
+    session.el.style.zIndex = topZ;
+
+    const banner = document.createElement('div');
+    banner.className = 'scr-pick-banner';
+    banner.innerHTML = `
+      <span class="scr-pick-dot"></span>
+      <span class="scr-pick-text" data-inspect-status>正在抓取手机控件树…</span>
+      <button type="button" class="scr-pick-cancel" data-inspect-refresh style="margin-right:4px">刷新控件</button>
+      <button type="button" class="scr-pick-cancel" data-inspect-cancel>取消</button>`;
+
+    const statusText = banner.querySelector('[data-inspect-status]');
+    const refreshBtn = banner.querySelector('[data-inspect-refresh]');
+    const cancelBtn = banner.querySelector('[data-inspect-cancel]');
+
+    // 悬停高亮框与浮层标签
+    const highlight = document.createElement('div');
+    highlight.style.cssText = 'position:fixed;pointer-events:none;border:2px solid #2e6cf6;background:rgba(46,108,246,0.18);border-radius:4px;z-index:2500;display:none;transition:all 40ms ease-out;';
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:absolute;left:0;top:-24px;background:#101828;color:#fff;font-size:11.5px;padding:2px 7px;border-radius:4px;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 6px rgba(0,0,0,.25);';
+    highlight.appendChild(tip);
+    document.body.appendChild(highlight);
+
+    let uiNodes = [];
+    let hoveredNode = null;
+
+    const fetchTree = async () => {
+      statusText.textContent = '正在抓取屏幕控件树…';
+      try {
+        const res = await api(`/api/admin/automation/ui-tree?deviceId=${encodeURIComponent(device.id)}`, { method: 'GET' });
+        uiNodes = (res && Array.isArray(res.nodes)) ? res.nodes : [];
+        statusText.textContent = uiNodes.length
+          ? `已捕获 ${uiNodes.length} 个控件，移动鼠标悬停高亮并点击拾取`
+          : '未抓到控件，可直接点击画面按坐标拾取';
+      } catch (e) {
+        uiNodes = [];
+        statusText.textContent = '控件树抓取失败，点击画面将回退为坐标拾取';
+      }
+    };
+    fetchTree();
+    refreshBtn.addEventListener('click', (e) => { e.stopPropagation(); fetchTree(); });
+    cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); exitPickMode(); });
+
+    const findSmallestHitNode = (devX, devY) => {
+      let best = null;
+      let bestArea = Infinity;
+      for (const n of uiNodes) {
+        const b = n.bounds;
+        if (!b || b.length !== 4) continue;
+        if (devX < b[0] || devX > b[2] || devY < b[1] || devY > b[3]) continue;
+        const hasInfo = !!(n.text || n.desc || n.resId || n.clickable);
+        const area = Math.max(1, (b[2] - b[0]) * (b[3] - b[1])) * (hasInfo ? 1 : 4);
+        if (area <= bestArea) {
+          bestArea = area;
+          best = n;
+        }
+      }
+      return best;
+    };
+
+    const onMove = (e) => {
+      if (session.screenW <= 0 || session.screenH <= 0 || !uiNodes.length) {
+        highlight.style.display = 'none';
+        return;
+      }
+      const rect = session.canvas.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        highlight.style.display = 'none';
+        hoveredNode = null;
+        return;
+      }
+      const devX = Math.round((e.clientX - rect.left) / rect.width * session.screenW);
+      const devY = Math.round((e.clientY - rect.top) / rect.height * session.screenH);
+      const hit = findSmallestHitNode(devX, devY);
+      hoveredNode = hit;
+      if (!hit) {
+        highlight.style.display = 'none';
+        return;
+      }
+      const [l, t, r, b] = hit.bounds;
+      const scaleX = rect.width / session.screenW;
+      const scaleY = rect.height / session.screenH;
+      highlight.style.left = (rect.left + l * scaleX) + 'px';
+      highlight.style.top = (rect.top + t * scaleY) + 'px';
+      highlight.style.width = Math.max(8, (r - l) * scaleX) + 'px';
+      highlight.style.height = Math.max(8, (b - t) * scaleY) + 'px';
+      const label = hit.text
+        ? `文本: "${hit.text}"`
+        : (hit.desc ? `描述: "${hit.desc}"` : (hit.resId ? `ID: ${hit.resId}` : hit.className));
+      tip.textContent = `${label} (${hit.centerX}, ${hit.centerY})`;
+      highlight.style.display = 'block';
+    };
+
+    const onDown = (e) => {
+      if (session.screenW <= 0 || session.screenH <= 0) {
+        toast && toast('画面尚未就绪，请稍候再点');
+        return;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+      const rect = session.canvas.getBoundingClientRect();
+      const devX = Math.round(Math.max(0, Math.min(session.screenW - 1, (e.clientX - rect.left) / rect.width * session.screenW)));
+      const devY = Math.round(Math.max(0, Math.min(session.screenH - 1, (e.clientY - rect.top) / rect.height * session.screenH)));
+      const hit = hoveredNode || findSmallestHitNode(devX, devY);
+      let picked;
+      if (hit && (hit.text || hit.resId || hit.desc)) {
+        const by = hit.text ? 'text' : (hit.resId ? 'id' : 'desc');
+        const value = hit.text || hit.resId || hit.desc;
+        picked = {
+          by,
+          value,
+          text: hit.text || '',
+          resId: hit.resId || '',
+          desc: hit.desc || '',
+          className: hit.className || '',
+          x: hit.centerX || devX,
+          y: hit.centerY || devY,
+        };
+      } else {
+        picked = { by: 'any', value: '', x: devX, y: devY };
+      }
+      onPickElement(picked);
+      exitPickMode();
+    };
+
+    session.canvas.addEventListener('pointermove', onMove, true);
+    session.canvas.addEventListener('pointerdown', onDown, true);
+    session.el.classList.add('is-picking');
+
+    const body = session.el.querySelector('.scr-window-body');
+    if (body) body.insertBefore(banner, body.firstChild);
+
+    pickState = {
+      session,
+      onPick: onPickElement,
+      cleanup: () => {
+        session.canvas.removeEventListener('pointermove', onMove, true);
+        session.canvas.removeEventListener('pointerdown', onDown, true);
+        session.el.classList.remove('is-picking');
+        banner.remove();
+        highlight.remove();
+        if (!reused) session.close();
       },
     };
   }
@@ -1171,8 +1376,9 @@
     try { cleanup(); } catch (_) {}
   }
 
-  // 对外暴露：pickPoint(device, onPick)。device 需含 id 字段。
+  // 对外暴露：pickPoint(device, onPick) 与 pickElement(device, onPickElement)。
   window.pickPoint = (device, onPick) => enterPickMode(device, onPick);
+  window.pickElement = (device, onPickElement) => enterInspectMode(device, onPickElement);
 
   // 打开某台设备的独立手机窗口。
   function openScrcpy(device, opts) {
@@ -1183,7 +1389,7 @@
       existing.device = device;
       if (existing.minimized) existing.restore();
       existing.el.style.zIndex = ++topZ;
-      if (!existing.alive) existing.initSession(opts);
+      if (!existing.alive || (opts && opts.manualSetup)) existing.initSession(opts);
       return;
     }
     const session = new ScrcpySession(device, opts);
@@ -1193,7 +1399,14 @@
 
   let topZ = 90;
   window.openScrcpy = openScrcpy;
-  window.closeScrcpy = () => {}; // 兼容旧调用，无操作
+  window.closeScrcpy = (deviceId) => {
+    if (deviceId) {
+      const s = sessions.get(deviceId);
+      if (s) s.close();
+      return;
+    }
+    for (const s of [...sessions.values()]) s.close();
+  };
 
   // ============ 群控（镜像操作）面板 ============
   // 形态 A：输入同步。把多台「已连接」的设备编成一个群控组，指定主控后，
@@ -2059,6 +2272,7 @@
         } catch (e) { console.warn('mirror decode chunk failed', e); }
       };
       sock.onclose = () => {
+        if (this.ws !== sock) return;
         const err = this.lastError;
         this.lastError = null;
         this.alive = false;

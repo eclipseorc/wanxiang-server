@@ -108,3 +108,28 @@ func containsAny(s string, subs ...string) bool {
 	}
 	return false
 }
+
+func TestParseUIHierarchyAndFindBestNode(t *testing.T) {
+	xmlSample := `<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy rotation="0">
+  <node index="0" text="要允许通过此网络进行无线调试吗？" resource-id="android:id/alertTitle" class="android.widget.TextView" clickable="false" bounds="[80,500][640,580]" />
+  <node index="1" text="允许" resource-id="android:id/button1" class="android.widget.Button" clickable="true" bounds="[500,820][620,900]" />
+</hierarchy>`
+
+	nodes, err := ParseUIHierarchyXML(xmlSample)
+	if err != nil {
+		t.Fatalf("ParseUIHierarchyXML failed: %v", err)
+	}
+	if len(nodes) != 2 {
+		t.Fatalf("got %d nodes, want 2", len(nodes))
+	}
+
+	// FindBestNode 应该优先命中完全相等且 clickable 的「允许」按钮，而不是包含「允许」的标题
+	best, ok := FindBestNode(nodes, "text", "允许")
+	if !ok {
+		t.Fatalf("expected FindBestNode to match 允许")
+	}
+	if best.ResourceID != "android:id/button1" || best.CenterX != 560 || best.CenterY != 860 {
+		t.Fatalf("FindBestNode picked wrong node: %+v", best)
+	}
+}

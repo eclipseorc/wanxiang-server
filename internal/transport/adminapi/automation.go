@@ -4,6 +4,7 @@
 package adminapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -251,9 +252,9 @@ func (r *Router) handleAutomationRun(w http.ResponseWriter, req *http.Request, u
 		return
 	}
 
-	// 异步执行,避免长时间任务阻塞 HTTP 请求。
+	// 异步执行,避免长时间任务阻塞 HTTP 请求（必须用独立 Background context，不可用会随 HTTP 返回即取消的 req.Context()）。
 	go func() {
-		if err := r.automation.Run(req.Context(), jobID); err != nil {
+		if err := r.automation.Run(context.Background(), jobID); err != nil {
 			// 执行器内部已尽量把失败落库;这里只记录底层错误。
 			_ = r.svc.Store.UpdateAutomationJobStatus(jobID, "failed")
 		}
@@ -301,6 +302,52 @@ func (r *Router) handleAutomationJob(w http.ResponseWriter, req *http.Request, u
 	writeJSON(w, http.StatusOK, map[string]any{
 		"job":  job,
 		"logs": logs,
+	})
+}
+
+// handleAutomationUITree 抓取目标设备当前屏幕的 UI 控件树（供前端 Scrcpy 屏幕元素拾取器悬停高亮与一键提取选择器）。
+// GET /api/admin/automation/ui-tree?deviceId=xxx
+func (r *Router) handleAutomationUITree(w http.ResponseWriter, req *http.Request, u sqlite.User) {
+	if !requireMethod(w, req, http.MethodGet) {
+		return
+	}
+	if !requireAdmin(w, u) {
+		return
+	}
+	if r.scrcpy == nil {
+		fail(w, http.StatusServiceUnavailable, "adb not configured")
+		return
+	}
+	deviceID := strings.TrimSpace(req.URL.Query().Get("deviceId"))
+	serial := strings.TrimSpace(req.URL.Query().Get("serial"))
+	if serial == "" && deviceID != "" {
+		dev, err := r.svc.Store.DeviceByID(deviceID)
+		if err != nil {
+			failNotFound(w, "device", err)
+			return
+		}
+		if dev.AdbIP == "" {
+			fail(w, http.StatusBadRequest, "设备尚未建立 ADB 连接（无 IP）")
+			return
+		}
+		port := dev.AdbPort
+		if port <= 0 {
+			port = 5555
+		}
+		serial = fmt.Sprintf("%s:%d", dev.AdbIP, port)
+	}
+	if serial == "" {
+		fail(w, http.StatusBadRequest, "deviceId or serial required")
+		return
+	}
+	nodes, err := automation.DumpUIHierarchy(req.Context(), r.scrcpy, serial)
+	if err != nil {
+		fail(w, http.StatusBadGateway, "抓取手机控件树失败: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"serial": serial,
+		"nodes":  nodes,
 	})
 }
 

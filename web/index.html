@@ -440,11 +440,11 @@ tbody tr:hover{background:#fafbff}
 .scr-window{position:fixed;z-index:90;display:flex;flex-direction:column;width:340px;background:#0b0d12;border-radius:26px;box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.08);overflow:hidden;animation:winIn .22s var(--ease)}
 @keyframes winIn{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
 /* 窗口标题栏（拖拽把手，顶到窗口最上方，整条可拖） */
-.scr-window-bar{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14171f;border-bottom:1px solid rgba(255,255,255,.06);cursor:move;user-select:none}
-.scr-window-bar .scr-win-title{flex:1;min-width:0;color:#e6e9f2;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scr-window-bar .scr-win-fps{flex:none;font-size:11px;font-weight:500;color:#7d8ba8;font-variant-numeric:tabular-nums;white-space:nowrap}
-.scr-window-bar .scr-win-status{flex:none;width:8px;height:8px;border-radius:50%;background:#b6bfd0}
-.scr-window-bar .scr-win-status.on{background:#16b978;box-shadow:0 0 0 3px rgba(22,185,120,.15)}
+.scr-window-bar{flex:none;display:flex;align-items:center;gap:6px;padding:10px 12px;background:#14171f;border-bottom:1px solid rgba(255,255,255,.06);cursor:move;user-select:none}
+.scr-window-bar .scr-win-status{flex:none;width:10px;height:10px;padding:0;border:none;margin:0 2px;border-radius:50%;background:#b6bfd0;align-self:center;box-sizing:border-box}
+.scr-window-bar .scr-win-status.on{background:#16b978;box-shadow:0 0 0 3px rgba(22,185,120,.18)}
+.scr-window-bar .scr-win-title{flex:0 1 auto;max-width:160px;min-width:0;color:#e6e9f2;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr-window-bar [data-toggle-setup]{margin-left:auto}
 .scr-window-bar .scr-win-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
 .scr-window-bar .scr-win-close:hover{background:rgba(255,255,255,.08);color:#fff}
 .scr-window-bar .scr-win-file{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:#9aa3b5;cursor:pointer}
@@ -455,7 +455,7 @@ tbody tr:hover{background:#fafbff}
 /* 窗口内容区 */
 .scr-window-body{flex:1;min-height:0;display:flex;flex-direction:column;background:#05070b}
 .scr-window .screen-frame{border:none;padding:0;border-radius:0;background:#05070b}
-.scr-window canvas{display:block;width:100%;height:auto;background:#000;aspect-ratio:var(--scr-ratio,9/19.5);cursor:crosshair;touch-action:none}
+.scr-window canvas{display:block;width:100%;height:auto;background:#000;aspect-ratio:var(--scr-ratio,9/19.5);cursor:default;touch-action:none}
 /* 取点模式：画面上的提示横幅 + 取点高亮光标 */
 .scr-window.is-picking canvas{cursor:crosshair;outline:2px solid var(--brand,#4a62e0);outline-offset:-2px}
 .scr-pick-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(74,98,224,.16);border-bottom:1px solid rgba(74,98,224,.3);color:#e7ecf5;font-size:12.5px;line-height:1.4;flex-wrap:wrap}
@@ -472,7 +472,9 @@ tbody tr:hover{background:#fafbff}
 .scr-win-setup .acc-notice{background:rgba(91,113,239,.12);border-color:rgba(91,113,239,.3)}
 .scr-win-setup .acc-notice.is-ok{background:rgba(22,185,120,.12);border-color:rgba(22,185,120,.3)}
 .scr-win-setup .acc-notice.is-err{background:rgba(214,69,60,.12);border-color:rgba(214,69,60,.3)}
-.scr-win-status{flex:none;padding:8px 14px;font-size:11.5px;color:#8fa1c4;background:#0b0d12;border-top:1px solid rgba(255,255,255,.06)}
+.scr-win-status{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 18px 8px 14px;font-size:11.5px;color:#8fa1c4;background:#0b0d12;border-top:1px solid rgba(255,255,255,.06)}
+.scr-win-status-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr-win-fps{flex:none;font-size:inherit;color:inherit;font-variant-numeric:tabular-nums;white-space:nowrap}
 .scr-win-status.ok{color:#2fd490}
 .scr-win-status.err{color:#ff6b60}
 /* 缩放把手（右下角） */
@@ -1044,58 +1046,60 @@ table .col-select{width:34px;text-align:center;padding:0}
           </div>
         </div>
 
-        <!-- 流程编辑抽屉 -->
+        <!-- 流程编辑抽屉（影刀式拖拽积木 + 画布双视图） -->
         <div class="scr-drawer hidden" id="autoEditor">
           <div class="scr-drawer-backdrop" id="autoEditorBackdrop"></div>
-          <div class="scr-drawer-panel" style="max-width:720px">
+          <div class="scr-drawer-panel" style="max-width:960px">
             <div class="scr-drawer-head">
-              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3 id="autoEditorTitle">新建流程</h3><span class="muted small">按顺序执行的动作步骤</span></div></div>
+              <div class="watch-title"><div class="wt-icon"><svg class="ico ico-lg"><use href="#i-bolt"/></svg></div><div><h3 id="autoEditorTitle">新建流程</h3><span class="muted small">从左侧拖拽动作积木到右侧流程区，支持在手机实时画面上悬停拾取控件</span></div></div>
               <button id="autoEditorCloseBtn" class="btn-ghost" title="关闭"><svg class="ico ico-sm"><use href="#i-arrow"/></svg>关闭</button>
             </div>
             <div class="scr-drawer-body">
-              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程名称</label>
-              <input id="autoFlowName" style="margin-bottom:14px" placeholder="例如：每日回归-打开App截图">
-              <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程说明（可选）</label>
-              <input id="autoFlowDesc" style="margin-bottom:16px" placeholder="简要描述该流程的用途">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div>
+                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程名称</label>
+                  <input id="autoFlowName" placeholder="例如：自动打开应用搜索并截图">
+                </div>
+                <div>
+                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">流程说明（可选）</label>
+                  <input id="autoFlowDesc" placeholder="简要描述该流程的用途">
+                </div>
+              </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                 <div>
                   <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">定时调度（cron，可选）</label>
                   <input id="autoFlowSchedule" placeholder="如 0 9 * * *（每天9点）">
-                  <div class="muted" style="font-size:11.5px;margin-top:4px;line-height:1.5">5 字段：分 时 日 月 周。留空 = 仅手动触发。示例：0 9 * * 1 每周一9点；*/30 * * * * 每30分钟</div>
+                  <div class="muted" style="font-size:11.5px;margin-top:4px;line-height:1.5">5 字段：分 时 日 月 周。留空 = 仅手动触发。</div>
                 </div>
                 <div>
-                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">默认目标设备（可选）</label>
-                  <div id="autoFlowDevices" style="max-height:120px;overflow:auto;border:1px solid var(--line-2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px">
+                  <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:500">默认目标设备（拾取控件与定时调度用）</label>
+                  <div id="autoFlowDevices" style="max-height:92px;overflow:auto;border:1px solid var(--line-2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px">
                     <div class="muted" style="font-size:12px">留空 = 定时触发时跑全部在线设备</div>
                   </div>
                 </div>
               </div>
 
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                <label style="font-size:13px;font-weight:500">动作步骤</label>
-                <div class="auto-view-toggle" style="margin:0;width:180px">
-                  <button type="button" class="active" id="autoViewFormBtn">表单</button>
-                  <button type="button" id="autoViewCanvasBtn">画布</button>
+                <label style="font-size:13px;font-weight:600">RPA 流程编排工作台（支持拖拽积木排序 & 手机屏幕悬停拾取控件）</label>
+                <div class="auto-view-toggle" style="margin:0;width:200px">
+                  <button type="button" class="active" id="autoViewFormBtn">积木拖拽</button>
+                  <button type="button" id="autoViewCanvasBtn">流程图画布</button>
                 </div>
               </div>
 
-              <!-- 表单式步骤列表 -->
+              <!-- 影刀式左右分栏：左侧动作积木库（可拖可点） + 右侧流程步骤栈（可拖拽排序） -->
               <div id="autoFormView">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                  <select id="autoAddAction" style="max-width:200px;margin:0">
-                    <option value="tap">点击 (tap)</option>
-                    <option value="swipe">滑动 (swipe)</option>
-                    <option value="inputText">输入文字 (inputText)</option>
-                    <option value="launchApp">打开应用 (launchApp)</option>
-                    <option value="installApk">安装应用 (installApk)</option>
-                    <option value="screenshot">截图 (screenshot)</option>
-                    <option value="wait">等待 (wait)</option>
-                    <option value="ocrFind">OCR 定位 (ocrFind)</option>
-                  </select>
-                  <button class="secondary" id="autoAddStepBtn"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加步骤</button>
+                <div style="display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start;margin-bottom:16px">
+                  <div id="autoBlockPalette" style="border:1px solid var(--line-2);border-radius:10px;padding:10px;background:#f8fafd;max-height:500px;overflow:auto"></div>
+                  <div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;display:none">
+                      <select id="autoAddAction" style="max-width:200px;margin:0"></select>
+                      <button class="secondary" id="autoAddStepBtn">添加步骤</button>
+                    </div>
+                    <div id="autoStepList" style="display:flex;flex-direction:column;gap:10px;min-height:360px;max-height:500px;overflow:auto;padding:10px;border:1px dashed var(--line-2);border-radius:10px;background:#fcfdff"></div>
+                  </div>
                 </div>
-                <div id="autoStepList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
               </div>
 
               <!-- 画布式编排器 -->
@@ -1346,7 +1350,7 @@ function deviceActions(d){const box=document.createElement('div');box.className=
   if(!adbConnected){
     const conn=document.createElement('button');conn.textContent='连接设备';conn.className='primary';conn.disabled=!d.enabled;conn.onclick=()=>openScrcpy(d,{manualSetup:true});box.append(conn);
   }else{
-    const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
+    const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
   }
   if(user){
     const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle);
@@ -1558,21 +1562,78 @@ if(token)showApp();
   'use strict';
   // 依赖第一个 script 里的 api()、toast()、devices 等全局变量。
 
-  // 动作原语的参数定义：key 为参数名，label 为中文提示。
+  // 动作原语的参数定义：key 为参数名，label 为中文提示，options 为下拉选项（如有）。
   const ACTION_PARAMS = {
-    tap: [{key:'x',label:'X 坐标'},{key:'y',label:'Y 坐标'}],
-    swipe: [{key:'x1',label:'起点 X'},{key:'y1',label:'起点 Y'},{key:'x2',label:'终点 X'},{key:'y2',label:'终点 Y'},{key:'duration',label:'时长(ms,可选)'}],
-    inputText: [{key:'text',label:'文字内容'}],
-    launchApp: [{key:'pkg',label:'应用包名'}],
+    clickElement: [
+      {key:'by',label:'匹配方式',options:[{v:'any',t:'智能匹配(文本/ID/描述)'},{v:'text',t:'按文本 (text)'},{v:'id',t:'按资源ID (resource-id)'},{v:'desc',t:'按描述 (content-desc)'}]},
+      {key:'value',label:'目标控件值',pickElement:true},
+      {key:'timeoutMs',label:'等待超时(ms,默认6000)',def:'6000'},
+      {key:'scroll',label:'找不到时自动下滑',options:[{v:'false',t:'不滚动'},{v:'true',t:'自动下滑查找'}]},
+      {key:'onError',label:'失败处理',options:[{v:'stop',t:'中止流程'},{v:'continue',t:'忽略并继续下一步'}]},
+    ],
+    waitForElement: [
+      {key:'by',label:'匹配方式',options:[{v:'any',t:'智能匹配(文本/ID/描述)'},{v:'text',t:'按文本 (text)'},{v:'id',t:'按资源ID (resource-id)'},{v:'desc',t:'按描述 (content-desc)'}]},
+      {key:'value',label:'目标控件值',pickElement:true},
+      {key:'timeoutMs',label:'等待超时(ms,默认8000)',def:'8000'},
+      {key:'scroll',label:'找不到时自动下滑',options:[{v:'false',t:'不滚动'},{v:'true',t:'自动下滑查找'}]},
+    ],
+    ifElementExists: [
+      {key:'by',label:'判断条件：匹配方式',options:[{v:'any',t:'智能匹配'},{v:'text',t:'按文本'},{v:'id',t:'按资源ID'},{v:'desc',t:'按描述'}]},
+      {key:'value',label:'当屏幕存在此控件时',pickElement:true},
+      {key:'thenAction',label:'执行动作',options:[{v:'click',t:'点击该控件（如关闭弹窗/点允许）'},{v:'pressBack',t:'按返回键 (Back)'},{v:'skip',t:'仅判断不操作'}]},
+      {key:'timeoutMs',label:'检测等待(ms,默认2000)',def:'2000'},
+    ],
+    loop: [
+      {key:'times',label:'循环次数',def:'3'},
+      {key:'subAction',label:'每次循环执行动作',options:[{v:'swipeUp',t:'向上滑屏（刷视频/翻页）'},{v:'swipeDown',t:'向下滑屏'},{v:'clickElement',t:'点击指定控件'}]},
+      {key:'value',label:'目标控件值(仅循环点击时填)',pickElement:true},
+      {key:'intervalMs',label:'每次循环间隔(ms)',def:'1500'},
+    ],
+    inputText: [
+      {key:'text',label:'输入文字内容（支持中文/英文）'},
+    ],
+    pressKey: [
+      {key:'key',label:'系统按键',options:[{v:'BACK',t:'返回键 (BACK)'},{v:'HOME',t:'桌面键 (HOME)'},{v:'APP_SWITCH',t:'最近任务 (RECENTS)'},{v:'ENTER',t:'回车/搜索 (ENTER)'},{v:'DELETE',t:'退格删除 (DELETE)'},{v:'POWER',t:'电源键 (POWER)'}]},
+    ],
+    tap: [
+      {key:'x',label:'X 坐标'},
+      {key:'y',label:'Y 坐标'},
+    ],
+    longPress: [
+      {key:'value',label:'按控件长按(可选,留空则按坐标)',pickElement:true},
+      {key:'x',label:'X 坐标(未填控件时生效)'},
+      {key:'y',label:'Y 坐标(未填控件时生效)'},
+      {key:'duration',label:'长按时长(ms)',def:'800'},
+    ],
+    swipe: [
+      {key:'direction',label:'快捷滑动方向',options:[{v:'up',t:'向上滑（页面往下滚）'},{v:'down',t:'向下滑（页面往上滚）'},{v:'left',t:'向左滑'},{v:'right',t:'向右滑'},{v:'',t:'自定义起止坐标'}]},
+      {key:'x1',label:'起点 X(自定义时填)'},
+      {key:'y1',label:'起点 Y'},
+      {key:'x2',label:'终点 X'},
+      {key:'y2',label:'终点 Y'},
+      {key:'duration',label:'时长(ms)',def:'350'},
+    ],
+    launchApp: [{key:'pkg',label:'应用包名（如 com.android.settings）'}],
+    stopApp: [{key:'pkg',label:'强行停止应用包名'}],
     installApk: [{key:'apkPath',label:'APK 本地路径(服务器)'}],
     screenshot: [{key:'dir',label:'保存子目录(可选)'}],
-    wait: [{key:'ms',label:'等待毫秒'}],
-    ocrFind: [{key:'text',label:'目标文字'}],
+    wait: [{key:'ms',label:'等待毫秒',def:'1500'}],
+    ocrFind: [
+      {key:'text',label:'OCR 识别目标文字'},
+      {key:'click',label:'识别后动作',options:[{v:'true',t:'点击文字中心'},{v:'false',t:'仅验证文字存在'}]},
+    ],
   };
   const ACTION_LABELS = {
-    tap:'点击',swipe:'滑动',inputText:'输入文字',launchApp:'打开应用',
-    installApk:'安装应用',screenshot:'截图',wait:'等待',ocrFind:'OCR 定位'
+    clickElement:'点击控件',waitForElement:'等待控件',ifElementExists:'条件判断(If)',loop:'循环执行(Loop)',
+    inputText:'输入文字',pressKey:'系统按键',tap:'点击坐标',longPress:'长按',swipe:'滑动/滚屏',
+    launchApp:'打开应用',stopApp:'关闭应用',installApk:'安装应用',screenshot:'截图存证',wait:'等待延时',ocrFind:'OCR 文字定位'
   };
+  const ACTION_GROUPS = [
+    { title: '控件与交互（推荐）', actions: ['clickElement', 'waitForElement', 'inputText', 'pressKey'] },
+    { title: '流程控制（逻辑）', actions: ['ifElementExists', 'loop', 'wait'] },
+    { title: '坐标与手势', actions: ['swipe', 'tap', 'longPress'] },
+    { title: '应用与视觉', actions: ['launchApp', 'stopApp', 'screenshot', 'ocrFind', 'installApk'] },
+  ];
 
   let flows = [];
   let editingFlow = null;   // 正在编辑的流程(id) 或 'new'
@@ -1629,48 +1690,211 @@ if(token)showApp();
   }
   function closeRun() { $('autoRunDrawer').classList.add('hidden'); }
 
-  // --- 步骤列表渲染 ---
+  function createDefaultStep(action) {
+    const params = {};
+    (ACTION_PARAMS[action] || []).forEach(p => {
+      params[p.key] = p.def !== undefined ? p.def : (p.options && p.options.length ? p.options[0].v : '');
+    });
+    return { action, params };
+  }
+
+  // 渲染左侧可拖拽动作积木库（支持拖拽到右侧列表任意位置，或直接点击追加）
+  function renderBlockPalette() {
+    const box = $('autoBlockPalette');
+    if (!box) return;
+    box.replaceChildren();
+    const tip = document.createElement('div');
+    tip.className = 'muted';
+    tip.style.cssText = 'font-size:11.5px;margin-bottom:8px;line-height:1.4';
+    tip.textContent = '拖拽积木到右侧编排区，或直接点击积木追加步骤：';
+    box.append(tip);
+
+    ACTION_GROUPS.forEach(g => {
+      const gt = document.createElement('div');
+      gt.style.cssText = 'font-size:11.5px;font-weight:700;color:var(--muted);margin:10px 0 6px;letter-spacing:.03em';
+      gt.textContent = g.title;
+      box.append(gt);
+
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+      g.actions.forEach(action => {
+        const item = document.createElement('div');
+        item.draggable = true;
+        item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#fff;border:1px solid var(--line-2);border-radius:8px;font-size:12.5px;font-weight:500;color:var(--ink);cursor:grab;user-select:none;box-shadow:0 1px 2px rgba(16,24,40,.04)';
+        item.innerHTML = `<span>${ACTION_LABELS[action] || action}</span><span class="muted" style="font-size:11px">+</span>`;
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', 'palette:' + action);
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+        item.addEventListener('click', () => {
+          editingSteps.push(createDefaultStep(action));
+          renderStepList();
+          if (lf) syncCanvasFromSteps();
+        });
+        list.append(item);
+      });
+      box.append(list);
+    });
+  }
+
+  let dragStepIdx = -1;
+
+  // --- 步骤列表渲染（支持拖拽排序、上下移、复制、屏幕悬停拾取控件与取坐标） ---
   function renderStepList() {
+    renderBlockPalette();
     const box = $('autoStepList');
     box.replaceChildren();
+
+    // 允许从左侧积木库直接拖入空白区或末尾
+    box.ondragover = (e) => { e.preventDefault(); };
+    box.ondrop = (e) => {
+      e.preventDefault();
+      const raw = e.dataTransfer.getData('text/plain') || '';
+      if (raw.startsWith('palette:')) {
+        const act = raw.slice('palette:'.length);
+        editingSteps.push(createDefaultStep(act));
+        renderStepList();
+        if (lf) syncCanvasFromSteps();
+      }
+    };
+
     editingSteps.forEach((step, i) => {
+      step.params = step.params || {};
       const div = document.createElement('div');
       div.className = 'auto-step';
+      div.draggable = true;
+      div.style.cssText = 'background:#fff;border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;transition:border-color .15s,box-shadow .15s';
+
+      div.addEventListener('dragstart', (e) => {
+        // 避免在输入框内选文字时误触发整块拖拽
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+          e.preventDefault();
+          return;
+        }
+        dragStepIdx = i;
+        e.dataTransfer.setData('text/plain', 'step:' + i);
+        e.dataTransfer.effectAllowed = 'move';
+        div.style.opacity = '0.55';
+      });
+      div.addEventListener('dragend', () => {
+        dragStepIdx = -1;
+        div.style.opacity = '1';
+      });
+      div.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        div.style.borderColor = 'var(--brand)';
+      });
+      div.addEventListener('dragleave', () => {
+        div.style.borderColor = 'var(--line-2)';
+      });
+      div.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        div.style.borderColor = 'var(--line-2)';
+        const raw = e.dataTransfer.getData('text/plain') || '';
+        if (raw.startsWith('palette:')) {
+          const act = raw.slice('palette:'.length);
+          editingSteps.splice(i, 0, createDefaultStep(act));
+          renderStepList();
+          if (lf) syncCanvasFromSteps();
+          return;
+        }
+        if (raw.startsWith('step:')) {
+          const from = parseInt(raw.slice('step:'.length), 10);
+          if (!isNaN(from) && from !== i && from >= 0 && from < editingSteps.length) {
+            const [moved] = editingSteps.splice(from, 1);
+            editingSteps.splice(i, 0, moved);
+            renderStepList();
+            if (lf) syncCanvasFromSteps();
+          }
+        }
+      });
+
       const head = document.createElement('div');
       head.className = 'auto-step-head';
       const title = document.createElement('div');
       title.className = 'auto-step-title';
-      title.innerHTML = `<span class="auto-step-idx">${i+1}</span><span>${ACTION_LABELS[step.action] || step.action}</span>`;
+      const summaryText = step.params.value || step.params.text || step.params.pkg || step.params.key || '';
+      title.innerHTML = `<span class="auto-step-idx" title="按住拖拽可调整顺序" style="cursor:grab">${i+1}</span><span style="font-weight:600">${ACTION_LABELS[step.action] || step.action}</span>${summaryText ? `<span class="muted" style="font-size:12px;margin-left:6px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">[${summaryText}]</span>` : ''}`;
+
+      const tools = document.createElement('div');
+      tools.style.cssText = 'display:flex;align-items:center;gap:4px';
+
+      const upBtn = document.createElement('button');
+      upBtn.type = 'button'; upBtn.className = 'auto-step-del'; upBtn.textContent = '↑'; upBtn.title = '上移';
+      upBtn.disabled = (i === 0);
+      upBtn.onclick = () => { if (i > 0) { const t = editingSteps[i-1]; editingSteps[i-1] = editingSteps[i]; editingSteps[i] = t; renderStepList(); if (lf) syncCanvasFromSteps(); } };
+
+      const downBtn = document.createElement('button');
+      downBtn.type = 'button'; downBtn.className = 'auto-step-del'; downBtn.textContent = '↓'; downBtn.title = '下移';
+      downBtn.disabled = (i === editingSteps.length - 1);
+      downBtn.onclick = () => { if (i < editingSteps.length - 1) { const t = editingSteps[i+1]; editingSteps[i+1] = editingSteps[i]; editingSteps[i] = t; renderStepList(); if (lf) syncCanvasFromSteps(); } };
+
+      const dupBtn = document.createElement('button');
+      dupBtn.type = 'button'; dupBtn.className = 'auto-step-del'; dupBtn.textContent = '复制'; dupBtn.title = '复制此步骤';
+      dupBtn.style.fontSize = '11.5px';
+      dupBtn.onclick = () => { editingSteps.splice(i + 1, 0, JSON.parse(JSON.stringify(step))); renderStepList(); if (lf) syncCanvasFromSteps(); };
+
       const del = document.createElement('button');
-      del.className = 'auto-step-del'; del.textContent = '×'; del.title = '删除此步骤';
+      del.type = 'button'; del.className = 'auto-step-del'; del.textContent = '×'; del.title = '删除此步骤';
       del.onclick = () => { editingSteps.splice(i,1); renderStepList(); if (lf) syncCanvasFromSteps(); };
-      head.append(title, del);
+
+      tools.append(upBtn, downBtn, dupBtn, del);
+      head.append(title, tools);
       div.append(head);
 
       const params = document.createElement('div');
       params.className = 'auto-step-params';
       const defs = ACTION_PARAMS[step.action] || [];
-      // 坐标类字段：加「从屏幕取点」按钮。
       const COORD_KEYS = { x:true, y:true, x1:true, y1:true, x2:true, y2:true };
       defs.forEach(p => {
+        if (step.params[p.key] === undefined && p.def !== undefined) {
+          step.params[p.key] = p.def;
+        }
         const cell = document.createElement('div');
         cell.className = 'param-cell';
         const label = document.createElement('label');
         label.textContent = p.label;
-        const input = document.createElement('input');
-        input.value = step.params[p.key] || '';
-        input.placeholder = p.label;
-        input.addEventListener('change', () => { step.params[p.key] = input.value.trim(); });
-        cell.append(label, input);
+        let control;
+        if (p.options && Array.isArray(p.options)) {
+          control = document.createElement('select');
+          p.options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            control.append(o);
+          });
+          control.value = step.params[p.key] !== undefined ? step.params[p.key] : p.options[0].v;
+          step.params[p.key] = control.value;
+          control.addEventListener('change', () => { step.params[p.key] = control.value; renderStepList(); });
+        } else {
+          control = document.createElement('input');
+          control.value = step.params[p.key] || '';
+          control.placeholder = p.label;
+          control.addEventListener('change', () => { step.params[p.key] = control.value.trim(); });
+        }
+        cell.append(label, control);
 
-        // 坐标字段：附加取点按钮。
+        // 控件拾取按钮（打开手机 Scrcpy 画面悬停高亮捕获控件 text / resource-id / content-desc）
+        if (p.pickElement) {
+          const pickElBtn = document.createElement('button');
+          pickElBtn.type = 'button';
+          pickElBtn.className = 'param-pick-btn';
+          pickElBtn.title = '打开手机实时画面，鼠标悬停高亮并点击捕获控件属性';
+          pickElBtn.innerHTML = `<svg class="ico ico-sm"><use href="#i-target"/></svg>拾取控件`;
+          pickElBtn.addEventListener('click', () => pickUIElement(step));
+          cell.append(pickElBtn);
+        }
+
+        // 坐标字段：附加取点按钮（同时回填成对的 X/Y 坐标）。
         if (COORD_KEYS[p.key]) {
           const pickBtn = document.createElement('button');
           pickBtn.type = 'button';
           pickBtn.className = 'param-pick-btn';
           pickBtn.title = '从设备屏幕点选此坐标';
           pickBtn.innerHTML = `<svg class="ico ico-sm"><use href="#i-target"/></svg>取点`;
-          pickBtn.addEventListener('click', () => pickCoordinate(step, p.key, input));
+          pickBtn.addEventListener('click', () => pickCoordinate(step, p.key, control));
           cell.append(pickBtn);
         }
         params.append(cell);
@@ -1680,10 +1904,42 @@ if(token)showApp();
     });
     if (!editingSteps.length) {
       const empty = document.createElement('div');
-      empty.className = 'muted'; empty.style.textAlign='center'; empty.style.padding='20px 0';
-      empty.textContent = '暂无步骤，从上方选择动作并「添加步骤」';
+      empty.className = 'muted'; empty.style.textAlign='center'; empty.style.padding='60px 20px';
+      empty.innerHTML = '暂无步骤<br><span style="font-size:12px">从左侧动作积木库拖拽积木到这里，或直接点击左侧积木添加</span>';
       box.append(empty);
     }
+  }
+
+  // --- 从手机实时画面悬停高亮拾取控件（类似影刀捕获元素） ---
+  function pickUIElement(step) {
+    const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices.filter(d => d && d.online) : [];
+    if (!list.length) { toast('当前没有在线设备可用于拾取控件'); return; }
+
+    const doInspect = (device) => {
+      if (!device) { toast('请选择设备'); return; }
+      if (typeof window.pickElement !== 'function') { toast('控件拾取器未就绪'); return; }
+      window.pickElement(device, (picked) => {
+        if (!picked) return;
+        if (picked.value) {
+          if (step.params.by !== undefined) step.params.by = picked.by || 'any';
+          step.params.value = picked.value;
+          toast(`已捕获控件 [${picked.by}=${picked.value}]`);
+        } else if (picked.x !== undefined && picked.y !== undefined) {
+          step.params.x = String(picked.x);
+          step.params.y = String(picked.y);
+          toast(`该位置无控件文本/ID，已回填坐标 (${picked.x}, ${picked.y})`);
+        }
+        renderStepList();
+        if (lf) syncCanvasFromSteps();
+      });
+    };
+
+    const defaultDevice = list.find(d => editingDeviceIds.includes(d.id)) || list.find(d => d.adbOnline) || list[0];
+    if (list.length === 1 || editingDeviceIds.length === 1) {
+      doInspect(defaultDevice);
+      return;
+    }
+    openPickDeviceModal(list, doInspect);
   }
 
   // --- 从屏幕取点：为坐标字段回填真实设备坐标 ---
@@ -1697,11 +1953,23 @@ if(token)showApp();
       if (typeof window.pickPoint !== 'function') { toast('屏幕取点未就绪'); return; }
       toast('请在设备画面上点击目标位置');
       window.pickPoint(device, (x, y) => {
-        const val = (key === 'x' || key === 'x1' || key === 'x2') ? x : y;
-        step.params[key] = String(val);
-        input.value = String(val);
-        toast(`已取点：${key}=${val}`);
-        // 同步画布视图（若激活）。
+        if (key === 'x' || key === 'y') {
+          step.params.x = String(x);
+          step.params.y = String(y);
+          toast(`已取点：(${x}, ${y})`);
+        } else if (key === 'x1' || key === 'y1') {
+          step.params.x1 = String(x);
+          step.params.y1 = String(y);
+          toast(`已取起点：(${x}, ${y})`);
+        } else if (key === 'x2' || key === 'y2') {
+          step.params.x2 = String(x);
+          step.params.y2 = String(y);
+          toast(`已取终点：(${x}, ${y})`);
+        } else {
+          const val = (key === 'x' || key === 'x1' || key === 'x2') ? x : y;
+          step.params[key] = String(val);
+        }
+        renderStepList();
         if (lf) syncCanvasFromSteps();
       });
     };
@@ -1768,9 +2036,7 @@ if(token)showApp();
       btn.className = 'palette-btn';
       btn.innerHTML = `<svg class="ico ico-sm"><use href="#i-plus"/></svg>${ACTION_LABELS[action] || action}`;
       btn.addEventListener('click', () => {
-        const params = {};
-        (ACTION_PARAMS[action] || []).forEach(p => { params[p.key] = ''; });
-        editingSteps.push({action, params});
+        editingSteps.push(createDefaultStep(action));
         syncCanvasFromSteps();
         renderStepList();
       });

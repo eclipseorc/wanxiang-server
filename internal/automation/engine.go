@@ -1,9 +1,6 @@
 // Package automation 提供内嵌轻量 RPA 引擎：把一组「动作原语」按流程编排,
-// 在目标安卓真机上逐步骤执行,并回写执行日志。复用心象已有的 ADB 能力,
+// 在目标安卓真机上逐步骤执行,并回写执行日志。复用万象已有的 ADB 与 UI 控件树能力,
 // 不依赖外部 RPA 软件(如影刀)。
-//
-// 一期范围:8 个动作原语(tap/swipe/inputText/launchApp/installApk/screenshot/
-// wait/ocrFind),流程以 JSON 步骤数组表达,执行引擎逐步骤解析执行。
 package automation
 
 import (
@@ -13,14 +10,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 )
 
 // Step 是流程中的一个步骤。Action 是动作原语名,Params 是参数键值对。
+// Children / ElseChildren 用于 ifElementExists（条件分支）与 loop（循环）容器积木。
 type Step struct {
-	Action string            `json:"action"`
-	Params map[string]string `json:"params"`
+	Action       string            `json:"action"`
+	Params       map[string]string `json:"params"`
+	Children     []Step            `json:"children,omitempty"`
+	ElseChildren []Step            `json:"elseChildren,omitempty"`
 }
 
 // StepResult 是单个步骤的执行结果。
@@ -45,8 +46,7 @@ type Engine struct {
 	installCache map[string]string // 已上传 APK 的本地路径缓存(见 Install 动作)
 }
 
-// OCRClient 是 OCR 文字识别的抽象接口,一期可注入 nil(未接入 OCR 时 ocrFind
-// 返回明确错误)。二期接入本地 RapidOCR/PaddleOCR 服务实现。
+// OCRClient 是 OCR 文字识别的抽象接口。
 type OCRClient interface {
 	// Recognize 对一张截图做文字识别,返回匹配 target 文字的中心坐标。
 	// 未找到时返回 found=false。
@@ -60,38 +60,64 @@ func NewEngine(adb *scrcpy.ADB, shotsDir string, ocr OCRClient) *Engine {
 
 // RunStep 执行单个步骤并返回结果。serial 是目标设备的 adb serial。
 // 任何动作原语执行失败都返回 Status=failed 与 Error,不向上抛出,由调用方
-// 决定是否中止整个流程。
+// 决定是否中止整个流程。若 step.Params["onError"] == "continue"，失败时也记为 success 放行。
 func (e *Engine) RunStep(ctx context.Context, serial string, index int, step Step) StepResult {
 	res := StepResult{Index: index, Action: step.Action, Status: "success"}
+	var err error
 	switch step.Action {
 	case "tap":
-		err := e.tap(ctx, serial, step.Params)
+		err = e.tap(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "longPress":
+		err = e.longPress(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 	case "swipe":
-		err := e.swipe(ctx, serial, step.Params)
+		err = e.swipe(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "clickElement":
+		err = e.clickElement(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "waitForElement":
+		err = e.waitForElement(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "ifElementExists":
+		err = e.ifElementExists(ctx, serial, step)
+		res = result(index, step.Action, err)
+	case "loop":
+		err = e.runLoop(ctx, serial, step)
 		res = result(index, step.Action, err)
 	case "inputText":
-		err := e.inputText(ctx, serial, step.Params)
+		err = e.inputText(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "pressKey":
+		err = e.pressKey(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 	case "launchApp":
-		err := e.launchApp(ctx, serial, step.Params)
+		err = e.launchApp(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "stopApp":
+		err = e.stopApp(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 	case "installApk":
-		err := e.installApk(ctx, serial, step.Params)
+		err = e.installApk(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 	case "screenshot":
-		path, err := e.screenshot(ctx, serial, step.Params)
+		var path string
+		path, err = e.screenshot(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 		res.Screenshot = path
 	case "wait":
-		err := e.wait(step.Params)
+		err = e.wait(step.Params)
 		res = result(index, step.Action, err)
 	case "ocrFind":
-		err := e.ocrFind(ctx, serial, step.Params)
+		err = e.ocrFind(ctx, serial, step.Params)
 		res = result(index, step.Action, err)
 	default:
 		res.Status = "failed"
 		res.Error = "unknown action: " + step.Action
+	}
+	if res.Status == "failed" && strings.EqualFold(strings.TrimSpace(step.Params["onError"]), "continue") {
+		res.Status = "success"
 	}
 	return res
 }
@@ -142,10 +168,65 @@ func (e *Engine) tap(ctx context.Context, serial string, p map[string]string) er
 	return err
 }
 
+func (e *Engine) longPress(ctx context.Context, serial string, p map[string]string) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	duration := 800
+	if d, err := intParam(p, "duration"); err == nil && d > 0 {
+		duration = d
+	}
+	// 支持按控件文本/ID 长按，或者按 (x, y) 坐标长按
+	if target := strings.TrimSpace(p["value"]); target != "" {
+		by := strings.TrimSpace(p["by"])
+		node, err := e.findNodeWithWait(ctx, serial, by, target, 5000, false)
+		if err != nil {
+			return err
+		}
+		_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input swipe %d %d %d %d %d",
+			node.CenterX, node.CenterY, node.CenterX, node.CenterY, duration))
+		return err
+	}
+	x, err := intParam(p, "x")
+	if err != nil {
+		return err
+	}
+	y, err := intParam(p, "y")
+	if err != nil {
+		return err
+	}
+	_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input swipe %d %d %d %d %d", x, y, x, y, duration))
+	return err
+}
+
 func (e *Engine) swipe(ctx context.Context, serial string, p map[string]string) error {
 	if err := e.requireAdb(); err != nil {
 		return err
 	}
+	duration := 350
+	if d, err := intParam(p, "duration"); err == nil && d > 0 {
+		duration = d
+	}
+	// 快捷方向滑动：direction = up / down / left / right（当未填 x1 时生效）
+	if dir := strings.ToLower(strings.TrimSpace(p["direction"])); dir != "" && strings.TrimSpace(p["x1"]) == "" {
+		w, h := e.screenSize(ctx, serial)
+		var x1, y1, x2, y2 int
+		switch dir {
+		case "up":
+			x1, y1, x2, y2 = w/2, h*3/4, w/2, h/4
+		case "down":
+			x1, y1, x2, y2 = w/2, h/4, w/2, h*3/4
+		case "left":
+			x1, y1, x2, y2 = w*4/5, h/2, w/5, h/2
+		case "right":
+			x1, y1, x2, y2 = w/5, h/2, w*4/5, h/2
+		default:
+			return fmt.Errorf("unknown swipe direction %q", dir)
+		}
+		_, err := e.adb.Shell(ctx, serial, fmt.Sprintf("input swipe %d %d %d %d %d", x1, y1, x2, y2, duration))
+		return err
+	}
+
 	x1, err := intParam(p, "x1")
 	if err != nil {
 		return err
@@ -162,13 +243,216 @@ func (e *Engine) swipe(ctx context.Context, serial string, p map[string]string) 
 	if err != nil {
 		return err
 	}
-	// 可选滑动时长(毫秒),默认 300。
-	duration := 300
-	if d, err := intParam(p, "duration"); err == nil {
-		duration = d
-	}
 	_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input swipe %d %d %d %d %d", x1, y1, x2, y2, duration))
 	return err
+}
+
+// clickElement 按控件选择器（text / id / desc / any）查找控件并点击中心坐标。
+// 支持 timeoutMs 智能等待，以及 scroll="true" 找不到时自动下滑查找。
+// 若拾取到的是无文本/无ID的纯画布坐标（value 为空但包含 x, y），自动回退为坐标点击。
+func (e *Engine) clickElement(ctx context.Context, serial string, p map[string]string) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	target := strings.TrimSpace(p["value"])
+	if target == "" {
+		target = strings.TrimSpace(p["text"])
+	}
+	if target == "" {
+		if strings.TrimSpace(p["x"]) != "" && strings.TrimSpace(p["y"]) != "" {
+			return e.tap(ctx, serial, p)
+		}
+		return fmt.Errorf("param \"value\" (目标文本或资源ID) required")
+	}
+	by := strings.TrimSpace(p["by"])
+	timeoutMs := 6000
+	if t, err := intParam(p, "timeoutMs"); err == nil && t > 0 {
+		timeoutMs = t
+	}
+	scroll := strings.EqualFold(strings.TrimSpace(p["scroll"]), "true") || strings.TrimSpace(p["scroll"]) == "1"
+
+	node, err := e.findNodeWithWait(ctx, serial, by, target, timeoutMs, scroll)
+	if err != nil {
+		return err
+	}
+	_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input tap %d %d", node.CenterX, node.CenterY))
+	return err
+}
+
+// waitForElement 等待目标控件出现在屏幕上。
+func (e *Engine) waitForElement(ctx context.Context, serial string, p map[string]string) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	target := strings.TrimSpace(p["value"])
+	if target == "" {
+		target = strings.TrimSpace(p["text"])
+	}
+	if target == "" {
+		return fmt.Errorf("param \"value\" required")
+	}
+	by := strings.TrimSpace(p["by"])
+	timeoutMs := 8000
+	if t, err := intParam(p, "timeoutMs"); err == nil && t > 0 {
+		timeoutMs = t
+	}
+	scroll := strings.EqualFold(strings.TrimSpace(p["scroll"]), "true") || strings.TrimSpace(p["scroll"]) == "1"
+	_, err := e.findNodeWithWait(ctx, serial, by, target, timeoutMs, scroll)
+	return err
+}
+
+// ifElementExists 条件判断：检测屏幕上是否存在指定控件。
+// 若存在：优先执行 step.Children 子步骤；若无 Children，则按 thenAction（默认 click 该控件 / pressBack / tap）执行。
+// 若不存在：执行 step.ElseChildren（若有），不报错。
+func (e *Engine) ifElementExists(ctx context.Context, serial string, step Step) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	p := step.Params
+	target := strings.TrimSpace(p["value"])
+	if target == "" {
+		target = strings.TrimSpace(p["text"])
+	}
+	if target == "" {
+		return fmt.Errorf("param \"value\" required")
+	}
+	by := strings.TrimSpace(p["by"])
+	timeoutMs := 2000
+	if t, err := intParam(p, "timeoutMs"); err == nil && t > 0 {
+		timeoutMs = t
+	}
+
+	node, err := e.findNodeWithWait(ctx, serial, by, target, timeoutMs, false)
+	if err == nil {
+		// 条件成立
+		if len(step.Children) > 0 {
+			for idx, child := range step.Children {
+				res := e.RunStep(ctx, serial, idx, child)
+				if res.Status != "success" {
+					return fmt.Errorf("if branch step %d (%s) failed: %s", idx+1, child.Action, res.Error)
+				}
+			}
+			return nil
+		}
+		thenAction := strings.ToLower(strings.TrimSpace(p["thenAction"]))
+		switch thenAction {
+		case "", "click":
+			_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input tap %d %d", node.CenterX, node.CenterY))
+			return err
+		case "back", "pressback":
+			_, err = e.adb.Shell(ctx, serial, "input keyevent 4")
+			return err
+		case "none", "skip":
+			return nil
+		default:
+			_, err = e.adb.Shell(ctx, serial, fmt.Sprintf("input tap %d %d", node.CenterX, node.CenterY))
+			return err
+		}
+	}
+
+	// 条件不成立：若有 ElseChildren 则执行，否则正常跳过
+	for idx, child := range step.ElseChildren {
+		res := e.RunStep(ctx, serial, idx, child)
+		if res.Status != "success" {
+			return fmt.Errorf("else branch step %d (%s) failed: %s", idx+1, child.Action, res.Error)
+		}
+	}
+	return nil
+}
+
+// runLoop 循环执行：按 times 次数重复执行 step.Children 子步骤（或快捷动作）。
+func (e *Engine) runLoop(ctx context.Context, serial string, step Step) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	times := 3
+	if t, err := intParam(step.Params, "times"); err == nil && t > 0 {
+		times = t
+	}
+	if times > 500 {
+		times = 500
+	}
+	intervalMs := 1000
+	if iv, err := intParam(step.Params, "intervalMs"); err == nil && iv >= 0 {
+		intervalMs = iv
+	}
+
+	for round := 0; round < times; round++ {
+		if len(step.Children) > 0 {
+			for idx, child := range step.Children {
+				res := e.RunStep(ctx, serial, idx, child)
+				if res.Status != "success" {
+					return fmt.Errorf("loop round %d step %d (%s) failed: %s", round+1, idx+1, child.Action, res.Error)
+				}
+			}
+		} else if subAct := strings.TrimSpace(step.Params["subAction"]); subAct != "" {
+			switch subAct {
+			case "swipeUp":
+				_ = e.swipe(ctx, serial, map[string]string{"direction": "up", "duration": "350"})
+			case "swipeDown":
+				_ = e.swipe(ctx, serial, map[string]string{"direction": "down", "duration": "350"})
+			case "clickElement":
+				if err := e.clickElement(ctx, serial, step.Params); err != nil {
+					return err
+				}
+			}
+		}
+		if intervalMs > 0 && round < times-1 {
+			time.Sleep(time.Duration(intervalMs) * time.Millisecond)
+		}
+	}
+	return nil
+}
+
+func (e *Engine) findNodeWithWait(ctx context.Context, serial, by, target string, timeoutMs int, scrollIfMissing bool) (UINode, error) {
+	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	scrollCount := 0
+	for {
+		nodes, err := DumpUIHierarchy(ctx, e.adb, serial)
+		if err == nil {
+			if node, ok := FindBestNode(nodes, by, target); ok {
+				return node, nil
+			}
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		if scrollIfMissing && scrollCount < 8 {
+			scrollCount++
+			_ = e.swipe(ctx, serial, map[string]string{"direction": "up", "duration": "380"})
+			time.Sleep(700 * time.Millisecond)
+		} else {
+			time.Sleep(600 * time.Millisecond)
+		}
+	}
+	return UINode{}, fmt.Errorf("未找到目标控件 [%s=%s]（等待 %dms）", byOrAny(by), target, timeoutMs)
+}
+
+func byOrAny(by string) string {
+	if by == "" {
+		return "any"
+	}
+	return by
+}
+
+func (e *Engine) screenSize(ctx context.Context, serial string) (int, int) {
+	out, err := e.adb.Shell(ctx, serial, "wm size")
+	if err == nil {
+		// 形如 "Physical size: 720x1612"
+		for _, line := range strings.Split(out, "\n") {
+			if idx := strings.LastIndex(line, ":"); idx >= 0 {
+				dim := strings.TrimSpace(line[idx+1:])
+				if wStr, hStr, ok := strings.Cut(dim, "x"); ok {
+					w, err1 := strconv.Atoi(strings.TrimSpace(wStr))
+					h, err2 := strconv.Atoi(strings.TrimSpace(hStr))
+					if err1 == nil && err2 == nil && w > 0 && h > 0 {
+						return w, h
+					}
+				}
+			}
+		}
+	}
+	return 720, 1600
 }
 
 func (e *Engine) inputText(ctx context.Context, serial string, p map[string]string) error {
@@ -179,9 +463,51 @@ func (e *Engine) inputText(ctx context.Context, serial string, p map[string]stri
 	if !ok || text == "" {
 		return fmt.Errorf("param %q required", "text")
 	}
-	// input text 对空格需转义为 %s;其余特殊字符由 adb 侧处理。
-	escaped := strings.ReplaceAll(text, " ", "%s")
-	_, err := e.adb.Shell(ctx, serial, "input text "+escaped)
+	// 纯 ASCII 走标准 input text；含中文或非 ASCII 时通过系统剪贴板 + KEYCODE_PASTE (279) 粘贴输入。
+	if isASCII(text) {
+		escaped := strings.ReplaceAll(text, " ", "%s")
+		_, err := e.adb.Shell(ctx, serial, "input text "+escaped)
+		return err
+	}
+	safeQuote := strings.ReplaceAll(text, "'", "'\\''")
+	cmd := fmt.Sprintf("cmd clipboard set-text '%s' >/dev/null 2>&1 && input keyevent 279 || am broadcast -a ADB_INPUT_TEXT --es msg '%s'", safeQuote, safeQuote)
+	_, err := e.adb.Shell(ctx, serial, cmd)
+	return err
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *Engine) pressKey(ctx context.Context, serial string, p map[string]string) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	k := strings.ToUpper(strings.TrimSpace(p["key"]))
+	if k == "" {
+		k = "BACK"
+	}
+	keyMap := map[string]string{
+		"BACK":        "4",
+		"HOME":        "3",
+		"APP_SWITCH":  "187",
+		"RECENTS":     "187",
+		"ENTER":       "66",
+		"POWER":       "26",
+		"VOLUME_UP":   "24",
+		"VOLUME_DOWN": "25",
+		"DELETE":      "67",
+	}
+	code, ok := keyMap[k]
+	if !ok {
+		code = k
+	}
+	_, err := e.adb.Shell(ctx, serial, "input keyevent "+code)
 	return err
 }
 
@@ -197,9 +523,19 @@ func (e *Engine) launchApp(ctx context.Context, serial string, p map[string]stri
 	return err
 }
 
-// installApk 安装应用。优先用 params 里的本地 APK 路径(apkPath);否则用
-// package 名从设备的包管理器卸载——一期只支持「本地路径安装」,远程 APK 复用
-// 既有 APK 上传 + adb install 能力,不在本动作内实现。
+func (e *Engine) stopApp(ctx context.Context, serial string, p map[string]string) error {
+	if err := e.requireAdb(); err != nil {
+		return err
+	}
+	pkg, ok := p["pkg"]
+	if !ok || strings.TrimSpace(pkg) == "" {
+		return fmt.Errorf("param %q required", "pkg")
+	}
+	_, err := e.adb.Shell(ctx, serial, "am force-stop "+strings.TrimSpace(pkg))
+	return err
+}
+
+// installApk 安装应用。
 func (e *Engine) installApk(ctx context.Context, serial string, p map[string]string) error {
 	if err := e.requireAdb(); err != nil {
 		return err
@@ -211,18 +547,15 @@ func (e *Engine) installApk(ctx context.Context, serial string, p map[string]str
 	return e.adb.Install(ctx, serial, strings.TrimSpace(apkPath))
 }
 
-// screenshot 截图并保存到产物目录,返回产物路径。文件名含设备与时间戳,避免覆盖。
+// screenshot 截图并保存到产物目录,返回产物路径。
 func (e *Engine) screenshot(ctx context.Context, serial string, p map[string]string) (string, error) {
 	if err := e.requireAdb(); err != nil {
 		return "", err
 	}
-	// 自定义保存路径(相对 shotsDir 的目录名),可选。
 	sub := strings.TrimSpace(p["dir"])
-	// 用设备 serial 中的非法字符替换为下划线,避免路径注入/越界。
 	safe := sanitize(serial)
 	name := fmt.Sprintf("%s_%d.png", safe, time.Now().UnixNano())
 	if e.adb != nil {
-		// 通过 exec-out screencap 拉取 PNG 二进制到本地。
 		if err := e.adb.Screencap(ctx, serial, e.shotPath(sub, name)); err != nil {
 			return "", err
 		}
@@ -230,7 +563,6 @@ func (e *Engine) screenshot(ctx context.Context, serial string, p map[string]str
 	return e.shotPath(sub, name), nil
 }
 
-// shotPath 拼出截图产物的本地绝对路径。
 func (e *Engine) shotPath(sub, name string) string {
 	dir := e.shotsDir
 	if sub != "" {
@@ -239,13 +571,9 @@ func (e *Engine) shotPath(sub, name string) string {
 	return dir + "/" + name
 }
 
-// sanitize 把字符串中的路径分隔符等替换为安全字符,防止路径注入/越界。
-// 先替换分隔符,再处理「..」,避免替换顺序导致重复下划线或残留穿越序列。
 func sanitize(s string) string {
 	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_")
 	s = replacer.Replace(s)
-	// 替换分隔符后,「..」已不可能形成路径穿越(点本身无害),无需额外处理,
-	// 但为稳妥仍去掉连续点,避免产生「..」这类易混淆片段。
 	s = strings.ReplaceAll(s, "..", "_")
 	return s
 }
@@ -262,8 +590,7 @@ func (e *Engine) wait(p map[string]string) error {
 	return nil
 }
 
-// ocrFind 截图后调用 OCR 识别目标文字,返回中心坐标。一期未接入 OCR 时返回
-// 明确错误,提示接入 OCR 服务。
+// ocrFind 截图后调用 OCR 识别目标文字,若找到且 click!="false" 则点击中心坐标。
 func (e *Engine) ocrFind(ctx context.Context, serial string, p map[string]string) error {
 	target, ok := p["text"]
 	if !ok || strings.TrimSpace(target) == "" {
@@ -276,12 +603,15 @@ func (e *Engine) ocrFind(ctx context.Context, serial string, p map[string]string
 	if err != nil {
 		return err
 	}
-	_, _, found, err := e.ocr.Recognize(ctx, path, strings.TrimSpace(target))
+	x, y, found, err := e.ocr.Recognize(ctx, path, strings.TrimSpace(target))
 	if err != nil {
 		return err
 	}
 	if !found {
 		return fmt.Errorf("text %q not found", target)
+	}
+	if strings.EqualFold(strings.TrimSpace(p["click"]), "true") && x > 0 && y > 0 {
+		_, _ = e.adb.Shell(ctx, serial, fmt.Sprintf("input tap %d %d", x, y))
 	}
 	return nil
 }

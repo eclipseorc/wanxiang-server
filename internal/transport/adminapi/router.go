@@ -283,6 +283,8 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleAutomationFlows(w, req, u)
 	case "automation/jobs":
 		r.handleAutomationJobs(w, req, u)
+	case "automation/ui-tree":
+		r.handleAutomationUITree(w, req, u)
 	case "device-scripts":
 		r.handleDeviceScripts(w, req, u)
 	case "device-models":
