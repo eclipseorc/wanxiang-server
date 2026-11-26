@@ -145,8 +145,8 @@ func (r *Router) handleScrcpyStatus(w http.ResponseWriter, req *http.Request, u 
 	writeJSON(w, http.StatusOK, map[string]bool{"online": online})
 }
 
-// handleScrcpyUsbDevices 返回当前 adb 中通过 USB 有线连接的设备序列号列表。
-// 供「传统模式」切 tcpip 时前端下拉选择，免去用户手填序列号。
+// handleScrcpyUsbDevices 返回当前 adb 中通过 USB 有线连接的设备序列号列表、授权状态，
+// 以及当前已在线的无线 ip:port 列表（供「传统模式」识别已切过 5555 的设备，避免重复切 tcpip）。
 func (r *Router) handleScrcpyUsbDevices(w http.ResponseWriter, req *http.Request, u sqlite.User) {
 	if !requireMethod(w, req, http.MethodGet) {
 		return
@@ -163,7 +163,16 @@ func (r *Router) handleScrcpyUsbDevices(w http.ResponseWriter, req *http.Request
 		fail(w, http.StatusInternalServerError, "list usb devices failed: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"serials": serials})
+	resp := map[string]any{"serials": serials}
+	if r.scrcpy != nil {
+		if usbDevs, err := r.scrcpy.UsbDevices(req.Context()); err == nil {
+			resp["devices"] = usbDevs
+		}
+		if onlineDevs, err := r.scrcpy.OnlineDevices(req.Context()); err == nil {
+			resp["tcpipOnline"] = onlineDevs
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleScrcpyTcpip 把一台 USB 连接的设备切换到 TCP 监听模式（adb tcpip <port>）。

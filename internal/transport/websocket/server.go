@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -118,6 +120,9 @@ type Hub struct {
 	// key 是客户端对象本身。它不等于管理员集合：普通用户连 /ws/admin 后
 	// 只能看到自己获授权的设备，任何可见性判断都必须走 Store.CanAccess。
 	admins map[*client]sqlite.User
+
+	// uiTreeWaiters 挂起等待设备回传极速无障碍控件树（dump-ui-tree -> ui-tree-result）的请求。
+	uiTreeWaiters map[string]chan []byte
 }
 
 // AdbReadyConnector 是处理设备「ADB 就绪」事件的最小接口。由装配层注入
@@ -127,14 +132,64 @@ type AdbReadyConnector interface {
 	ConnectAfterReady(ctx context.Context, deviceID, ip string, port int) (connected bool, err error)
 }
 
+// AdbPairConnector 是可选扩展接口：供设备无障碍读到 6 位配对码后，由服务端直接执行 adb pair + connect。
+type AdbPairConnector interface {
+	PairAndConnect(ctx context.Context, deviceID, ip string, pairPort int, code string, connectPort int) (finalPort int, connected bool, err error)
+}
+
 // NewHub 创建一个新的 WebSocket 中枢，并在内存中保留设备/管理员连接映射。
 func NewHub(store *sqlite.Store) *Hub {
 	return &Hub{
-		store:     store,
-		devices:   make(map[string]*client),
-		deviceIPs: make(map[string]string),
-		adbOnline: make(map[string]bool),
-		admins:    make(map[*client]sqlite.User),
+		store:         store,
+		devices:       make(map[string]*client),
+		deviceIPs:     make(map[string]string),
+		adbOnline:     make(map[string]bool),
+		admins:        make(map[*client]sqlite.User),
+		uiTreeWaiters: make(map[string]chan []byte),
+	}
+}
+
+// RequestUITree 通过 WebSocket 向在线设备请求极速抓取当前屏幕的无障碍控件树（约 50ms）。
+// 若设备未在线、未开启无障碍或 2.5 秒内未返回，则返回错误，由调用方自动回退到 ADB dump。
+func (h *Hub) RequestUITree(ctx context.Context, deviceID string) ([]byte, error) {
+	if deviceID == "" {
+		return nil, errors.New("empty deviceId")
+	}
+	reqID := fmt.Sprintf("ut-%d", time.Now().UnixNano())
+	ch := make(chan []byte, 1)
+
+	h.mu.Lock()
+	dev := h.devices[deviceID]
+	if dev == nil {
+		h.mu.Unlock()
+		return nil, errors.New("device websocket offline")
+	}
+	h.uiTreeWaiters[reqID] = ch
+	h.mu.Unlock()
+
+	defer func() {
+		h.mu.Lock()
+		delete(h.uiTreeWaiters, reqID)
+		h.mu.Unlock()
+	}()
+
+	if err := dev.send(map[string]any{"type": "dump-ui-tree", "reqId": reqID}); err != nil {
+		return nil, err
+	}
+
+	timer := time.NewTimer(2500 * time.Millisecond)
+	defer timer.Stop()
+
+	select {
+	case data := <-ch:
+		if len(data) == 0 {
+			return nil, errors.New("accessibility ui tree unavailable")
+		}
+		return data, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-timer.C:
+		return nil, errors.New("ui tree request timeout")
 	}
 }
 
@@ -208,7 +263,7 @@ func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request, kind string) (
 	if err != nil {
 		return nil, err
 	}
-	conn.SetReadLimit(64 << 10)
+	conn.SetReadLimit(512 << 10)
 	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -400,13 +455,21 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 			status = status[:maxPayloadBytes]
 		}
 		// 记录设备上报的本机 IP，供 ADB 掉线判断使用（deviceId → IP 内存映射）。
+		// 若设备断网切网导致局域网 IP 变化，立即同步更新数据库 adb_ip 并尝试用新 IP 重连 ADB。
 		if ip, _ := message["ip"].(string); ip != "" {
+			ip = strings.TrimSpace(ip)
 			if len(ip) > 64 {
 				ip = ip[:64]
 			}
-			h.hub.mu.Lock()
-			h.hub.deviceIPs[c.id] = ip
-			h.hub.mu.Unlock()
+			if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
+				h.hub.mu.Lock()
+				prevIP := h.hub.deviceIPs[c.id]
+				h.hub.deviceIPs[c.id] = ip
+				h.hub.mu.Unlock()
+				if prevIP != ip {
+					h.syncDeviceIPChange(c.id, ip)
+				}
+			}
 		}
 		if err := h.hub.store.UpdateDeviceState(c.id, battery, rtt, status); err != nil {
 			log.Printf("device heartbeat state update failed device_id=%s: %v", c.id, err)
@@ -417,6 +480,35 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		})
 	case "adb-ready":
 		h.handleAdbReady(c, message)
+	case "adb-pair-request":
+		h.handleAdbPairRequest(c, message)
+	case "ui-tree-result":
+		reqID, _ := message["reqId"].(string)
+		if reqID == "" {
+			return
+		}
+		h.hub.mu.RLock()
+		ch := h.hub.uiTreeWaiters[reqID]
+		h.hub.mu.RUnlock()
+		if ch == nil {
+			return
+		}
+		okVal, _ := message["ok"].(bool)
+		if !okVal {
+			select {
+			case ch <- nil:
+			default:
+			}
+			return
+		}
+		rawNodes, err := json.Marshal(message["nodes"])
+		if err != nil {
+			rawNodes = nil
+		}
+		select {
+		case ch <- rawNodes:
+		default:
+		}
 	case "pull-device-script":
 		// 设备端（连接建立后）主动拉取本机型号对应的「自动配对」机型脚本。
 		h.sendDeviceScript(c)
@@ -432,6 +524,64 @@ func (h *Handler) handleDevice(c *client, message map[string]any) {
 		}
 		h.hub.broadcastDevice(c.id, "command-result", payload)
 	}
+}
+
+// syncDeviceIPChange 在心跳发现设备局域网 IP 变化时（例如断网重连 Wi-Fi 后 DHCP 分配了新 IP），
+// 立即把新 IP 写入数据库并广播给管理端，避免后台仍拿着旧 IP 显示在线或点击控屏失败；
+// 同时异步尝试用新 IP 自动重连 ADB。
+func (h *Handler) syncDeviceIPChange(deviceID, newIP string) {
+	dev, err := h.hub.store.DeviceByID(deviceID)
+	if err != nil || dev.AdbIP == newIP {
+		return
+	}
+	oldIP := dev.AdbIP
+	port := dev.AdbPort
+	if port <= 0 {
+		port = 5555
+	}
+	mode := dev.AdbMode
+
+	if mode != "" {
+		_ = h.hub.store.SetDeviceAdbWithMode(deviceID, newIP, port, false, mode)
+	} else {
+		_ = h.hub.store.SetDeviceAdb(deviceID, newIP, port, false)
+	}
+	h.hub.mu.Lock()
+	h.hub.adbOnline[deviceID] = false
+	h.hub.mu.Unlock()
+	h.hub.broadcastDevice(deviceID, "device-adb-state", map[string]any{
+		"adbOnline": false,
+		"ip":        newIP,
+		"port":      port,
+		"adbMode":   mode,
+	})
+	log.Printf("device ip changed device_id=%s old_ip=%s new_ip=%s port=%d", deviceID, oldIP, newIP, port)
+
+	if h.hub.connector == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+		defer cancel()
+		connected, err := h.hub.connector.ConnectAfterReady(ctx, deviceID, newIP, port)
+		if mode != "" {
+			_ = h.hub.store.SetDeviceAdbWithMode(deviceID, newIP, port, connected && err == nil, mode)
+		}
+		if err != nil || !connected {
+			log.Printf("device ip change adb reconnect pending device_id=%s ip=%s:%d err=%v", deviceID, newIP, port, err)
+			return
+		}
+		h.hub.mu.Lock()
+		h.hub.adbOnline[deviceID] = true
+		h.hub.mu.Unlock()
+		h.hub.broadcastDevice(deviceID, "device-adb-state", map[string]any{
+			"adbOnline": true,
+			"ip":        newIP,
+			"port":      port,
+			"adbMode":   mode,
+		})
+		log.Printf("device ip change adb reconnected device_id=%s ip=%s:%d", deviceID, newIP, port)
+	}()
 }
 
 // handleAdbReady 处理设备端上行的「ADB 就绪」事件：设备在本地完成「无线调试
@@ -460,26 +610,83 @@ func (h *Handler) handleAdbReady(c *client, message map[string]any) {
 		return
 	}
 
+	adbMode, _ := message["adb_mode"].(string)
+	adbMode = strings.TrimSpace(adbMode)
+	if adbMode != "wireless" && adbMode != "tcpip" {
+		adbMode = "wireless"
+	}
+
 	connected, err := h.hub.connector.ConnectAfterReady(context.Background(), c.id, ip, port)
 	if err != nil {
 		log.Printf("adb-ready connect failed device_id=%s ip=%s: %v", c.id, ip, err)
-		// 即使首次 connect 因待授权未立刻变为 device，也先把上报的 IP、端口与 auto 模式推给前端。
-		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": "auto"})
+		_ = h.hub.store.SetDeviceAdbWithMode(c.id, ip, port, false, adbMode)
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": adbMode})
 		_ = c.send(map[string]string{"type": "adb-ready-ack", "connected": "false", "reason": "connect failed"})
 		return
 	}
 
+	_ = h.hub.store.SetDeviceAdbWithMode(c.id, ip, port, connected, adbMode)
 	if connected {
-		log.Printf("adb-ready connected device_id=%s ip=%s:%d", c.id, ip, port)
+		log.Printf("adb-ready connected device_id=%s ip=%s:%d mode=%s", c.id, ip, port, adbMode)
 		// 更新内存态 adbOnline，供管理端快照与广播立即反映 adb 上线。
 		h.hub.mu.Lock()
 		h.hub.adbOnline[c.id] = true
 		h.hub.mu.Unlock()
-		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": true, "ip": ip, "port": port, "adbMode": "auto"})
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": true, "ip": ip, "port": port, "adbMode": adbMode})
 	} else {
-		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": "auto"})
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{"adbOnline": false, "ip": ip, "port": port, "adbMode": adbMode})
 	}
 	_ = c.send(map[string]any{"type": "adb-ready-ack", "connected": strconv.FormatBool(connected)})
+}
+
+// handleAdbPairRequest 处理设备无障碍读到无线调试配对码后发来的服务端配对请求：
+// 异步在电脑端执行 adb pair + adb connect + pm grant WRITE_SECURE_SETTINGS，并回执 adb-pair-ack。
+func (h *Handler) handleAdbPairRequest(c *client, message map[string]any) {
+	ip, _ := message["lan_ip"].(string)
+	ip = strings.TrimSpace(ip)
+	code, _ := message["code"].(string)
+	code = strings.TrimSpace(code)
+	pairPort := intValue(message["pair_port"])
+	connectPort := intValue(message["connect_port"])
+	if ip == "" || pairPort <= 0 || code == "" {
+		_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": false, "error": "缺少 lan_ip / pair_port / code"})
+		return
+	}
+	pairer, ok := h.hub.connector.(AdbPairConnector)
+	if !ok || pairer == nil {
+		_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": false, "error": "服务端未配置 ADB 配对器"})
+		return
+	}
+
+	h.hub.mu.Lock()
+	h.hub.deviceIPs[c.id] = ip
+	h.hub.mu.Unlock()
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		finalPort, connected, err := pairer.PairAndConnect(ctx, c.id, ip, pairPort, code, connectPort)
+		if err != nil || !connected {
+			errMsg := "配对连接失败"
+			if err != nil {
+				errMsg = err.Error()
+			}
+			log.Printf("adb-pair-request failed device_id=%s ip=%s:%d err=%s", c.id, ip, pairPort, errMsg)
+			_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": false, "error": errMsg})
+			return
+		}
+		h.hub.mu.Lock()
+		h.hub.adbOnline[c.id] = true
+		h.hub.mu.Unlock()
+		h.hub.broadcastDevice(c.id, "device-adb-state", map[string]any{
+			"adbOnline": true,
+			"ip":        ip,
+			"port":      finalPort,
+			"adbMode":   "wireless",
+		})
+		log.Printf("adb-pair-request ok device_id=%s ip=%s:%d", c.id, ip, finalPort)
+		_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": true, "port": finalPort})
+	}()
 }
 
 // snapshotDevice 在设备快照中附加 ADB 在线状态（内存态，由 ADBMonitor 维护），
@@ -511,18 +718,22 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 			visible = append(visible, snapshotDevice{Device: device})
 		}
 	}
-	// 再在锁内补充 adbOnline 状态（内存态，比落库更实时）与设备上报 IP。
+	// 再在锁内以当前真实 WebSocket 连接（hub.devices）为准刷新在线态与 ADB 状态。
 	h.hub.mu.RLock()
 	for i := range visible {
-		if v, ok := h.hub.adbOnline[visible[i].ID]; ok {
-			visible[i].AdbOnline = v
-		} else if !visible[i].Online {
-			// 设备业务已离线且无内存态连接时，ADB 状态不应残留为 true。
+		_, wsConnected := h.hub.devices[visible[i].ID]
+		visible[i].Online = wsConnected
+		if !wsConnected {
 			visible[i].AdbOnline = false
+		} else if v, ok := h.hub.adbOnline[visible[i].ID]; ok {
+			visible[i].AdbOnline = v
 		}
-		// 设备心跳上报的 IP 比落库的 adb_ip 更实时；落库为空时用上报值兜底，
-		// 让前端始终能拿到一个可拼 serial 的 IP。
-		if visible[i].AdbIP == "" {
+		// 设备在线时，心跳上报的实时 IP 优先于落库的旧 adb_ip（防止切网换 IP 后显示旧地址）。
+		if visible[i].Online {
+			if ip, ok := h.hub.deviceIPs[visible[i].ID]; ok && ip != "" {
+				visible[i].AdbIP = ip
+			}
+		} else if visible[i].AdbIP == "" {
 			if ip, ok := h.hub.deviceIPs[visible[i].ID]; ok {
 				visible[i].AdbIP = ip
 			}

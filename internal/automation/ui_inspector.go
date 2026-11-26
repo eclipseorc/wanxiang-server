@@ -2,15 +2,51 @@ package automation
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 )
+
+// FastUITreeProvider 是由 WebSocket Hub 注入的极速无障碍控件树抓取函数（~50ms）。
+type FastUITreeProvider func(ctx context.Context, deviceID string) ([]byte, error)
+
+var (
+	fastUITreeMu       sync.RWMutex
+	fastUITreeProvider FastUITreeProvider
+)
+
+// RegisterFastUITreeProvider 注册 WebSocket 极速控件树提供者（通常由 app.RunWebsocket 启动时注入）。
+func RegisterFastUITreeProvider(fn FastUITreeProvider) {
+	fastUITreeMu.Lock()
+	fastUITreeProvider = fn
+	fastUITreeMu.Unlock()
+}
+
+// DumpUIHierarchyForDevice 优先通过 WebSocket 无障碍通道 50ms 级秒抓控件树；
+// 若设备未开无障碍或未连 WS，自动无缝回退到传统 ADB `uiautomator dump`。
+func DumpUIHierarchyForDevice(ctx context.Context, adb *scrcpy.ADB, deviceID, serial string) ([]UINode, error) {
+	if strings.TrimSpace(deviceID) != "" {
+		fastUITreeMu.RLock()
+		fn := fastUITreeProvider
+		fastUITreeMu.RUnlock()
+		if fn != nil {
+			if raw, err := fn(ctx, deviceID); err == nil && len(raw) > 2 {
+				var nodes []UINode
+				if err := json.Unmarshal(raw, &nodes); err == nil && len(nodes) > 0 {
+					return nodes, nil
+				}
+			}
+		}
+	}
+	return DumpUIHierarchy(ctx, adb, serial)
+}
 
 // UINode 表示手机屏幕上无障碍/UIAutomator 控件树中的一个可见控件节点。
 // 既供后端 clickElement / waitForElement / ifElementExists 查找定位，

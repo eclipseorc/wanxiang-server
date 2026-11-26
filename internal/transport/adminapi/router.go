@@ -4,6 +4,7 @@
 package adminapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,8 @@ type Router struct {
 	apks    *apkStore
 	// automation 是自动化执行引擎(动作原语 + 流程执行),由 WithScrcpy 注入。
 	automation *automation.Executor
+	// ai 是视觉大模型 Mobile Agent 调度器,由 WithScrcpy 注入。
+	ai *automation.AIManager
 }
 
 func New(s *logic.Service) *Router {
@@ -53,9 +56,32 @@ func New(s *logic.Service) *Router {
 func (r *Router) WithScrcpy(adb *scrcpy.ADB) *Router {
 	r.scrcpy = adb
 	r.adbConn = logic.NewAdbConnector(r.svc, adb)
+	eng := automation.NewEngine(adb, "./data/automation-shots", buildOCR())
+	r.ai = automation.NewAIManager(adb, eng)
+	eng.SetAIRunner(func(ctx context.Context, serial, prompt string) error {
+		cfg, err := r.loadAIConfig()
+		if err != nil {
+			return err
+		}
+		// 反查 serial 对应的 deviceID，使 RPA 中的 aiAct 也能走 50ms WS 无障碍树。
+		deviceID := ""
+		if devs, err := r.svc.Store.ListDevices(); err == nil {
+			for _, d := range devs {
+				p := d.AdbPort
+				if p <= 0 {
+					p = 5555
+				}
+				if d.AdbIP != "" && fmt.Sprintf("%s:%d", d.AdbIP, p) == serial {
+					deviceID = d.ID
+					break
+				}
+			}
+		}
+		return r.ai.RunSubGoal(ctx, cfg, deviceID, serial, prompt)
+	})
 	r.automation = automation.NewExecutor(
 		r.svc.Store,
-		automation.NewEngine(adb, "./data/automation-shots", buildOCR()),
+		eng,
 		adb,
 		automationMaxConcurrency(),
 	)
@@ -265,6 +291,14 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 		r.handleDeviceDisconnect(w, req, u)
 	case "device/screen":
 		r.handleDeviceScreen(w, req, u)
+	case "ai/settings":
+		r.handleAISettings(w, req, u)
+	case "ai/test":
+		r.handleAITest(w, req, u)
+	case "ai/run":
+		r.handleAIRun(w, req, u)
+	case "ai/tasks":
+		r.handleAITasks(w, req, u)
 	case "files/list":
 		r.handleFilesList(w, req, u)
 	case "files/download":
@@ -320,6 +354,9 @@ func (r *Router) admin(w http.ResponseWriter, req *http.Request) {
 			return
 		case strings.HasPrefix(path, "device-scripts/"):
 			r.handleDeviceScriptDelete(w, req, u, strings.TrimPrefix(path, "device-scripts/"))
+			return
+		case strings.HasPrefix(path, "ai/tasks/"):
+			r.handleAITaskDetail(w, req, u, strings.TrimPrefix(path, "ai/tasks/"))
 			return
 		}
 		http.NotFound(w, req)

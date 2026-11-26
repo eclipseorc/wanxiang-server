@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/eclipseorc/wanxiang-server/internal/automation"
 	"github.com/eclipseorc/wanxiang-server/internal/envfile"
 	"github.com/eclipseorc/wanxiang-server/internal/logic"
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
@@ -40,6 +41,10 @@ func RunWebsocket() error {
 	defer db.Close()
 
 	store := sqlite.NewStore(db)
+	// 启动时清零上次进程残留的在线标记，等待各设备真实重连后再置为在线。
+	if err := store.ResetAllOnline(); err != nil {
+		log.Printf("reset online devices on startup failed: %v", err)
+	}
 
 	certFile := envfile.String("TLS_CERT", "")
 	keyFile := envfile.String("TLS_KEY", "")
@@ -48,6 +53,7 @@ func RunWebsocket() error {
 	}
 
 	hub := wsserver.NewHub(store)
+	automation.RegisterFastUITreeProvider(hub.RequestUITree)
 
 	// 装配 adb 能力：既是「业务在线但 adb 离线」状态扫描器，也是设备「ADB 就绪」
 	// 设备「ADB 就绪」事件的 connect 执行器。两者共享同一个 logic.AdbConnector

@@ -90,8 +90,12 @@ func (r *Router) handleDeviceConnect(w http.ResponseWriter, req *http.Request, u
 	}
 
 	mode := strings.TrimSpace(body.Mode)
-	if mode != "auto" && mode != "manual" {
-		mode = "manual"
+	if mode != "wireless" && mode != "tcpip" {
+		if realPort == 5555 && body.PairPort <= 0 {
+			mode = "tcpip"
+		} else {
+			mode = "wireless"
+		}
 	}
 
 	// 落库：记录 IP、真实端口、在线状态以及连接模式（"auto" 或 "manual"）。

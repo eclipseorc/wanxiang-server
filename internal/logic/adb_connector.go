@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/eclipseorc/wanxiang-server/internal/scrcpy"
 )
@@ -159,4 +160,79 @@ func (c *AdbConnector) ConnectAfterReady(ctx context.Context, deviceID, ip strin
 	}
 	_ = c.svc.Store.Audit("device", "adb-ready", deviceID, serial)
 	return true, nil
+}
+
+// PairAndConnect 处理设备无障碍读取配对码后发来的服务端配对请求（免 USB 线全自动授权）：
+//  1. 用电脑服务端自身的 adb 执行 `adb pair <ip>:<pairPort> <code>`，把电脑公钥正式写入手机；
+//  2. 直接连接手机的无线调试动态端口（优先 connectPort，失败则通过 mDNS 扫描兜底）；
+//  3. 顺手通过 adb shell 为 App 授予 WRITE_SECURE_SETTINGS，支持后续重启后台静默开启无线调试；
+//  4. 落库为 wireless 模式 + adb_online=true。
+func (c *AdbConnector) PairAndConnect(ctx context.Context, deviceID, ip string, pairPort int, code string, connectPort int) (int, bool, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	ip = strings.TrimSpace(ip)
+	code = strings.TrimSpace(code)
+	if deviceID == "" || ip == "" || pairPort <= 0 || code == "" {
+		return 0, false, fmt.Errorf("device_id, lan_ip, pair_port and code are required")
+	}
+	if err := c.svc.RegisterDevice(deviceID, ""); err != nil {
+		return 0, false, err
+	}
+	if err := c.svc.Store.SetOnline(deviceID, true); err != nil {
+		return 0, false, err
+	}
+	if c.adb == nil {
+		return 0, false, fmt.Errorf("adb not configured")
+	}
+
+	_ = c.adb.EnsureServer(ctx)
+	if err := c.adb.Pair(ctx, ip, pairPort, code); err != nil {
+		return 0, false, fmt.Errorf("adb pair failed: %w", err)
+	}
+
+	// 配对完成后稍等片刻让手机侧无线调试端口就绪。
+	select {
+	case <-ctx.Done():
+		return 0, false, ctx.Err()
+	case <-time.After(800 * time.Millisecond):
+	}
+
+	finalPort := 0
+	if connectPort > 0 && connectPort != pairPort {
+		if err := c.adb.Connect(ctx, ip, connectPort); err == nil {
+			finalPort = connectPort
+		}
+	}
+	// 若未传 connectPort 或连接失败，尝试从 mDNS 发现该 IP 的实时无线调试端口。
+	if finalPort <= 0 {
+		if services, err := c.adb.MdnsServices(ctx); err == nil {
+			for _, addr := range services {
+				host, pStr, ok := strings.Cut(addr, ":")
+				if ok && host == ip {
+					if p, err := strconv.Atoi(pStr); err == nil && p > 0 && p != pairPort {
+						if err := c.adb.Connect(ctx, ip, p); err == nil {
+							finalPort = p
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	if finalPort <= 0 {
+		// 即使暂未连上动态端口，电脑公钥已写入手机；下次心跳/mDNS 会自动连上。
+		if connectPort > 0 {
+			_ = c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, connectPort, false, "wireless")
+		}
+		return 0, false, fmt.Errorf("配对成功但未能连接无线调试端口，请稍候自动重连")
+	}
+
+	serial := fmt.Sprintf("%s:%d", ip, finalPort)
+	// 顺手为 App 授予 WRITE_SECURE_SETTINGS，让手机重启后可直接后台静默重开无线调试。
+	_, _ = c.adb.Shell(ctx, serial, "pm grant com.wanxiang.client android.permission.WRITE_SECURE_SETTINGS")
+
+	if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, finalPort, true, "wireless"); err != nil {
+		return finalPort, true, err
+	}
+	_ = c.svc.Store.Audit("device", "adb-pair-auto", deviceID, serial)
+	return finalPort, true, nil
 }

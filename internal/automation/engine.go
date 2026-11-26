@@ -44,6 +44,12 @@ type Engine struct {
 	shotsDir     string // 截图产物目录
 	ocr          OCRClient
 	installCache map[string]string // 已上传 APK 的本地路径缓存(见 Install 动作)
+	aiRunner     func(ctx context.Context, serial, prompt string) error
+}
+
+// SetAIRunner 注入「AI 智能处理」积木的执行函数（供 RPA 流程中的 aiAct 步骤调用）。
+func (e *Engine) SetAIRunner(fn func(ctx context.Context, serial, prompt string) error) {
+	e.aiRunner = fn
 }
 
 // OCRClient 是 OCR 文字识别的抽象接口。
@@ -111,6 +117,16 @@ func (e *Engine) RunStep(ctx context.Context, serial string, index int, step Ste
 		res = result(index, step.Action, err)
 	case "ocrFind":
 		err = e.ocrFind(ctx, serial, step.Params)
+		res = result(index, step.Action, err)
+	case "aiAct":
+		prompt := strings.TrimSpace(step.Params["prompt"])
+		if prompt == "" {
+			err = fmt.Errorf("param \"prompt\" (AI 指令) required")
+		} else if e.aiRunner == nil {
+			err = fmt.Errorf("AI 智能体未初始化")
+		} else {
+			err = e.aiRunner(ctx, serial, prompt)
+		}
 		res = result(index, step.Action, err)
 	default:
 		res.Status = "failed"
@@ -515,12 +531,19 @@ func (e *Engine) launchApp(ctx context.Context, serial string, p map[string]stri
 	if err := e.requireAdb(); err != nil {
 		return err
 	}
-	pkg, ok := p["pkg"]
-	if !ok || strings.TrimSpace(pkg) == "" {
+	pkg := strings.TrimSpace(p["pkg"])
+	if pkg == "" {
 		return fmt.Errorf("param %q required", "pkg")
 	}
-	_, err := e.adb.Shell(ctx, serial, fmt.Sprintf("monkey -p %s -c android.intent.category.LAUNCHER 1", strings.TrimSpace(pkg)))
-	return err
+	out, err := e.adb.Shell(ctx, serial, fmt.Sprintf("monkey -p %s -c android.intent.category.LAUNCHER 1", pkg))
+	if err != nil {
+		return err
+	}
+	lower := strings.ToLower(out)
+	if strings.Contains(lower, "no activities found") || strings.Contains(lower, "monkey aborted") || strings.Contains(lower, "error:") {
+		return fmt.Errorf("启动应用失败（未找到包名 %q，请填写准确的 Android 包名而非中文名）", pkg)
+	}
+	return nil
 }
 
 func (e *Engine) stopApp(ctx context.Context, serial string, p map[string]string) error {

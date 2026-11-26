@@ -144,6 +144,20 @@ func InitSchema(db *sql.DB) error {
 	if err := addColumnIfMissing(db, "automation_flows", "device_ids", `TEXT NOT NULL DEFAULT ''`); err != nil {
 		return err
 	}
+	// AI 视觉大模型配置表（单行存储 id=1）。
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS ai_settings(
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			base_url TEXT NOT NULL DEFAULT '',
+			api_key TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			max_steps INTEGER NOT NULL DEFAULT 15,
+			guard_words TEXT NOT NULL DEFAULT '确认付款,立即支付,确认转账,注销账号,删除账号,确认删除',
+			updated_at INTEGER NOT NULL DEFAULT 0
+		)
+	`); err != nil {
+		return err
+	}
 	return nil
 }
 

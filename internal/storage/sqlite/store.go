@@ -243,6 +243,13 @@ func (s *Store) SetOnline(id string, online bool) error {
 	return err
 }
 
+// ResetAllOnline 在 WebSocket 服务启动时将所有设备的在线与 ADB 在线标记归零，
+// 防止上次进程异常退出或重启后，数据库中残留幽灵「在线 / ADB 在线」状态。
+func (s *Store) ResetAllOnline() error {
+	_, err := s.DB.Exec(`UPDATE devices SET online=0, adb_online=0`)
+	return err
+}
+
 // SetDeviceAdb 记录设备最近一次 adb 连接的 IP、端口（拼 serial 用）与在线状态。
 // 连接成功时传 ip/port 与 online=true；断开时 ip/port 保留（供自动重连）、online=false。
 func (s *Store) SetDeviceAdb(id, ip string, port int, online bool) error {

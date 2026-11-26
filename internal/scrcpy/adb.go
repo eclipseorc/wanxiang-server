@@ -222,6 +222,40 @@ func parseOnlineSerials(out string) []string {
 	return serials
 }
 
+// UsbDevice 表示一条 USB 有线 ADB 记录及其授权状态（device / unauthorized）。
+type UsbDevice struct {
+	Serial string `json:"serial"`
+	State  string `json:"state"`
+}
+
+// UsbDevices 返回当前通过 USB 有线连接的设备列表（含 device 与 unauthorized 状态标记），
+// 供前端「传统模式」明确区分「已授权可切 5555」与「未授权（可能已切过 5555）」的序列号。
+func (a *ADB) UsbDevices(ctx context.Context) ([]UsbDevice, error) {
+	out, err := a.run(ctx, "devices")
+	if err != nil {
+		return nil, err
+	}
+	return parseUsbDevices(out), nil
+}
+
+func parseUsbDevices(out string) []UsbDevice {
+	list := make([]UsbDevice, 0)
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		serial, state := fields[0], fields[1]
+		if strings.Contains(serial, ":") {
+			continue
+		}
+		if state == "device" || state == "unauthorized" {
+			list = append(list, UsbDevice{Serial: serial, State: state})
+		}
+	}
+	return list
+}
+
 // UsbSerials 返回 adb 中通过 USB 有线连接的设备序列号列表（非 ip:port 形式）。
 // 用于「传统模式」切 tcpip 时，让前端下拉选择设备、免去用户手填序列号。
 // 包含 device 与 unauthorized 状态：刚插线尚未点「允许 USB 调试」时是
@@ -309,10 +343,17 @@ func (a *ADB) Pair(ctx context.Context, host string, pairPort int, code string) 
 // 因此 connect 后轮询等待设备进入 device 状态，超时则返回明确错误，避免上层
 // 误以为已连接成功。
 func (a *ADB) Connect(ctx context.Context, host string, port int) error {
-	if _, err := a.run(ctx, "connect", fmt.Sprintf("%s:%d", host, port)); err != nil {
+	serial := fmt.Sprintf("%s:%d", host, port)
+	// 若 adb 列表中残留了同名 serial 的 offline 僵尸 TCP 连接（手机断网重连后极常见），
+	// 必须先 disconnect 清理再 connect，否则 Windows adb 会返回 "already connected" 并永久卡在 offline。
+	if out, err := a.run(ctx, "devices"); err == nil {
+		if strings.Contains(out, serial+"\toffline") {
+			_, _ = a.run(ctx, "disconnect", serial)
+		}
+	}
+	if _, err := a.run(ctx, "connect", serial); err != nil {
 		return err
 	}
-	serial := fmt.Sprintf("%s:%d", host, port)
 	// 设备从 connect 到真正进入 device 状态需要几秒，轮询等待。
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {

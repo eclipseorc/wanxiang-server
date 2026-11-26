@@ -126,10 +126,15 @@ func (m *ADBMonitor) scanOnce() {
 		if info.ip == "" {
 			continue
 		}
+		// 以 hub.adbOnline 作为单一真相源，避免 handleAdbReady / syncDeviceIPChange 更新状态后
+		// 与 lastAdbState 不同步导致漏发离线事件。
+		m.hub.mu.RLock()
+		hubOnline, hubKnown := m.hub.adbOnline[info.id]
+		m.hub.mu.RUnlock()
+
 		connected := onlineIPs[info.ip]
 		if connected {
-			// 已在线：若之前是离线态，则状态恢复，撤销通知 + 更新管理端标记。
-			if prev, known := m.lastAdbState[info.id]; !known || !prev {
+			if prev, known := m.lastAdbState[info.id]; !known || !prev || !hubKnown || !hubOnline {
 				m.publishState(info.id, info.ip, true)
 			}
 			continue
@@ -145,37 +150,36 @@ func (m *ADBMonitor) scanOnce() {
 		}
 
 		// 自动重连失败（或未到重试时机）：标记离线并通知人工。
-		if prev, known := m.lastAdbState[info.id]; !known || prev {
+		if prev, known := m.lastAdbState[info.id]; !known || prev || (hubKnown && hubOnline) {
 			m.publishState(info.id, info.ip, false)
 		}
 	}
 }
 
-// tryRecover 尝试自动恢复一台 adb 离线设备。优先用落库的真实端口重连
-// （设备端口未变时最快），失败再用 mDNS 发现的当前动态端口连接。无线调试
-// 端口是动态分配的，这里绝不再执行 adb tcpip 5555（会把无线调试设备打成
-// unauthorized、破坏授权）。成功返回 true。
+// tryRecover 尝试自动恢复一台 adb 离线设备。始终使用设备最新心跳上报的 ip，
+// 绝不去连已经失效的旧 dev.AdbIP（否则 TCP 超时会直接耗光整个恢复时间窗口）。
+// 优先用落库的真实端口重连，其次尝试 5555，最后用 mDNS 发现的动态端口连接。
 func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// 1) 落库的真实端口（无线调试连接时记录的真实端口，端口未变时直接可用）。
-	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil && dev.AdbIP != "" && dev.AdbPort > 0 {
-		if m.connector.Connect(ctx, dev.AdbIP, dev.AdbPort) == nil {
-			log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, dev.AdbIP, dev.AdbPort)
-			m.publishState(deviceID, ip, true)
+	// 1) 落库的真实端口（若与 5555 不同，用最新 ip + 该端口先试）。
+	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil && dev.AdbPort > 0 && dev.AdbPort != adbReconnectPort {
+		if m.connector.Connect(ctx, ip, dev.AdbPort) == nil {
+			log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, ip, dev.AdbPort)
+			m.publishStateWithPort(deviceID, ip, dev.AdbPort, true)
 			return true
 		}
 	}
 
-	// 2) 传统模式兜底：固定 5555（设备是 USB 切 tcpip 的传统模式时监听 5555）。
+	// 2) 固定 5555 端口（无线自配对固化 5555 或传统模式 tcpip 5555）。
 	if m.connector.Connect(ctx, ip, adbReconnectPort) == nil {
 		log.Printf("adb-status auto reconnect ok device_id=%s ip=%s port=%d", deviceID, ip, adbReconnectPort)
-		m.publishState(deviceID, ip, true)
+		m.publishStateWithPort(deviceID, ip, adbReconnectPort, true)
 		return true
 	}
 
-	// 3) mDNS 发现的动态端口（设备重启后端口变了）。连上后保持原端口，
+	// 3) mDNS 发现的动态端口（设备重启或切网后端口变了）。连上后保持原端口，
 	//    不再切回 5555（无线调试设备切 5555 会破坏授权）。
 	if addr, ok := mdnsByIP[ip]; ok {
 		host, portStr, ok := strings.Cut(addr, ":")
@@ -183,7 +187,7 @@ func (m *ADBMonitor) tryRecover(deviceID, ip string, mdnsByIP map[string]string)
 			if port, err := strconv.Atoi(portStr); err == nil {
 				if err := m.connector.Connect(ctx, host, port); err == nil {
 					log.Printf("adb-status mdns reconnect ok device_id=%s addr=%s", deviceID, addr)
-					m.publishState(deviceID, ip, true)
+					m.publishStateWithPort(deviceID, host, port, true)
 					return true
 				}
 			}
@@ -232,6 +236,10 @@ func serialIPSet(serials []string) map[string]bool {
 //  2. 更新 hub.adbOnline（供管理端快照与广播读取）；
 //  3. 下发 adb-status 给设备 + 广播 device-adb-state 给管理端。
 func (m *ADBMonitor) publishState(deviceID, ip string, connected bool) {
+	m.publishStateWithPort(deviceID, ip, 0, connected)
+}
+
+func (m *ADBMonitor) publishStateWithPort(deviceID, ip string, knownPort int, connected bool) {
 	m.lastAdbState[deviceID] = connected
 
 	m.hub.mu.Lock()
@@ -257,15 +265,19 @@ func (m *ADBMonitor) publishState(deviceID, ip string, connected bool) {
 	}
 
 	// 广播给管理端（前端据此标注「ADB 掉线」或「在线」状态，同时同步 IP、端口与模式）。
-	port := adbReconnectPort
-	mode := "auto"
+	port := knownPort
+	mode := ""
 	if dev, err := m.hub.store.DeviceByID(deviceID); err == nil {
-		if dev.AdbPort > 0 {
+		if port <= 0 && dev.AdbPort > 0 {
 			port = dev.AdbPort
 		}
-		if dev.AdbMode == "manual" && port != adbReconnectPort {
-			mode = "manual"
-		}
+		mode = strings.TrimSpace(dev.AdbMode)
+	}
+	if port <= 0 {
+		port = adbReconnectPort
+	}
+	if mode == "" {
+		mode = "wireless"
 	}
 	if connected {
 		_ = m.hub.store.SetDeviceAdbWithMode(deviceID, ip, port, true, mode)
@@ -283,5 +295,5 @@ func (m *ADBMonitor) publishState(deviceID, ip string, connected bool) {
 	if !connected {
 		state = "offline"
 	}
-	log.Printf("adb-status published device_id=%s adb=%s", deviceID, state)
+	log.Printf("adb-status published device_id=%s ip=%s:%d adb=%s", deviceID, ip, port, state)
 }

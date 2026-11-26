@@ -528,9 +528,8 @@
         this.setStepNotice(3, '连接就绪，点击「开始控制」进入远程画面。', 'info');
         this.status('ADB 连接成功，可开始控制', true);
         this.persistCfg();
-        // 连接成功后把 IP、真实端口与 adb 在线状态落库，供设备清单显示状态并
-        // 启用「远程控制」「读取文件」按钮。失败不阻断控制流程，仅提示。
-        await this.persistAdbOnline(host, realPort);
+        // 连接成功后把 IP、真实端口与无线调试模式（wireless）落库，供设备清单显示状态。
+        await this.persistAdbOnline(host, realPort, 'wireless');
       } catch (e) {
         this.setStepState(2, 'error');
         this.setStepNotice(2, '连接失败：' + e.message, 'err');
@@ -598,7 +597,8 @@
       this.connectWs(serial);
     }
 
-    // 从服务端获取当前 USB 连接的设备序列号，填充下拉框（免手填）。
+    // 从服务端获取当前 USB 连接的设备序列号（含授权状态）及已在线的 5555 无线设备。
+    // 若检测到该设备已处于 5555 无线模式，自动标记第 1 步完成并展开第 2 步，避免重复对未授权 USB 序列号切 tcpip。
     async loadUsbSerials() {
       const sel = this.field('usbSerial');
       if (!sel) return;
@@ -606,14 +606,51 @@
       sel.disabled = true;
       try {
         const r = await api('/api/admin/scrcpy/usb-devices', { method: 'GET' });
-        const serials = (r && r.serials) || [];
-        if (!serials.length) {
-          sel.innerHTML = '<option value="">未检测到 USB 设备（请插线并开启 USB 调试）</option>';
-          return;
+        const usbDevs = (r && Array.isArray(r.devices) && r.devices.length)
+          ? r.devices
+          : ((r && r.serials) || []).map((s) => ({ serial: s, state: 'device' }));
+        const tcpipOnline = (r && Array.isArray(r.tcpipOnline)) ? r.tcpipOnline : [];
+
+        // 检查当前设备 IP 是否已在 5555 无线端口在线（传统模式切过一次 5555 后无需再切）
+        const curIp = (this.field('tcpipIp') && this.field('tcpipIp').value.trim()) || (this.device && this.device.adbIp) || '';
+        const curPort = parseInt((this.field('tcpipConnPort') && this.field('tcpipConnPort').value.trim()) || '5555', 10) || 5555;
+        const matchedTcpip = curIp
+          ? tcpipOnline.find((s) => s === `${curIp}:${curPort}` || s.startsWith(`${curIp}:`))
+          : (tcpipOnline.length === 1 && !usbDevs.some((u) => u.state === 'device') ? tcpipOnline[0] : '');
+
+        if (!usbDevs.length) {
+          sel.innerHTML = '<option value="">未检测到 USB 设备（若已切过 5555 请直接走第 2 步连接）</option>';
+        } else {
+          sel.innerHTML = '<option value="">请选择设备…</option>' +
+            usbDevs.map((u) => {
+              const label = u.state === 'unauthorized'
+                ? `${u.serial}（未授权 · 若已切 5555 请直接走第 2 步）`
+                : `${u.serial}（已授权 · 可切 5555）`;
+              return `<option value="${u.serial}">${label}</option>`;
+            }).join('');
+          const firstAuth = usbDevs.find((u) => u.state === 'device');
+          if (firstAuth) sel.value = firstAuth.serial;
+          else if (usbDevs.length === 1) sel.value = usbDevs[0].serial;
         }
-        sel.innerHTML = '<option value="">请选择设备…</option>' +
-          serials.map((s) => `<option value="${s}">${s}</option>`).join('');
-        if (serials.length === 1) sel.value = serials[0]; // 仅一台时自动选中
+
+        // 若该设备已处于 5555 无线在线（或所有 USB 设备均已变成 unauthorized 且存在已保存 IP），自动放行第 2 步！
+        if (matchedTcpip) {
+          const [mIp, mPort] = matchedTcpip.split(':');
+          if (mIp && this.field('tcpipIp') && !this.field('tcpipIp').value.trim()) {
+            this.field('tcpipIp').value = mIp;
+          }
+          if (mPort && this.field('tcpipConnPort')) {
+            this.field('tcpipConnPort').value = mPort;
+          }
+          this.setStepState(1, 'done');
+          this.setStepNotice(1, `检测到设备已处于无线模式（${matchedTcpip}），无需重复执行 adb tcpip，可直接执行第 2 步。`, 'ok');
+          this.setStepState(2, 'active');
+          this.setStepNotice(2, `设备 ${matchedTcpip} 已在线，点击下方「连接」即可直接控制。`, 'info');
+        } else if (curIp && !usbDevs.some((u) => u.state === 'device')) {
+          // 未发现已授权 USB（常见于已切 5555 后拔线或 USB 显示未授权），允许用户直接点开第 2 步尝试 IP:5555 连接
+          this.setStepState(2, 'active');
+          this.setStepNotice(2, `若手机未重启且之前已切过 ${curPort}，可直接点击下方「连接」跳过第 1 步。`, 'info');
+        }
       } catch (e) {
         sel.innerHTML = '<option value="">检测失败，请手动填写序列号</option>';
         // 检测失败时退回可手填的文本框，避免用户卡住
@@ -629,6 +666,7 @@
     async doTcpipSwitch() {
       const serial = this.field('usbSerial').value.trim();
       const port = parseInt(this.field('tcpipPort').value.trim(), 10) || 5555;
+      const curIp = (this.field('tcpipIp') && this.field('tcpipIp').value.trim()) || '';
       if (!serial) { toast('请填写设备序列号（先 USB 连接并开启 USB 调试）'); return; }
       this.setStepNotice(1, '正在切换为无线监听模式…', 'info');
       this.status('正在切换 adb tcpip…');
@@ -641,9 +679,32 @@
         this.field('tcpipConnPort').value = String(port);
         toast('已切换到无线监听，可拔掉 USB 线');
       } catch (e) {
+        // 传统模式二次连接常见场景：之前已切过 5555，USB 序列号变为 unauthorized，但 IP:5555 本身已可达。
+        // 若已填写设备 IP，自动探测一次 IP:port 连接；连通则直接跳过第 1 步并完成连接！
+        if (curIp) {
+          this.setStepNotice(1, `USB 序列号切换失败，正在检测 ${curIp}:${port} 是否已处于无线模式…`, 'info');
+          try {
+            await adminApi('/api/admin/scrcpy/connect', { host: curIp, port });
+            this.setStepState(1, 'done');
+            this.setStepNotice(1, `设备已处于 ${port} 无线模式，已自动跳过 USB 切换。`, 'ok');
+            this.setStepState(2, 'done');
+            this.setStepNotice(2, `已自动连接 ${curIp}:${port}`, 'ok');
+            this.setStepState(3, 'active');
+            this.setStepNotice(3, '连接就绪，点击「开始控制」进入远程画面。', 'info');
+            this.status('ADB 连接成功，可开始控制', true);
+            this.field('tcpipConnPort').value = String(port);
+            this.persistTcpipCfg();
+            await this.persistAdbOnline(curIp, port, 'tcpip');
+            toast(`设备已在 ${port} 端口就绪，已自动跳过 USB 切换并完成连接`);
+            return;
+          } catch (_) {
+            // IP:5555 也不可达，说明手机确实重启或未授权，展示明确指引
+          }
+        }
         this.setStepState(1, 'error');
-        this.setStepNotice(1, '切换失败：' + e.message, 'err');
-        this.status('切换失败：' + e.message, false);
+        const msg = (e && e.message) ? e.message : String(e);
+        this.setStepNotice(1, '切换失败：' + msg + '（若之前已切过 5555 且未重启，请直接点击第 2 步「连接」；若手机已重启，请重插 USB 并在手机点允许调试）', 'err');
+        this.status('切换失败：' + msg, false);
       }
     }
 
@@ -661,7 +722,7 @@
         this.setStepNotice(3, '连接就绪，点击「开始控制」进入远程画面。', 'info');
         this.status('ADB 连接成功，可开始控制', true);
         this.persistTcpipCfg();
-        await this.persistAdbOnline(host, port);
+        await this.persistAdbOnline(host, port, 'tcpip');
       } catch (e) {
         this.setStepState(2, 'error');
         this.setStepNotice(2, '连接失败：' + e.message, 'err');
@@ -713,24 +774,17 @@
         return;
       }
 
-      // 1. 只要 ADB 在线（无论是安卓端上报 5555 的自动模式，还是后台无线调试/传统模式手动连上的），直接打开投屏画面！
+      // 1. 只要 ADB 在线（无论是无线调试还是传统模式），直接打开投屏画面（不篡改已有 adbMode）！
       if (this.device.adbOnline === true && host && port) {
-        // 若直接点「远程控制」即可打开屏幕，且并非刚才通过手动面板连接的，确保模式标记为自动模式
-        if (this.device.adbMode !== 'manual' || Number(port) === 5555) {
-          this.setDeviceAdbMode('auto', true);
-        }
         this.startDirectStream(host, port);
         return;
       }
 
-      // 2. ADB 不在线时，区分 ADB 模式：
-      //    - 若有安卓端上报的 IP（自动模式），先尝试自动连接 5555；成功则标记为自动模式并直开屏幕，失败则自动降级到手动模式面板。
-      //    - 若安卓端未上报 IP，直接降级展示管理后台的「无线调试模式」和「传统模式」面板供手动连接。
+      // 2. ADB 不在线时：若有已上报/保存的 IP，尝试直连；否则展开手动连接面板。
       if (host && this.device.online) {
         await this.tryAutoConnectOrFallback(host, port || 5555);
       } else {
-        this.setDeviceAdbMode('manual', false);
-        this.showManualSetup('当前设备 ADB 未在线（未收到安卓端自动上报），请通过「无线调试模式」或「传统模式」手动连接');
+        this.showManualSetup('当前设备 ADB 未在线，请通过「无线调试模式」或「传统模式」连接');
       }
     }
 
@@ -761,6 +815,14 @@
     showManualSetup(reasonMsg) {
       this.stage.classList.add('hidden');
       this.setup.classList.remove('hidden');
+      // 若该设备之前通过「传统模式」连接过（保存了 tcpipIp 且未用过无线调试配对码），
+      // 自动切到传统模式并检测 5555 是否已在线，不影响无线调试模式设备。
+      if (this.device) {
+        const saved = loadSavedConfig(this.device.id) || {};
+        if (saved.tcpipIp && !saved.pairPort) {
+          this.setMode('tcpip');
+        }
+      }
       if (reasonMsg) {
         this.status(reasonMsg, false);
       }
@@ -768,23 +830,27 @@
 
     async tryAutoConnectOrFallback(host, port) {
       let realPort = Number(port) || 5555;
+      const keepMode = (this.device && (this.device.adbMode === 'tcpip' || this.device.adbMode === 'wireless'))
+        ? this.device.adbMode
+        : 'wireless';
       this.setup.classList.add('hidden');
       this.stage.classList.remove('hidden');
-      this.status(`自动模式：正在连接安卓端上报地址 (${host}:${realPort})…`);
+      this.status(`正在尝试直连 (${host}:${realPort})…`);
 
       try {
         const r = await adminApi('/api/admin/device/connect', {
           deviceId: this.device.id,
           host,
           port: realPort,
-          mode: 'auto',
+          mode: keepMode,
         });
         if (r && r.port) realPort = r.port;
+        const finalMode = (r && r.adbMode) ? r.adbMode : keepMode;
         if (this.device) {
           this.device.adbIp = host;
           this.device.adbPort = realPort;
           this.device.adbOnline = true;
-          this.device.adbMode = 'auto';
+          this.device.adbMode = finalMode;
         }
         if (typeof devices !== 'undefined' && Array.isArray(devices)) {
           const dev = devices.find((d) => d && d.id === this.device.id);
@@ -792,7 +858,7 @@
             dev.adbIp = host;
             dev.adbPort = realPort;
             dev.adbOnline = true;
-            dev.adbMode = 'auto';
+            dev.adbMode = finalMode;
           }
         }
         if (typeof renderDevices === 'function') renderDevices();
@@ -806,11 +872,10 @@
         });
         this.startDirectStream(host, realPort);
       } catch (e) {
-        // 安卓端上报连接失败 → 自动降级到管理后台的「无线调试模式」和「传统模式」，并将列表模式更新为手动模式
-        this.setDeviceAdbMode('manual', false);
-        this.showManualSetup(`自动模式连接 ${host}:${realPort} 失败（${e.message}），已自动降级为手动连接模式`);
+        // 直连失败 → 自动降级到手动连接面板（保持原模式记录不被误改）
+        this.showManualSetup(`直连 ${host}:${realPort} 失败（${e.message}），请通过「无线调试模式」或「传统模式」连接`);
         this.setStepState(1, 'active');
-        this.setStepNotice(1, `自动模式连接失败（${e.message}），已降级为手动模式，请用无线调试模式或传统模式连接。`, 'err');
+        this.setStepNotice(1, `直连失败（${e.message}），请使用无线调试模式或传统模式连接。`, 'err');
       }
     }
 
@@ -2777,11 +2842,11 @@
           <td class="name-cell">${escapeHtml(g.name)}</td>
           <td>${escapeHtml(memberText)}</td>
           <td>${escapeHtml(masterName)}</td>
-          <td>
-            <div class="mirror-group-actions">
-              <button type="button" class="btn-primary btn-sm" data-launch>一键镜像</button>
-              <button type="button" class="btn-ghost btn-sm mirror-save-btn" data-edit>编辑</button>
-              <button type="button" class="btn-ghost btn-sm" data-del>删除</button>
+          <td class="action-cell">
+            <div class="actions" style="flex-wrap:nowrap">
+              <button type="button" class="primary" data-launch>一键镜像</button>
+              <button type="button" class="secondary" data-edit>编辑</button>
+              <button type="button" class="danger" data-del>删除</button>
             </div>
           </td>
         </tr>`;

@@ -614,12 +614,12 @@ table .col-select{width:34px;text-align:center;padding:0}
 .mirror-close{flex:none;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;border-radius:7px;background:transparent;color:#9aa3b5;cursor:pointer}
 .mirror-close:hover{background:rgba(255,255,255,.08);color:#fff}
 .mirror-layout{flex:1;min-height:0;display:flex;gap:16px;padding:16px;overflow:hidden}
-.mirror-master-zone{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mirror-master-zone{flex:0 0 clamp(300px,28vw,420px);min-width:0;display:flex;flex-direction:column;gap:8px}
 .mirror-grid-zone{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px}
 .mirror-zone-label{flex:none;font-size:11px;font-weight:700;letter-spacing:.12em;color:#63739a;text-transform:uppercase}
 .mirror-master-slot{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 .mirror-master-slot .mirror-tile{width:100%;height:100%}
-.mirror-grid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;align-content:start}
+.mirror-grid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;align-content:start}
 .mirror-tile{position:relative;display:flex;flex-direction:column;background:#14171f;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .15s}
 .mirror-tile:hover{border-color:rgba(125,146,255,.45)}
 .mirror-tile.is-master{border-color:rgba(125,146,255,.7);box-shadow:0 0 0 1px rgba(125,146,255,.35)}
@@ -836,6 +836,7 @@ table .col-select{width:34px;text-align:center;padding:0}
       <a class="nav-link" data-target="sec-device-groups" href="#sec-device-groups"><svg class="ico"><use href="#i-layers"/></svg><span class="nav-label">设备分组</span></a>
       <a class="nav-link" data-target="sec-device-scripts" href="#sec-device-scripts"><svg class="ico"><use href="#i-bolt"/></svg><span class="nav-label">机型脚本</span></a>
       <a class="nav-link" data-target="sec-automation" href="#sec-automation"><svg class="ico"><use href="#i-bolt"/></svg><span class="nav-label">自动化</span></a>
+      <a class="nav-link" data-target="sec-ai-agent" href="#sec-ai-agent"><svg class="ico"><use href="#i-target"/></svg><span class="nav-label">AI 智能体</span></a>
       <div class="nav-group-title">资源管理</div>
       <a class="nav-link" data-target="sec-accounts" href="#sec-accounts"><svg class="ico"><use href="#i-users"/></svg><span class="nav-label">账号管理</span></a>
       <a class="nav-link" data-target="sec-groups" href="#sec-groups"><svg class="ico"><use href="#i-shield"/></svg><span class="nav-label">角色管理</span></a>
@@ -1069,7 +1070,7 @@ table .col-select{width:34px;text-align:center;padding:0}
             </div>
             <div class="table-card">
               <table>
-                <thead><tr><th>名称</th><th>步骤数</th><th>调度</th><th>更新时间</th><th style="width:220px">操作</th></tr></thead>
+                <thead><tr><th>名称</th><th>步骤数</th><th>调度</th><th>更新时间</th><th style="width:250px">操作</th></tr></thead>
                 <tbody id="autoFlowRows"><tr><td colspan="5" class="muted">暂无流程，点击「新建流程」开始</td></tr></tbody>
               </table>
             </div>
@@ -1189,6 +1190,122 @@ table .col-select{width:34px;text-align:center;padding:0}
               <div id="autoJobSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
               <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:500">步骤执行日志</label>
               <div id="autoJobLogs" style="display:flex;flex-direction:column;gap:8px;max-height:440px;overflow:auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 页面：AI 智能体（视觉大模型 Mobile Agent） -->
+      <section id="sec-ai-agent" class="section page" data-title="AI 智能体" data-crumb="AI 智能体">
+        <div class="section-head"><div><span class="eyebrow">AI Mobile Agent</span><h2>AI 智能体</h2><p>输入自然语言指令，结合 50ms 无障碍控件树 + SoM 视觉编号标注 + 多模态大模型自主操控真机</p></div></div>
+
+        <div class="mdm-tabs" id="aiTabs">
+          <button class="mdm-tab active" data-tab="run">AI 任务执行</button>
+          <button class="mdm-tab" data-tab="history">任务记录</button>
+          <button class="mdm-tab" data-tab="config">模型配置</button>
+        </div>
+
+        <!-- Tab 1：AI 任务执行 + 实时视觉轨迹 -->
+        <div class="mdm-panel active" id="aiPanel-run">
+          <div style="display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:18px;align-items:start">
+            <!-- 左侧：指令下发表单 -->
+            <div class="card" style="padding:22px 24px">
+              <h3 style="font-size:16px;font-weight:700;margin-bottom:4px">下发自然语言任务</h3>
+              <p class="muted small" style="margin-bottom:16px">AI 将自动循环「看屏 → 思考 → 执行」，命中高危操作词自动拦截</p>
+
+              <div class="stack-form">
+                <label>目标真机（仅显示 ADB 在线设备）
+                  <select id="aiDeviceSelect"></select>
+                </label>
+                <label>感知模式
+                  <select id="aiModeSelect">
+                    <option value="fast">极速模式（50ms 无障碍树 + SoM 红色编号标注，准确率最高）</option>
+                    <option value="pure">纯净视觉模式（0 无障碍依赖，纯截屏坐标，防银行/风控拦截）</option>
+                  </select>
+                </label>
+                <label>任务指令
+                  <textarea id="aiPromptInput" rows="4" placeholder="例如：打开设置，查看本机 Android 版本号并总结告诉我；或者：帮我关掉当前屏幕上的广告弹窗" style="width:100%;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;font-size:13.5px;resize:vertical;font-family:inherit"></textarea>
+                </label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button type="button" class="secondary" style="font-size:11.5px;padding:5px 10px" data-ai-preset="打开系统设置，进入关于手机页面，读取设备型号和系统版本并汇报给我">示例：查系统版本</button>
+                  <button type="button" class="secondary" style="font-size:11.5px;padding:5px 10px" data-ai-preset="关闭当前屏幕上的所有弹窗或广告，返回应用主界面">示例：清理当前弹窗</button>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:6px">
+                  <button type="button" id="aiRunBtn" class="btn-primary" style="flex:1">开始 AI 执行</button>
+                  <button type="button" id="aiStopBtn" class="danger hidden">中止任务</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧：实时思考与 SoM 视觉截图轨迹 -->
+            <div class="card" style="padding:22px 24px;min-height:420px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)">
+                <div>
+                  <h3 style="font-size:16px;font-weight:700" id="aiLiveTitle">实时执行轨迹</h3>
+                  <p class="muted small" id="aiLiveSub">选择设备并点击「开始 AI 执行」后，这里将实时展示每一步的 AI 思考与带红色编号框的真机画面</p>
+                </div>
+                <span class="chip hidden" id="aiLiveStatus">—</span>
+              </div>
+              <div id="aiLiveResult" class="result-box" style="margin:0 0 14px"></div>
+              <div id="aiLiveSteps" style="display:flex;flex-direction:column;gap:12px;max-height:560px;overflow:auto">
+                <div class="muted" style="text-align:center;padding:64px 16px;font-size:13px">暂无运行中的 AI 任务</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2：任务记录 -->
+        <div class="mdm-panel" id="aiPanel-history">
+          <div class="card table-card">
+            <div class="card-head">
+              <div><h3>AI 任务记录</h3><p>保留最近 50 条视觉大模型执行记录与截图轨迹</p></div>
+              <div class="card-head-right"><button class="secondary" id="aiRefreshHistoryBtn">刷新记录</button></div>
+            </div>
+            <div class="scroll"><table>
+              <thead><tr><th>设备</th><th>模式</th><th>自然语言指令</th><th>步数</th><th>状态</th><th>结果摘要</th><th style="width:110px">操作</th></tr></thead>
+              <tbody id="aiHistoryRows"><tr><td colspan="7" class="table-empty">暂无 AI 任务记录</td></tr></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- Tab 3：模型配置（OpenAI 兼容多模态协议） -->
+        <div class="mdm-panel" id="aiPanel-config">
+          <div class="card" style="padding:24px 26px;max-width:740px">
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:4px">视觉大模型配置（OpenAI 兼容协议）</h3>
+            <p class="muted small" style="margin-bottom:16px">支持通义千问 Qwen-VL、火山豆包视觉、智谱 GLM-4V、Gemini、GPT-4o 以及本地 Ollama 等任意支持图片输入的大模型接口</p>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="qwen">通义千问 Qwen-VL</button>
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="doubao">火山豆包视觉</button>
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="glm">智谱 GLM-4V</button>
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="gemini">Google Gemini</button>
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="openai">OpenAI GPT-4o</button>
+              <button type="button" class="secondary" style="font-size:12px;padding:6px 10px" data-ai-provider="ollama">本地 Ollama</button>
+            </div>
+
+            <div class="stack-form">
+              <label>API Base URL
+                <input id="aiCfgBaseUrl" placeholder="如 https://dashscope.aliyuncs.com/compatible-mode/v1">
+              </label>
+              <label>API Key <span id="aiCfgKeyHint" class="muted small" style="font-weight:400;margin-left:6px"></span>
+                <input id="aiCfgApiKey" type="password" placeholder="留空表示保持已保存的 API Key 不变">
+              </label>
+              <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+                <label>视觉模型名称 (Model)
+                  <input id="aiCfgModel" placeholder="如 qwen-vl-plus / qwen2.5-vl-72b-instruct / gpt-4o-mini">
+                </label>
+                <label>单任务最大步数
+                  <input id="aiCfgMaxSteps" type="number" min="3" max="40" value="15">
+                </label>
+              </div>
+              <label>高危操作拦截关键词（逗号分隔，AI 尝试点击含此类词汇的按钮时将自动中止并提醒人工）
+                <input id="aiCfgGuardWords" placeholder="确认付款,立即支付,确认转账,注销账号,删除账号,确认删除">
+              </label>
+              <div style="display:flex;gap:10px;margin-top:8px">
+                <button type="button" id="aiCfgSaveBtn" class="btn-primary">保存配置</button>
+                <button type="button" id="aiCfgTestBtn" class="secondary">测试连通性</button>
+              </div>
+              <div id="aiCfgTestResult" class="result-box"></div>
             </div>
           </div>
         </div>
@@ -1378,8 +1495,8 @@ let deviceView='list';
 function deviceDisplayName(d){return d.name||d.model||('设备 '+d.id.slice(0,8))}
 // 设备业务在线状态（第一列「状态」）。
 function deviceStatusInfo(d){if(!d.online)return{dot:'offline',label:'离线'};return{dot:'online',label:'在线'}}
-// ADB 模式：区分安卓端上报/直接一键直连的「自动模式」与管理后台通过无线调试/传统模式主动连接的「手动模式」。
-function deviceAdbModeInfo(d){const isAuto=d.adbMode==='auto'||(d.adbMode!=='manual'&&(d.adbOnline===true||!!(d.online&&d.adbIp)));return isAuto?{mode:'auto',label:'自动模式'}:{mode:'manual',label:'手动模式'}}
+// ADB 模式：区分通过「无线调试」(wireless) 还是「传统模式」(tcpip) 建立的 ADB 连接。
+function deviceAdbModeInfo(d){if(d.adbMode==='tcpip')return{mode:'manual',label:'传统模式'};if(d.adbMode==='wireless')return{mode:'auto',label:'无线调试'};if(d.adbMode==='manual')return{mode:'manual',label:'传统模式'};if(d.adbMode==='auto')return{mode:'auto',label:'无线调试'};return{mode:'manual',label:'—'}}
 // ADB 状态：无论通过安卓端自动开启上报 5555 还是管理后台手动连接，只要设备在线且连上 ADB 就显示「在线」，否则「离线」。
 function deviceAdbStatusInfo(d){return (!!d.online&&d.adbOnline===true)?{dot:'online',label:'在线'}:{dot:'offline',label:'离线'}}
 function deviceGroupLabel(d){return (d.groupIds||[]).map(id=>groups.find(g=>g.id===id)?.name||id).join(', ')||'—'}
@@ -1393,7 +1510,7 @@ function deviceActions(d){const box=document.createElement('div');box.className=
   if(!adbConnected){
     const conn=document.createElement('button');conn.textContent='连接设备';conn.className='primary';conn.disabled=!d.enabled;conn.onclick=()=>openScrcpy(d,{manualSetup:true});box.append(conn);
   }else{
-    const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
+    const dis=document.createElement('button');dis.textContent='断开';dis.className='danger';dis.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};box.append(dis);
   }
   if(user){
     const toggle=document.createElement('button');toggle.className=d.enabled?'danger':'secondary';toggle.textContent=d.enabled?'停用':'启用';toggle.onclick=()=>deviceAction(d.id,d.enabled?'disconnect':'enable');box.append(toggle);
@@ -1546,7 +1663,7 @@ function renderDeviceCards(){const grid=$('deviceGridView');grid.replaceChildren
   const rightBtn=document.createElement('button');
   if(adbConnected){
     rightBtn.className='dc-btn danger';rightBtn.textContent='断开';
-    rightBtn.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;d.adbIp='';cardScreenUrls.delete(d.id);renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};
+    rightBtn.onclick=async()=>{if(!confirm('确定断开此设备的 ADB 连接？'))return;try{if(typeof window.closeScrcpy==='function')window.closeScrcpy(d.id);await api('/api/admin/device/disconnect',{method:'POST',body:JSON.stringify({deviceId:d.id})});d.adbOnline=false;cardScreenUrls.delete(d.id);renderDevices();toast('已断开')}catch(e){toast('断开失败：'+e.message)}};
   }else if(!d.online && user){
     rightBtn.className='dc-btn danger';rightBtn.textContent='删除';
     rightBtn.onclick=async()=>{if(!confirm(`确定删除离线设备「${deviceDisplayName(d)}」记录吗？`))return;try{await api(`/api/admin/devices/${encodeURIComponent(d.id)}`,{method:'DELETE'});devices=devices.filter(x=>x.id!==d.id);renderDevices();toast('已删除离线设备')}catch(e){toast('删除失败：'+e.message)}};
@@ -1564,7 +1681,7 @@ function applyDeviceView(){const listEl=$('deviceListView'),gridEl=$('deviceGrid
 function setDeviceView(v){deviceView=v;applyDeviceView();try{localStorage.setItem('deviceView',v)}catch(_){}}
 async function connectRealtime(){if(ws&&ws.readyState===WebSocket.OPEN){toast('实时事件已连接');return}if(wsTicketBusy)return;wsTicketBusy=true;try{const {ticket}=await api('/api/admin/ws-ticket',{method:'POST'});const sock=new WebSocket(`${wsBase}/ws/admin?ticket=${encodeURIComponent(ticket)}`);ws=sock;$('connStatus').textContent='正在连接实时事件…';sock.onopen=()=>{$('connStatus').textContent='实时事件已连接';$('connectBtn').textContent='实时已连接';loadAll()};sock.onmessage=event=>{try{const m=JSON.parse(event.data);if(m&&typeof m==='object'){const p=handleServerMessage(m);if(p&&typeof p.catch==='function')p.catch(e=>console.warn('[dashboard] 消息处理失败',e))}}catch(e){console.warn('[dashboard] 忽略无法解析的服务端消息',e)}};sock.onclose=()=>{$('connStatus').textContent='实时连接已断开';$('connectBtn').textContent='重新连接';clearTimeout(reconnectTimer);reconnectTimer=setTimeout(()=>{if(token)connectRealtime()},4000)};sock.onerror=()=>{$('connStatus').textContent='实时连接失败；检查 WS 地址/Origin'};}catch(e){toast(`WebSocket ticket 获取失败：${e.message}`)}finally{wsTicketBusy=false}}
 function sendWS(msg){if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));else toast('管理端实时连接尚未建立')}
-async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline'){d.online=false;d.adbOnline=false}if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip;if(m.data.port>0)d.adbPort=m.data.port;else if(!d.adbPort)d.adbPort=5555;if(m.data.adbMode)d.adbMode=m.data.adbMode}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
+async function handleServerMessage(m){if(m.type==='device-list'){devices=m.devices||[];renderDevices();return}if(m.type==='device-online'||m.type==='device-offline'||m.type==='device-state'||m.type==='device-admin-state'||m.type==='device-adb-state'){const d=devices.find(x=>x.id===m.deviceId);if(d){if(m.type==='device-online')d.online=true;if(m.type==='device-offline'){d.online=false;d.adbOnline=false}if(m.type==='device-admin-state'&&m.data?.state==='disconnect'){d.enabled=false;d.online=false;d.adbOnline=false}if(m.type==='device-admin-state'&&m.data?.state==='enable')d.enabled=true;if(m.type==='device-state'&&m.data){d.battery=m.data.battery??d.battery;d.rttMs=m.data.rttMs??d.rttMs;d.status=m.data.status??d.status;d.lastSeen=m.data.lastSeen??d.lastSeen}if(m.type==='device-adb-state'&&m.data){d.adbOnline=m.data.adbOnline??true;if(m.data.ip)d.adbIp=m.data.ip;if(m.data.port>0)d.adbPort=m.data.port;else if(!d.adbPort)d.adbPort=5555;if(m.data.adbMode)d.adbMode=m.data.adbMode}renderDevices()}else loadAll();return}if(m.type==='error'){toast(m.message||'服务器返回错误');return}}
 async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定停用并断开此设备？':'确定重新启用此设备？'))return;if(!ws||ws.readyState!==WebSocket.OPEN){toast('实时连接未就绪，无法下发控制指令');return}sendWS({type:'device-control',deviceId:id,action:action})}
 
 /* ===== 资源管理：账号 / 分组 / 权限 三个列表页 ===== */
@@ -1573,7 +1690,7 @@ async function deviceAction(id,action){if(!confirm(action==='disconnect'?'确定
 function renderGroupPage(){renderUserList();renderGroupList();renderPermList()}
 
 function roleLabel(r){return r==='admin'?'管理员':'普通用户'}
-function fmtCreatedAt(t){if(!t)return'—';try{const d=new Date(t);if(!isNaN(d))return d.toLocaleString()}catch(_){}return t}
+function fmtCreatedAt(t){if(!t)return'—';try{let d;const s=String(t).trim();if(/^\d{10}$/.test(s))d=new Date(Number(s)*1000);else if(/^\d{13}$/.test(s))d=new Date(Number(s));else d=new Date(s.includes('T')?s:s.replace(' ','T'));if(!isNaN(d)){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`}}catch(_){}return t}
 
 // renderUserList 渲染账号列表。
 function renderUserList(){const body=$('userRows');if(!body)return;body.replaceChildren();if(!users.length){body.innerHTML='<tr><td colspan="5" class="table-empty">暂无账号</td></tr>';updateDelState('user');return}
@@ -1791,15 +1908,20 @@ if(token)showApp();
       {key:'text',label:'OCR 识别目标文字'},
       {key:'click',label:'识别后动作',options:[{v:'true',t:'点击文字中心'},{v:'false',t:'仅验证文字存在'}]},
     ],
+    aiAct: [
+      {key:'prompt',label:'AI 自然语言指令（如：关闭屏幕上未知的弹窗）'},
+      {key:'onError',label:'失败处理',options:[{v:'stop',t:'中止流程'},{v:'continue',t:'忽略并继续下一步'}]},
+    ],
   };
   const ACTION_LABELS = {
     clickElement:'点击控件',waitForElement:'等待控件',ifElementExists:'条件判断(If)',loop:'循环执行(Loop)',
     inputText:'输入文字',pressKey:'系统按键',tap:'点击坐标',longPress:'长按',swipe:'滑动/滚屏',
-    launchApp:'打开应用',stopApp:'关闭应用',installApk:'安装应用',screenshot:'截图存证',wait:'等待延时',ocrFind:'OCR 文字定位'
+    launchApp:'打开应用',stopApp:'关闭应用',installApk:'安装应用',screenshot:'截图存证',wait:'等待延时',ocrFind:'OCR 文字定位',
+    aiAct:'AI 智能处理'
   };
   const ACTION_GROUPS = [
     { title: '控件与交互（推荐）', actions: ['clickElement', 'waitForElement', 'inputText', 'pressKey'] },
-    { title: '流程控制（逻辑）', actions: ['ifElementExists', 'loop', 'wait'] },
+    { title: 'AI 与流程控制', actions: ['aiAct', 'ifElementExists', 'loop', 'wait'] },
     { title: '坐标与手势', actions: ['swipe', 'tap', 'longPress'] },
     { title: '应用与视觉', actions: ['launchApp', 'stopApp', 'screenshot', 'ocrFind', 'installApk'] },
   ];
@@ -1852,10 +1974,14 @@ if(token)showApp();
   }
 
   function openRun(flow) {
-    runningFlow = flow;
-    $('autoRunFlowName').textContent = flow.name;
-    renderRunDevices();
-    $('autoRunDrawer').classList.remove('hidden');
+    try {
+      runningFlow = flow;
+      $('autoRunFlowName').textContent = flow.name;
+      renderRunDevices(flow);
+      $('autoRunDrawer').classList.remove('hidden');
+    } catch (e) {
+      toast('打开运行面板失败：' + e.message);
+    }
   }
   function closeRun() { $('autoRunDrawer').classList.add('hidden'); }
 
@@ -2410,13 +2536,16 @@ if(token)showApp();
       const sched = document.createElement('td'); sched.textContent = f.schedule || '手动触发';
       const upd = document.createElement('td'); upd.textContent = f.updatedAt ? new Date(f.updatedAt*1000).toLocaleString() : '—';
       const act = document.createElement('td');
-      const edit = document.createElement('button'); edit.textContent='编辑'; edit.className='secondary'; edit.style.marginRight='6px';
-      edit.onclick = () => openEditor(f);
-      const run = document.createElement('button'); run.textContent='运行'; run.className='primary'; run.style.marginRight='6px';
+      act.className = 'action-cell';
+      const actBox = document.createElement('div'); actBox.className = 'actions'; actBox.style.flexWrap = 'nowrap';
+      const run = document.createElement('button'); run.type='button'; run.textContent='运行'; run.className='primary';
       run.onclick = () => openRun(f);
-      const del = document.createElement('button'); del.textContent='删除'; del.className='danger';
+      const edit = document.createElement('button'); edit.type='button'; edit.textContent='编辑'; edit.className='secondary';
+      edit.onclick = () => openEditor(f);
+      const del = document.createElement('button'); del.type='button'; del.textContent='删除'; del.className='danger';
       del.onclick = async () => { if(!confirm(`确定删除流程「${f.name}」？其执行记录将一并删除。`))return; try{await api('/api/admin/automation/flows/'+f.id,{method:'DELETE'});toast('已删除');loadFlows();}catch(e){toast('删除失败：'+e.message)} };
-      act.append(edit, run, del);
+      actBox.append(run, edit, del);
+      act.append(actBox);
       tr.append(name, cnt, sched, upd, act);
       body.append(tr);
     });
@@ -2446,7 +2575,7 @@ if(token)showApp();
   });
 
   // --- 运行：设备选择 ---
-  function renderRunDevices() {
+  function renderRunDevices(flow) {
     const box = $('autoRunDeviceList');
     box.replaceChildren();
     const list = (typeof devices !== 'undefined' && Array.isArray(devices)) ? devices : [];
@@ -2455,10 +2584,12 @@ if(token)showApp();
       const empty = document.createElement('div'); empty.className='muted'; empty.textContent='没有可用的在线设备（需业务在线且 ADB 在线）';
       box.append(empty); return;
     }
+    const presetIds = Array.isArray(flow?.deviceIds) ? flow.deviceIds : [];
     candidates.forEach(d => {
       const row = document.createElement('label');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line-2);border-radius:9px;cursor:pointer;font-size:13.5px';
       const cb = document.createElement('input'); cb.type='checkbox'; cb.value=d.id; cb.className='auto-run-device';
+      if (presetIds.includes(d.id) || (presetIds.length === 0 && candidates.length === 1)) cb.checked = true;
       const nm = document.createElement('span'); nm.textContent = (d.name || d.model || d.id);
       row.append(cb, nm);
       box.append(row);
@@ -2473,7 +2604,11 @@ if(token)showApp();
       const res = await api('/api/admin/automation/flows/'+runningFlow.id+'/run', {method:'POST', body:JSON.stringify({deviceIds:ids})});
       toast('已触发执行，任务 ID：' + res.jobId);
       closeRun();
-      loadJobs();
+      // 自动切到「执行记录」页并刷新，方便立刻查看执行进度与结果
+      const jobsTab = document.querySelector('#autoTabs .mdm-tab[data-tab="jobs"]');
+      if (jobsTab) jobsTab.click();
+      else loadJobs();
+      setTimeout(loadJobs, 2000);
     } catch (e) { toast('执行失败：'+e.message); }
     finally { btn.disabled = false; btn.textContent = '开始执行'; }
   });
@@ -2499,10 +2634,12 @@ if(token)showApp();
       const statusMap = {pending:'待执行',running:'执行中',success:'成功',failed:'失败',partial:'部分成功'};
       st.innerHTML = `<span class="chip">${statusMap[j.status] || j.status}</span>`;
       const ct = document.createElement('td'); ct.textContent = j.createdAt ? new Date(j.createdAt*1000).toLocaleString() : '—';
-      const act = document.createElement('td');
-      const view = document.createElement('button'); view.textContent='详情'; view.className='secondary';
+      const act = document.createElement('td'); act.className = 'action-cell';
+      const actBox = document.createElement('div'); actBox.className = 'actions'; actBox.style.flexWrap = 'nowrap';
+      const view = document.createElement('button'); view.type='button'; view.textContent='详情'; view.className='secondary';
       view.onclick = () => viewJob(j);
-      act.append(view);
+      actBox.append(view);
+      act.append(actBox);
       tr.append(id, fn, cnt, st, ct, act);
       body.append(tr);
     });
@@ -3044,6 +3181,10 @@ if(token)showApp();
     if (targetId === 'sec-device-scripts' && typeof window.renderDeviceScriptsPage === 'function') {
       window.renderDeviceScriptsPage();
     }
+    // 切换到「AI 智能体」页时刷新设备列表、配置与任务记录。
+    if (targetId === 'sec-ai-agent' && typeof window.renderAIAgentPage === 'function') {
+      window.renderAIAgentPage();
+    }
   }
 
   for (const link of links) {
@@ -3066,6 +3207,293 @@ if(token)showApp();
 
   updateStats();
   syncUser();
+})();
+</script>
+<script>
+/* ===== AI 智能体：自然语言任务执行、实时 SoM 视觉轨迹与模型配置 ===== */
+(() => {
+  'use strict';
+  const el = id => document.getElementById(id);
+  let activeTaskId = null;
+  let pollTimer = null;
+
+  const AI_PRESETS = {
+    qwen:   { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3-vl-plus' },
+    doubao: { baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',          model: 'doubao-1-5-vision-pro-32k-250115' },
+    glm:    { baseUrl: 'https://open.bigmodel.cn/api/paas/v4',              model: 'glm-4v-plus' },
+    gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash' },
+    openai: { baseUrl: 'https://api.openai.com/v1',                         model: 'gpt-4o-mini' },
+    ollama: { baseUrl: 'http://127.0.0.1:11434/v1',                         model: 'qwen2.5vl:7b' },
+  };
+
+  // Tab 切换
+  const tabsWrap = el('aiTabs');
+  if (tabsWrap) {
+    tabsWrap.addEventListener('click', e => {
+      const btn = e.target.closest('.mdm-tab');
+      if (!btn) return;
+      const tab = btn.dataset.tab;
+      tabsWrap.querySelectorAll('.mdm-tab').forEach(b => b.classList.toggle('active', b === btn));
+      ['run', 'history', 'config'].forEach(t => {
+        const panel = el('aiPanel-' + t);
+        if (panel) panel.classList.toggle('active', t === tab);
+      });
+      if (tab === 'history') loadAIHistory();
+      if (tab === 'config') loadAISettings();
+      if (tab === 'run') refreshAIDeviceSelect();
+    });
+  }
+
+  // 快速指令示例按钮
+  document.querySelectorAll('[data-ai-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inp = el('aiPromptInput');
+      if (inp) inp.value = btn.dataset.aiPreset || '';
+    });
+  });
+
+  // 模型厂商预设一键填入
+  document.querySelectorAll('[data-ai-provider]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = AI_PRESETS[btn.dataset.aiProvider];
+      if (!p) return;
+      el('aiCfgBaseUrl').value = p.baseUrl;
+      el('aiCfgModel').value = p.model;
+      toast('已填入预设，请补充 API Key 后点击保存');
+    });
+  });
+
+  function refreshAIDeviceSelect() {
+    const sel = el('aiDeviceSelect');
+    if (!sel) return;
+    const prev = sel.value;
+    const list = (typeof devices !== 'undefined' && Array.isArray(devices))
+      ? devices.filter(d => d && d.online && d.adbOnline === true && d.enabled)
+      : [];
+    if (!list.length) {
+      sel.innerHTML = '<option value="">暂无 ADB 在线设备（请先在设备清单连接）</option>';
+      return;
+    }
+    sel.innerHTML = list.map(d =>
+      `<option value="${escapeHTML(d.id)}">${escapeHTML(deviceDisplayName(d))} (${escapeHTML(d.adbIp || '')})</option>`
+    ).join('');
+    if (prev && list.some(d => d.id === prev)) sel.value = prev;
+  }
+
+  async function loadAISettings() {
+    try {
+      const r = await api('/api/admin/ai/settings');
+      el('aiCfgBaseUrl').value = r.baseUrl || '';
+      el('aiCfgApiKey').value = '';
+      el('aiCfgKeyHint').textContent = r.hasApiKey ? `（已配置：${r.apiKeyMasked}，留空不修改）` : '（尚未配置）';
+      el('aiCfgModel').value = r.model || '';
+      el('aiCfgMaxSteps').value = r.maxSteps || 15;
+      el('aiCfgGuardWords').value = r.guardWords || '确认付款,立即支付,确认转账,注销账号,删除账号,确认删除';
+    } catch (e) {
+      toast('加载模型配置失败：' + e.message);
+    }
+  }
+
+  async function saveAISettings() {
+    const body = {
+      baseUrl: el('aiCfgBaseUrl').value.trim(),
+      apiKey: el('aiCfgApiKey').value.trim(),
+      model: el('aiCfgModel').value.trim(),
+      maxSteps: parseInt(el('aiCfgMaxSteps').value, 10) || 15,
+      guardWords: el('aiCfgGuardWords').value.trim(),
+    };
+    if (!body.baseUrl || !body.model) {
+      toast('请填写 API Base URL 和视觉模型名称');
+      return;
+    }
+    try {
+      await api('/api/admin/ai/settings', { method: 'POST', body: JSON.stringify(body) });
+      toast('视觉大模型配置已保存');
+      loadAISettings();
+    } catch (e) {
+      toast('保存失败：' + e.message);
+    }
+  }
+
+  async function testAISettings() {
+    const resBox = el('aiCfgTestResult');
+    resBox.textContent = '正在向大模型发送连通性测试请求…';
+    try {
+      const r = await api('/api/admin/ai/test', {
+        method: 'POST',
+        body: JSON.stringify({
+          baseUrl: el('aiCfgBaseUrl').value.trim(),
+          apiKey: el('aiCfgApiKey').value.trim(),
+          model: el('aiCfgModel').value.trim(),
+        }),
+      });
+      resBox.textContent = '✓ 连接成功！模型回复：' + (r.reply || 'OK');
+    } catch (e) {
+      resBox.textContent = '✕ ' + e.message;
+    }
+  }
+
+  function statusLabel(st) {
+    const m = { running: '执行中…', success: '已完成', failed: '执行失败', stopped: '已中止', guarded: '高危拦截' };
+    return m[st] || st;
+  }
+
+  function renderTaskDetail(task) {
+    if (!task) return;
+    el('aiLiveTitle').textContent = `执行轨迹 · ${task.deviceName || task.deviceId}`;
+    el('aiLiveSub').textContent = `模式：${task.mode === 'pure' ? '纯净视觉模式' : '极速 SoM 模式'} · 指令：${task.prompt}`;
+    const chip = el('aiLiveStatus');
+    chip.classList.remove('hidden');
+    chip.textContent = statusLabel(task.status);
+    el('aiStopBtn').classList.toggle('hidden', task.status !== 'running');
+
+    const resBox = el('aiLiveResult');
+    if (task.status === 'success' && task.result) {
+      resBox.textContent = '✓ 任务结果：' + task.result;
+    } else if (task.status === 'guarded') {
+      resBox.textContent = '⚠ ' + (task.error || '触发高危操作护栏');
+    } else if (task.status === 'failed' && task.error) {
+      resBox.textContent = '✕ 失败原因：' + task.error;
+    } else {
+      resBox.textContent = '';
+    }
+
+    const box = el('aiLiveSteps');
+    box.replaceChildren();
+    const steps = task.steps || [];
+    if (!steps.length) {
+      box.innerHTML = `<div class="muted" style="text-align:center;padding:48px 16px;font-size:13px">${task.status === 'running' ? '正在抓屏并请求视觉大模型思考第 1 步…' : '无步骤记录'}</div>`;
+      return;
+    }
+    steps.forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'job-log';
+      card.style.cssText = 'display:flex;flex-direction:row;gap:14px;align-items:flex-start';
+
+      if (s.shotBase64) {
+        const img = document.createElement('img');
+        img.src = s.shotBase64;
+        img.alt = 'step ' + s.index;
+        img.style.cssText = 'width:110px;border-radius:10px;border:1px solid var(--line);flex:none;cursor:zoom-in';
+        img.onclick = () => {
+          openModal(`第 ${s.index} 步 · SoM 标注画面`, `<img src="${s.shotBase64}" style="width:100%;max-height:72vh;object-fit:contain;border-radius:12px;display:block;margin:0 auto">`);
+        };
+        card.append(img);
+      }
+
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:5px';
+      const badgeCls = s.status === 'success' ? 'success' : 'failed';
+      const targetDesc = s.targetId ? `编号 [${s.targetId}] ${s.targetText || ''}` : ((s.x || s.y) ? `坐标 (${s.x}, ${s.y})` : '');
+      const extraDesc = s.inputText ? ` · 输入「${s.inputText}」` : (s.direction ? ` · 方向 ${s.direction}` : '');
+      info.innerHTML = `
+        <div class="job-log-head">
+          <div class="job-log-title"><span>第 ${s.index} 步 · ${escapeHTML(s.action)}</span><span class="muted" style="font-size:11.5px;font-weight:400">${s.durationMs || 0} ms</span></div>
+          <span class="job-log-badge ${badgeCls}">${escapeHTML(statusLabel(s.status))}</span>
+        </div>
+        ${s.thought ? `<div style="font-size:13px;color:var(--ink-2);line-height:1.55"><b>AI 思考：</b>${escapeHTML(s.thought)}</div>` : ''}
+        ${(targetDesc || extraDesc) ? `<div class="job-log-dev">${escapeHTML(targetDesc + extraDesc)}</div>` : ''}
+        ${s.error ? `<div class="job-log-err">${escapeHTML(s.error)}</div>` : ''}
+      `;
+      card.append(info);
+      box.append(card);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function startPolling(taskId) {
+    activeTaskId = taskId;
+    if (pollTimer) clearInterval(pollTimer);
+    const tick = async () => {
+      if (!activeTaskId) return;
+      try {
+        const task = await api('/api/admin/ai/tasks/' + encodeURIComponent(activeTaskId));
+        renderTaskDetail(task);
+        if (task.status !== 'running') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          loadAIHistory();
+        }
+      } catch (_) {}
+    };
+    tick();
+    pollTimer = setInterval(tick, 1800);
+  }
+
+  async function startAIRun() {
+    const deviceId = el('aiDeviceSelect').value;
+    const prompt = el('aiPromptInput').value.trim();
+    const mode = el('aiModeSelect').value;
+    if (!deviceId) { toast('请先选择一台 ADB 在线设备'); return; }
+    if (!prompt) { toast('请输入自然语言任务指令'); return; }
+    try {
+      const task = await api('/api/admin/ai/run', {
+        method: 'POST',
+        body: JSON.stringify({ deviceId, prompt, mode }),
+      });
+      toast('AI 智能体已启动，正在实时执行…');
+      renderTaskDetail(task);
+      startPolling(task.id);
+    } catch (e) {
+      toast('启动失败：' + e.message);
+    }
+  }
+
+  async function stopAIRun() {
+    if (!activeTaskId) return;
+    try {
+      await api('/api/admin/ai/tasks/' + encodeURIComponent(activeTaskId) + '/stop', { method: 'POST' });
+      toast('已发送中止指令');
+    } catch (e) {
+      toast('中止失败：' + e.message);
+    }
+  }
+
+  async function loadAIHistory() {
+    const tbody = el('aiHistoryRows');
+    if (!tbody) return;
+    try {
+      const list = await api('/api/admin/ai/tasks');
+      tbody.replaceChildren();
+      if (!list || !list.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="table-empty">暂无 AI 任务记录</td></tr>';
+        return;
+      }
+      list.forEach(t => {
+        const tr = document.createElement('tr');
+        const modeTxt = t.mode === 'pure' ? '纯净视觉' : '极速 SoM';
+        const resTxt = t.result || t.error || '—';
+        tr.innerHTML = `
+          <td class="name-cell">${escapeHTML(t.deviceName || t.deviceId)}</td>
+          <td>${modeTxt}</td>
+          <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(t.prompt)}">${escapeHTML(t.prompt)}</td>
+          <td class="num-cell">${(t.steps || []).length} 步</td>
+          <td>${escapeHTML(statusLabel(t.status))}</td>
+          <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(resTxt)}">${escapeHTML(resTxt)}</td>
+          <td class="action-cell"><div class="actions" style="flex-wrap:nowrap"><button class="secondary" type="button">查看轨迹</button></div></td>
+        `;
+        tr.querySelector('button').onclick = () => {
+          // 切回执行页展示完整带图轨迹
+          const runTab = tabsWrap && tabsWrap.querySelector('[data-tab="run"]');
+          if (runTab) runTab.click();
+          startPolling(t.id);
+        };
+        tbody.append(tr);
+      });
+    } catch (_) {}
+  }
+
+  el('aiRunBtn')?.addEventListener('click', startAIRun);
+  el('aiStopBtn')?.addEventListener('click', stopAIRun);
+  el('aiCfgSaveBtn')?.addEventListener('click', saveAISettings);
+  el('aiCfgTestBtn')?.addEventListener('click', testAISettings);
+  el('aiRefreshHistoryBtn')?.addEventListener('click', loadAIHistory);
+
+  window.renderAIAgentPage = function () {
+    refreshAIDeviceSelect();
+    loadAISettings();
+    loadAIHistory();
+  };
 })();
 </script>
 </body>

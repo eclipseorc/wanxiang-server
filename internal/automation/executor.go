@@ -104,6 +104,8 @@ func (x *Executor) runOnDevice(ctx context.Context, jobID, deviceID string, flow
 		log.Printf("automation resolve serial device=%s: %v", deviceID, err)
 		return false
 	}
+	// 执行 RPA 流程前先唤醒息屏并解除无密码锁屏（KEYCODE_WAKEUP 224 幂等，已亮屏无副作用）。
+	_, _ = x.adb.Shell(ctx, serial, "input keyevent 224 && wm dismiss-keyguard")
 
 	allOK := true
 	for i, step := range flow.Steps {

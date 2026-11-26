@@ -340,7 +340,7 @@ func (r *Router) handleAutomationUITree(w http.ResponseWriter, req *http.Request
 		fail(w, http.StatusBadRequest, "deviceId or serial required")
 		return
 	}
-	nodes, err := automation.DumpUIHierarchy(req.Context(), r.scrcpy, serial)
+	nodes, err := automation.DumpUIHierarchyForDevice(req.Context(), r.scrcpy, deviceID, serial)
 	if err != nil {
 		fail(w, http.StatusBadGateway, "抓取手机控件树失败: "+err.Error())
 		return
