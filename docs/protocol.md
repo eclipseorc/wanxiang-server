@@ -43,4 +43,4 @@
   ```json
   {"type":"com","command":"error","requestId":"...","data":{"code":"unsupported_command","message":"unsupported command"}}
   ```
-- **扩展约定**：新增命令必须在 `internal/transport/websocket/commands.go` 显式定义常量、载荷结构与处理逻辑，并补充单测；涉及状态变更的命令必须校验角色与 `CanAccess` 权限。
+- **扩展约定**：所有 WebSocket 入站消息与 `com` 命令均统一注册在 `internal/transport/websocket/commands.go`（设备端 `deviceRoutes`、管理端 `adminRoutes`、`com` 信封 `comHandlers`），新增命令只需在对应注册表加一行并补充单测，无需改动 `server.go`；涉及状态变更的命令必须校验角色与 `CanAccess` 权限。

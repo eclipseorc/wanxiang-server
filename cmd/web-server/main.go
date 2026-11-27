@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+	defer app.SetupLogging("web-server")()
 	if err := app.RunWeb(); err != nil {
 		log.Fatal(err)
 	}

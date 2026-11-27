@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	defer app.SetupLogging("admin-server")()
 	if err := app.RunAdmin(); err != nil {
 		log.Fatal(err)
 	}

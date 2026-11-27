@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+	defer app.SetupLogging("scrcpy-server")()
 	if err := app.RunScrcpy(); err != nil {
 		log.Fatal(err)
 	}

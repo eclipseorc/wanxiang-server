@@ -815,11 +815,13 @@
     showManualSetup(reasonMsg) {
       this.stage.classList.add('hidden');
       this.setup.classList.remove('hidden');
-      // 若该设备之前通过「传统模式」连接过（保存了 tcpipIp 且未用过无线调试配对码），
-      // 自动切到传统模式并检测 5555 是否已在线，不影响无线调试模式设备。
+      // 无线调试模式设备直连失败时保持停留在「无线调试模式」，避免误切到传统模式；
+      // 仅当设备明确为传统模式（tcpip）或历史仅通过传统模式连过时才切到传统模式。
       if (this.device) {
         const saved = loadSavedConfig(this.device.id) || {};
-        if (saved.tcpipIp && !saved.pairPort) {
+        if (this.device.adbMode === 'wireless') {
+          this.setMode('wireless');
+        } else if (this.device.adbMode === 'tcpip' || (saved.tcpipIp && !saved.pairPort)) {
           this.setMode('tcpip');
         }
       }

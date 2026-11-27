@@ -155,6 +155,8 @@ func (c *AdbConnector) ConnectAfterReady(ctx context.Context, deviceID, ip strin
 	if err := c.adb.Connect(ctx, ip, port); err != nil {
 		return false, err
 	}
+	// 连上后顺手补授 WRITE_SECURE_SETTINGS（幂等），确保后续可后台静默自恢复。
+	_, _ = c.adb.Shell(ctx, serial, "pm grant com.wanxiang.client android.permission.WRITE_SECURE_SETTINGS")
 	if err := c.svc.Store.SetDeviceAdbWithMode(deviceID, ip, port, true, "auto"); err != nil {
 		return false, err
 	}

@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	defer app.SetupLogging("wanxiang")()
 	app.Supervise([]app.Service{
 		{Name: "web", Run: app.RunWeb},
 		{Name: "admin", Run: app.RunAdmin},

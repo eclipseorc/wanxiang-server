@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -431,98 +430,11 @@ func (h *Handler) removeAdmin(c *client) {
 	c.close()
 }
 
-// handleDevice 处理设备端消息；设备消息通常是心跳、状态上报或命令回执。
+// handleDevice 按 commands.go 中的 deviceRoutes 注册表分发设备端消息。
 func (h *Handler) handleDevice(c *client, message map[string]any) {
-	switch message["type"] {
-	case commandType:
-		h.handleCommand(c, message)
-	case "join":
-		_ = c.send(map[string]string{"type": "joined", "deviceId": c.id})
-	case "out":
-		_ = c.send(map[string]string{"type": "out-ack"})
-		c.close()
-	case "heartbeat":
-		battery := intValue(message["battery"])
-		if battery < 0 || battery > 100 {
-			battery = 0
-		}
-		rtt := int64(intValue(message["rttMs"]))
-		if rtt < 0 || rtt > 60000 {
-			rtt = 0
-		}
-		status, _ := message["status"].(string)
-		if len(status) > maxPayloadBytes {
-			status = status[:maxPayloadBytes]
-		}
-		// 记录设备上报的本机 IP，供 ADB 掉线判断使用（deviceId → IP 内存映射）。
-		// 若设备断网切网导致局域网 IP 变化，立即同步更新数据库 adb_ip 并尝试用新 IP 重连 ADB。
-		if ip, _ := message["ip"].(string); ip != "" {
-			ip = strings.TrimSpace(ip)
-			if len(ip) > 64 {
-				ip = ip[:64]
-			}
-			if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
-				h.hub.mu.Lock()
-				prevIP := h.hub.deviceIPs[c.id]
-				h.hub.deviceIPs[c.id] = ip
-				h.hub.mu.Unlock()
-				if prevIP != ip {
-					h.syncDeviceIPChange(c.id, ip)
-				}
-			}
-		}
-		if err := h.hub.store.UpdateDeviceState(c.id, battery, rtt, status); err != nil {
-			log.Printf("device heartbeat state update failed device_id=%s: %v", c.id, err)
-		}
-		_ = c.send(map[string]any{"type": "heartbeat-ack", "sentAt": message["sentAt"]})
-		h.hub.broadcastDevice(c.id, "device-state", map[string]any{
-			"battery": battery, "rttMs": rtt, "status": status, "lastSeen": time.Now().Unix(),
-		})
-	case "adb-ready":
-		h.handleAdbReady(c, message)
-	case "adb-pair-request":
-		h.handleAdbPairRequest(c, message)
-	case "ui-tree-result":
-		reqID, _ := message["reqId"].(string)
-		if reqID == "" {
-			return
-		}
-		h.hub.mu.RLock()
-		ch := h.hub.uiTreeWaiters[reqID]
-		h.hub.mu.RUnlock()
-		if ch == nil {
-			return
-		}
-		okVal, _ := message["ok"].(bool)
-		if !okVal {
-			select {
-			case ch <- nil:
-			default:
-			}
-			return
-		}
-		rawNodes, err := json.Marshal(message["nodes"])
-		if err != nil {
-			rawNodes = nil
-		}
-		select {
-		case ch <- rawNodes:
-		default:
-		}
-	case "pull-device-script":
-		// 设备端（连接建立后）主动拉取本机型号对应的「自动配对」机型脚本。
-		h.sendDeviceScript(c)
-	case "status":
-		h.hub.broadcastDevice(c.id, "device-state", boundedPayload(message["data"]))
-	case "command-result":
-		// 只挑必要字段转发，避免设备提交的任意字段被放大广播给所有管理端。
-		payload := make(map[string]any, 4)
-		for _, key := range []string{"commandId", "requestId", "ok", "result"} {
-			if value, ok := message[key]; ok {
-				payload[key] = boundedPayload(value)
-			}
-		}
-		h.hub.broadcastDevice(c.id, "command-result", payload)
+	msgType, _ := message["type"].(string)
+	if fn, ok := deviceRoutes[msgType]; ok {
+		fn(h, c, message)
 	}
 }
 
@@ -671,8 +583,11 @@ func (h *Handler) handleAdbPairRequest(c *client, message map[string]any) {
 			if err != nil {
 				errMsg = err.Error()
 			}
-			log.Printf("adb-pair-request failed device_id=%s ip=%s:%d err=%s", c.id, ip, pairPort, errMsg)
-			_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": false, "error": errMsg})
+			// 若 adb pair 本身已成功、仅因旧 connectPort 失效未连上，标记 paired=true，
+			// 让手机端用本机 NsdManager 探测最新实时端口再上报 adb-ready。
+			paired := strings.Contains(errMsg, "配对成功")
+			log.Printf("adb-pair-request failed device_id=%s ip=%s:%d paired=%v err=%s", c.id, ip, pairPort, paired, errMsg)
+			_ = c.send(map[string]any{"type": "adb-pair-ack", "ok": false, "paired": paired, "error": errMsg})
 			return
 		}
 		h.hub.mu.Lock()
@@ -750,15 +665,11 @@ func (h *Handler) sendSnapshot(c *client, user sqlite.User) {
 	_ = c.send(map[string]any{"type": "device-list", "devices": visible})
 }
 
-// handleAdmin 处理管理员端消息：包括权限校验、设备控制与命令下发。
+// handleAdmin 按 commands.go 中的 adminRoutes 注册表分发管理端消息。
 func (h *Handler) handleAdmin(c *client, user sqlite.User, message map[string]any) {
-	switch message["type"] {
-	case commandType:
-		h.handleCommand(c, message)
-	case "device-control":
-		h.handleDeviceControl(c, user, message)
-	case "ping":
-		_ = c.send(map[string]any{"type": "pong", "sentAt": message["sentAt"]})
+	msgType, _ := message["type"].(string)
+	if fn, ok := adminRoutes[msgType]; ok {
+		fn(h, c, user, message)
 	}
 }
 
@@ -783,9 +694,9 @@ func (h *Handler) sendDeviceScript(c *client) {
 		return
 	}
 	_ = c.send(map[string]any{
-		"type":    "device-script",
-		"found":   true,
-		"model":   device.Model,
+		"type":  "device-script",
+		"found": true,
+		"model": device.Model,
 		"script": map[string]any{
 			"scriptId":      script.ID,
 			"name":          script.Name,
@@ -794,24 +705,6 @@ func (h *Handler) sendDeviceScript(c *client) {
 			"version":       script.Version,
 		},
 	})
-}
-
-// handleCommand 负责把 message 解析为统一的 CommandMessage，再调用命令分发器处理。
-func (h *Handler) handleCommand(c *client, raw map[string]any) {
-	encoded, err := json.Marshal(raw)
-	if err != nil {
-		_ = c.send(newCommandError("", commandInvalid, "invalid command message"))
-		return
-	}
-	var message CommandMessage
-	if err := json.Unmarshal(encoded, &message); err != nil {
-		_ = c.send(newCommandError("", commandInvalid, "invalid command message"))
-		return
-	}
-	response := dispatchCommand(message)
-	if err := c.send(response); err != nil {
-		log.Printf("websocket command response failed kind=%s id=%s command=%s: %v", c.kind, c.id, response.Command, err)
-	}
 }
 
 // broadcastDevice 把设备状态广播给所有有权限查看该设备的管理员。

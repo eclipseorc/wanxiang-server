@@ -54,6 +54,6 @@ go build -o bin/wanxiang.exe ./cmd/wanxiang
 ## 编码与兼容约定
 
 - **对外契约只增不减**：HTTP 路径、JSON 字段、`com` 命令、WS `type` 不改名不删除；导出函数签名优先通过新增变体/Options 扩展。
-- **命名防冲突**：`websocket/commands.go` 中 `commandError` 是常量，构造错误函数保持 `newCommandError`。
+- **命令注册表**：所有 WebSocket 消息与 `com` 命令统一注册在 `internal/transport/websocket/commands.go`（`deviceRoutes` / `adminRoutes` / `comHandlers`），新增命令直接在此注册，无需改 `server.go`；`commandError` 是常量，构造错误函数保持 `newCommandError`。
 - **前端脚本顺序**：admin-server 注入顺序固定为 `ws-framework.js` → `admin-dashboard-bridge.js` → `modules/*.js` → `admin-heartbeat.js`，不可打乱。
 - **注释与测试**：Go 文件需带中文注释（解释「为什么」而非复述代码）；复用包返回错误，禁止在包内 `os.Exit`；修 bug 补回归测试；改公开 API 或环境变量时同步更新 `README.md` 与 `.env.example`。

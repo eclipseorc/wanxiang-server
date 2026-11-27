@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	defer app.SetupLogging("websocket-server")()
 	if err := app.RunWebsocket(); err != nil {
 		log.Fatal(err)
 	}
